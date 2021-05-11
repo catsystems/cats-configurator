@@ -1,30 +1,9 @@
-<template>
-  <div id="app">
-    <router-view></router-view>
-  </div>
-</template>
-
-<script>
-  export default {
-    name: 'cats-configurator'
-  }
-</script>
-
-<style>
 /* Style the header with a grey background and some padding */
-
-html, #app, #app > div{
-	height:100%;
-}
 
 body { 
     margin: 0;
     font-family: Arial, Helvetica, sans-serif;
-	position: relative;
-	height: 100%;
   }
-
-
 
 #main  {background:#888; height:100%; padding:60px 0 40px; box-sizing:border-box;}
   
@@ -33,11 +12,6 @@ body {
     overflow: hidden;
     background-color: #464646;
     padding: 20px 10px;
-	z-index: 2;
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
   }
   
   /* Style the header links */
@@ -78,14 +52,13 @@ body {
   .sidenav {
     height: 100%;
     width: 250px;
-    position: absolute;
-	box-sizing: border-box;
-	padding-top:89px;
-	top:0;
-    z-index: 1;
+    position: fixed;
+    /* z-index: 1; */
+    top: 0;
     left: 0;
     background-color: #111;
     overflow-x: hidden;
+    padding-top: 10px;
   }
   
   .sidenav a {
@@ -108,13 +81,16 @@ body {
     margin-left: 50px;
   }
   
-  #content{
-	box-sizing: border-box;
-    position: absolute;
-    left: 250px;
-	top:0;
-	padding-top: 89px;
-	height:100%;
+  
+  /* Add media queries for responsiveness - when the screen is 500px wide or less, stack the links on top of each other */
+  @media screen and (max-width: 500px) {
+    .header a {
+      float: none;
+      display: block;
+      text-align: left;
+    }
+    .header-right {
+      float: none;
+    }
   }
 
-</style>

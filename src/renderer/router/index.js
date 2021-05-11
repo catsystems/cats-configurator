@@ -8,7 +8,7 @@ export default new Router({
     {
       path: '/',
       name: 'home-page',
-      component: require('@/components/HelloWorld').default
+      component: require('@/components/Home').default
     },
     {
       path: '/landing',

@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <layout>
 
         <router-link to="/landing">Landing page</router-link>
         <button v-on:click="serial_list">List</button>
@@ -11,10 +11,12 @@
 
         
         
-    </div>
+    </layout>
 </template>
 
 <script>
+
+import Layout from './Layout.vue';
 
 const SerialPort = require("serialport");
 const Readline = require('@serialport/parser-readline')
@@ -30,6 +32,10 @@ var intervalId = setInterval(function() {
 
 
 export default {
+
+    components: {
+        Layout
+    },
 
     methods: {
     serial_list: function () {
