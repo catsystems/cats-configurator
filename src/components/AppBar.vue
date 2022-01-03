@@ -49,6 +49,7 @@
         v-if="!active"
         color="primary"
         class="ml-2"
+        style="width: 120px"
         :loading="connectBtnLoading"
         :disabled="!selectedPort"
         @click="connect"
@@ -59,6 +60,7 @@
         v-else
         color="error"
         class="ml-2"
+        style="width: 120px"
         :loading="connectBtnLoading"
         @click="disconnect"
       >

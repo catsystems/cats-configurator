@@ -96,11 +96,11 @@ export const EVENT_SETTINGS = [
   { name: "Servo 3", args: [0, 180], type: "NUMBER", unit: "deg" },
   { name: "Servo 4", args: [0, 180], type: "NUMBER", unit: "deg" },
   {
-    name: "Loggin",
+    name: "Recorder",
     args: [
       { text: "OFF", value: 0 },
       { text: "PRE", value: 1 },
-      { text: "LOGGING", value: 2 },
+      { text: "LOG", value: 2 },
     ],
     type: "SELECT",
     unit: null,
@@ -108,9 +108,9 @@ export const EVENT_SETTINGS = [
 ];
 
 export const CONFIG_SETTINGS = {
-  main_altitude: { unit: "m" },
-  boot_state: { unit: null },
-  acc_threshhold: { unit: "m/s" },
+  boot_state: { name: "Mode", unit: null },
+  main_altitude: { name: "Main Altitude", unit: "m" },
+  acc_threshhold: { name: "Liftoff Threshold", unit: "m/s^2" },
 };
 
 export const LOG_ELEMENTS = [
@@ -130,5 +130,5 @@ export const LOG_ELEMENTS = [
 
 // KEYS:
 export const TIMER_KEYS = ["timer1", "timer2", "timer3", "timer4"];
-export const EVENT_KEYS = ["ev_moving", "ev_ready", "ev_liftoff", "ev_burnout"];
+export const EVENT_KEYS = ["ev_liftoff", "ev_burnout", "ev_apogee", "ev_lowalt", "ev_touchdown", "ev_custom1", "ev_custom2"];
 export const LOG_KEYS = ["rec_speed", "rec_elements"];

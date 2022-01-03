@@ -27,7 +27,7 @@ const routes = [
   },
   {
     path: "/timer",
-    name: "Timer",
+    name: "Timers",
     component: TimersView,
   },
   {

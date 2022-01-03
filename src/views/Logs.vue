@@ -62,7 +62,7 @@
       <v-row>
         <v-col>
           <v-card>
-            <v-card-title>Eelements</v-card-title>
+            <v-card-title>Elements</v-card-title>
             <v-card-text>
               <v-row dense>
                 <v-col

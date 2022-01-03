@@ -1,6 +1,6 @@
 {
   "name": "cats",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
@@ -15,6 +15,7 @@
   "main": "background.js",
   "dependencies": {
     "core-js": "^3.6.5",
+    "custom-electron-titlebar": "^3.2.10",
     "serialport": "^9.2.8",
     "vue": "^2.6.11",
     "vue-router": "^3.2.0",

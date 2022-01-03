@@ -28,7 +28,7 @@ export default {
       navItems: [
         { title: "Configuration", link: "/config" },
         { title: "Events", link: "/events" },
-        { title: "Timer", link: "/timer" },
+        { title: "Timers", link: "/timer" },
         { title: "Log", link: "/log" },
         { title: "CLI", link: "/cli" },
       ],

@@ -11,7 +11,7 @@
                   <v-col cols="6">
                     <div
                       class="text-capitalize py-2"
-                      v-text="key.replace('_', ' ')"
+                      v-text="data[key].name"
                     />
                   </v-col>
                   <v-col cols="6">
@@ -173,7 +173,7 @@ export default {
       if (this.timer) clearInterval(this.timer);
       this.timer = setInterval(() => {
         window.renderer.send("BOARD:INFO");
-      }, 1000 * 60 * 15); // every 15 min
+      }, 250); // every 250 ms
     },
     onSave() {
       if (!this.$refs.form.validate()) return;
