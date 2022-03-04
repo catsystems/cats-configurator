@@ -29,7 +29,7 @@ export default {
         { title: "Configuration", link: "/config" },
         { title: "Events", link: "/events" },
         { title: "Timers", link: "/timer" },
-        { title: "Log", link: "/log" },
+        //{ title: "Log", link: "/log" },
         { title: "CLI", link: "/cli" },
       ],
     };

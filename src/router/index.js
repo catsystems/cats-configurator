@@ -30,11 +30,11 @@ const routes = [
     name: "Timers",
     component: TimersView,
   },
-  {
+  /*{
     path: "/log",
     name: "Log",
     component: LogsView,
-  },
+  },*/
   {
     path: "/cli",
     name: "Cli",

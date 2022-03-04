@@ -29,6 +29,7 @@ function connect(path) {
   port = new SerialPort(path, CONFIG, function (err) {
     if (err) return sendToRenderer("CONNECTION_ERROR", err);
   });
+  
 
   parser = port.pipe(
     new Readline({
@@ -36,12 +37,14 @@ function connect(path) {
       encoding: "utf8",
     })
   );
+
   parser.on("data", onData);
 
   port.on("error", function (err) {
     sendAlert(err.message);
   });
   port.on("open", function () {
+    port.write('\n');
     command("version");
     sendToRenderer("CONNECTED");
   });
@@ -68,7 +71,12 @@ function onData(data) {
   if (cliMode) {
     return sendToRenderer("CLI_COMMAND", data);
   }
+  //console.log(data);
 
+  if (data.includes("CATS is now ready")){
+    command("version");
+  }
+  
   // Catch confirmation response
   if (data.includes("^._.^") || data === "version") {
     currentCommand = data === "version" ? "version" : parseCommand(data);

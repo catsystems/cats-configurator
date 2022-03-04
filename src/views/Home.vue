@@ -8,7 +8,7 @@
           If you are having issues connecting, please refer the getting started
           guid on
           <a
-            href="https://www.electronjs.org/docs/latest/tutorial/in-app-purchases"
+            href="https://github.com/catsystems/cats-embedded/wiki/Installation"
             target="_blank"
           >
             Github

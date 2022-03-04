@@ -16,9 +16,9 @@ protocol.registerSchemesAsPrivileged([
 async function createWindow() {
   // Create the browser window.
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 1000,
+    width: 1700,
+    height: 1000,
+    minWidth: 1200,
     minHeight: 800,
     webPreferences: {
       // Use pluginOptions.nodeIntegration, leave this alone
@@ -30,6 +30,10 @@ async function createWindow() {
   });
 
   win.removeMenu();
+  
+  win.webContents.on('did-finish-load',() => {
+    win.setTitle("CATS Configurator");
+  });
 
   if (process.env.WEBPACK_DEV_SERVER_URL) {
     // Load the url of the dev server if in development mode
@@ -62,7 +66,7 @@ app.on("activate", () => {
 // Some APIs can only be used after this event occurs.
 app.on("ready", async () => {
   subscribeListeners();
-
+  
   if (isDevelopment && !process.env.IS_TEST) {
     // Install Vue Devtools
     try {

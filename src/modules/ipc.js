@@ -9,7 +9,7 @@ export function subscribeListeners() {
   });
 
   ipcMain.on("BOARD:SET_CONFIG", async (event, [key, value]) => {
-    if (!key || !value) return;
+    if (!key) return;
     command(`set ${key} = ${value}`);
   });
 

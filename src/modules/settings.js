@@ -108,9 +108,9 @@ export const EVENT_SETTINGS = [
 ];
 
 export const CONFIG_SETTINGS = {
-  boot_state: { name: "Mode", unit: null },
+  //boot_state: { name: "Mode", unit: null },
   main_altitude: { name: "Main Altitude", unit: "m" },
-  acc_threshhold: { name: "Liftoff Threshold", unit: "m/s^2" },
+  acc_threshhold: { name: "Liftoff Threshold", unit: "mg" },
 };
 
 export const LOG_ELEMENTS = [
@@ -129,6 +129,6 @@ export const LOG_ELEMENTS = [
 ];
 
 // KEYS:
-export const TIMER_KEYS = ["timer1", "timer2", "timer3", "timer4"];
+export const TIMER_KEYS = ["timer1", "timer2"]; //, "timer3", "timer4"];
 export const EVENT_KEYS = ["ev_liftoff", "ev_burnout", "ev_apogee", "ev_lowalt", "ev_touchdown", "ev_custom1", "ev_custom2"];
 export const LOG_KEYS = ["rec_speed", "rec_elements"];
