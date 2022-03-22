@@ -110,7 +110,9 @@ export const EVENT_SETTINGS = [
 export const CONFIG_SETTINGS = {
   //boot_state: { name: "Mode", unit: null },
   main_altitude: { name: "Main Altitude", unit: "m" },
-  acc_threshhold: { name: "Liftoff Threshold", unit: "mg" },
+  acc_threshold: { name: "Liftoff Threshold", unit: "m/s^2" },
+  servo1_init_pos: { name: "Initial Position Servo 1", unit: "deg" },
+  servo2_init_pos: { name: "Initial Position Servo 2", unit: "deg" },
 };
 
 export const LOG_ELEMENTS = [

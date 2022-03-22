@@ -155,8 +155,9 @@ export default {
     },
     onSave() {
       if (!this.$refs.form.validate()) return;
-
-      setTimers(this.data);
+      // TODO fix this later
+      const { timer1_active, timer2_active, timer3_active, timer4_active, ...dataCopy } = this.data;
+      setTimers(dataCopy);
       this.init();
     },
     getEventName(key) {
