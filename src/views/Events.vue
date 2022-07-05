@@ -122,7 +122,9 @@ export default {
     },
     saveData() {
       setEvents(this.events);
-      getEvents();
+      setTimeout(function () {
+        getEvents();
+      }, 100);
     },
     isActionsFilled(event) {
       return event.actions.length >= Math.floor(event.arrayLength / 2);

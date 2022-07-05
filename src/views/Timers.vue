@@ -145,7 +145,7 @@ export default {
     },
     onSwitcherChange(key, active) {
       if (!active) this.data[`${key}_duration`].value = 0;
-      else this.data[`${key}_duration`].value = 1;
+      else this.data[`${key}_duration`].value = 1000;
     },
     onDurationChange(key, duration) {
       if (!duration) {

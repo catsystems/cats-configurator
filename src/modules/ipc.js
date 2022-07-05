@@ -28,7 +28,7 @@ export function subscribeListeners() {
   });
 
   ipcMain.on("BOARD:LOG_INFO", () => {
-    command("flash_info");
+    command("rec_info");
   });
 
   ipcMain.on("BOARD:DUMP", () => {

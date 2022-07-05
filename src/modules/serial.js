@@ -72,7 +72,6 @@ function onData(data) {
     return sendToRenderer("CLI_COMMAND", data);
   }
 
-  console.log(data);
   if (data.includes("CATS is now ready")){
     command("version");
   }
@@ -87,7 +86,7 @@ function onData(data) {
   if (!currentCommand) return;
 
   // Handle actual data
-  if (["version", "status", "flash_info"].includes(currentCommand)) {
+  if (["version", "status", "rec_info"].includes(currentCommand)) {
     const parsedData = parseData(currentCommand, data);
 
     sendToRenderer("BOARD:STATIC_DATA", parsedData);
