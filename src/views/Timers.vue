@@ -158,7 +158,9 @@ export default {
       // TODO fix this later
       const { timer1_active, timer2_active, timer3_active, timer4_active, ...dataCopy } = this.data;
       setTimers(dataCopy);
-      getTimers();
+      setTimeout(function () {
+        getTimers();
+      }, 100);
     },
     getEventName(key) {
       let name = key.split("");
