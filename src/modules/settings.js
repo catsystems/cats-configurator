@@ -131,6 +131,6 @@ export const LOG_ELEMENTS = [
 ];
 
 // KEYS:
-export const TIMER_KEYS = ["timer1", "timer2"]; //, "timer3", "timer4"];
+export const TIMER_KEYS = ["timer1", "timer2"] //, "timer3", "timer4"];
 export const EVENT_KEYS = ["ev_liftoff", "ev_burnout", "ev_apogee", "ev_lowalt", "ev_touchdown", "ev_custom1", "ev_custom2"];
 export const LOG_KEYS = ["rec_speed", "rec_elements"];
