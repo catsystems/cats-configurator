@@ -71,6 +71,7 @@ function onData(data) {
   if (cliMode) {
     return sendToRenderer("CLI_COMMAND", data);
   }
+  // console.log(data);
 
   if (data.includes("CATS is now ready")){
     command("version");

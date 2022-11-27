@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld("renderer", {
   send: (channel, data) => {
     let validChannels = CHANNELS;
     if (validChannels.includes(channel)) {
+      // console.log(channel +"  " + data);
       ipcRenderer.send(channel, data);
     }
   },

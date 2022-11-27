@@ -110,7 +110,8 @@ export const EVENT_SETTINGS = [
 export const CONFIG_SETTINGS = {
   //boot_state: { name: "Mode", unit: null },
   main_altitude: { name: "Main Altitude", unit: "m" },
-  acc_threshold: { name: "Liftoff Threshold", unit: "m/s^2" },
+  liftoff_detection_agl: {name: "Liftoff Detection Height", unit: "m"},
+  acc_threshold: { name: "Liftoff Detection Acceleration", unit: "m/s^2" },
   servo1_init_pos: { name: "Initial Position Servo 1", unit: "deg" },
   servo2_init_pos: { name: "Initial Position Servo 2", unit: "deg" },
 };
@@ -131,6 +132,29 @@ export const LOG_ELEMENTS = [
 ];
 
 // KEYS:
-export const TIMER_KEYS = ["timer1", "timer2"] //, "timer3", "timer4"];
-export const EVENT_KEYS = ["ev_liftoff", "ev_burnout", "ev_apogee", "ev_lowalt", "ev_touchdown", "ev_custom1", "ev_custom2"];
+// TODO: setting timer 4 doesn't work because something interrupts the setting:
+// ^._.^:/> set timer1_start = MOVING
+// timer1_start set to MOVING
+// ^._.^:/> set timer1_duration = 0
+// timer1_duration set to 0
+// ^._.^:/> set timer1_trigger = MOVING
+// timer1_trigger set to MOVING
+// ^._.^:/> set timer2_start = MOVING
+// timer2_start set to MOVING
+// ^._.^:/> set timer2_duration = 0
+// timer2_duration set to 0
+// ^._.^:/> set timer2_trigger = MOVING
+// timer2_trigger set to MOVING
+// ^._.^:/> set timer3_start = MOVING
+// timer3_start set to MOVING
+// ^._.^:/> set timer3_duration = 0
+// timer3_duration set to 0
+// ^._.^:/> set timer3_trigger = MOVING
+// timer3_trigger set to MOVING
+// ^._.^:/> set timer4_sG                           <----- problem
+// ERROR IN set: INVALID NAME:
+// ^._.^:/> save
+// Successfully written to flash
+export const TIMER_KEYS = ["timer1", "timer2"]; //, "timer3", "timer4"];
+export const EVENT_KEYS = ["ev_liftoff", "ev_burnout", "ev_apogee", "ev_main_deployment", "ev_touchdown", "ev_custom1", "ev_custom2"];
 export const LOG_KEYS = ["rec_speed", "rec_elements"];

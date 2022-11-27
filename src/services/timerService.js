@@ -5,7 +5,9 @@ export function getTimers() {
 }
 
 export function setTimers(data) {
+  // console.log("SETTING TIMERS");
   Object.keys(data).forEach((key) => {
+    // console.log("SETTING TIMER " + key);
     window.renderer.send("BOARD:SET_CONFIG", [key, data[key].value]);
   });
 

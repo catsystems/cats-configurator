@@ -20,7 +20,7 @@ export function subscribeListeners() {
   ipcMain.on("BOARD:TIMERS", async (event, key) => {
     command(`get ${key}_start`);
     command(`get ${key}_duration`);
-    command(`get ${key}_end`);
+    command(`get ${key}_trigger`);
   });
 
   ipcMain.on("BOARD:INFO", () => {

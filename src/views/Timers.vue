@@ -71,12 +71,12 @@
                 </v-row>
                 <v-row dense>
                   <v-col cols="5">
-                    <div class="text-capitalize py-2">End</div>
+                    <div class="text-capitalize py-2">Trigger</div>
                   </v-col>
                   <v-col>
                     <v-select
-                      v-model="data[`${key}_end`].value"
-                      :items="data[`${key}_end`].allowedValues"
+                      v-model="data[`${key}_trigger`].value"
+                      :items="data[`${key}_trigger`].allowedValues"
                       solo
                       dense
                       hide-details
@@ -156,8 +156,15 @@ export default {
     onSave() {
       if (!this.$refs.form.validate()) return;
       // TODO fix this later
-      const { timer1_active, timer2_active, timer3_active, timer4_active, ...dataCopy } = this.data;
+      const {
+        timer1_active,
+        timer2_active,
+        timer3_active,
+        timer4_active,
+        ...dataCopy
+      } = this.data;
       setTimers(dataCopy);
+
       setTimeout(function () {
         getTimers();
       }, 100);
