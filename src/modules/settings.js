@@ -91,10 +91,10 @@ export const EVENT_SETTINGS = [
     type: "SELECT",
     unit: null,
   },
-  { name: "Servo 1", args: [0, 180], type: "NUMBER", unit: "deg" },
-  { name: "Servo 2", args: [0, 180], type: "NUMBER", unit: "deg" },
-  { name: "Servo 3", args: [0, 180], type: "NUMBER", unit: "deg" },
-  { name: "Servo 4", args: [0, 180], type: "NUMBER", unit: "deg" },
+  { name: "Servo 1", args: [0, 1000], type: "NUMBER", unit: "‰" },
+  { name: "Servo 2", args: [0, 1000], type: "NUMBER", unit: "‰" },
+  { name: "Servo 3", args: [0, 1000], type: "NUMBER", unit: "‰" },
+  { name: "Servo 4", args: [0, 1000], type: "NUMBER", unit: "‰" },
   {
     name: "Recorder",
     args: [
@@ -112,8 +112,8 @@ export const CONFIG_SETTINGS = {
   main_altitude: { name: "Main Altitude", unit: "m" },
   liftoff_detection_agl: {name: "Liftoff Detection Height", unit: "m"},
   acc_threshold: { name: "Liftoff Detection Acceleration", unit: "m/s^2" },
-  servo1_init_pos: { name: "Initial Position Servo 1", unit: "deg" },
-  servo2_init_pos: { name: "Initial Position Servo 2", unit: "deg" },
+  servo1_init_pos: { name: "Initial Position Servo 1", unit: "‰" },
+  servo2_init_pos: { name: "Initial Position Servo 2", unit: "‰" },
 };
 
 export const LOG_ELEMENTS = [
