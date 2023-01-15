@@ -1,11 +1,10 @@
-import SerialPort from "serialport";
+import { SerialPort, ReadlineParser } from "serialport";
 import { BrowserWindow, Notification, dialog } from "electron";
 import fs from "fs";
 import path from "path";
 
 import { EVENT_SETTINGS } from "./settings.js";
 
-const Readline = SerialPort.parsers.Readline;
 const CONFIG = {
   baudRate: 115200,
 };
@@ -29,10 +28,9 @@ function connect(path) {
   port = new SerialPort(path, CONFIG, function (err) {
     if (err) return sendToRenderer("CONNECTION_ERROR", err);
   });
-  
 
   parser = port.pipe(
-    new Readline({
+    new ReadlineParser({
       delimiter: "\r\n",
       encoding: "utf8",
     })
