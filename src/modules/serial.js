@@ -25,7 +25,7 @@ async function getList() {
 function connect(path) {
   mainWindow = BrowserWindow.getFocusedWindow();
 
-  port = new SerialPort(path, CONFIG, function (err) {
+  port = new SerialPort({ ...CONFIG, path }, function (err) {
     if (err) return sendToRenderer("CONNECTION_ERROR", err);
   });
 
@@ -42,17 +42,17 @@ function connect(path) {
     sendAlert(err.message);
   });
   port.on("open", function () {
-    port.write('\n');
+    port.write("\n");
     command("version");
     sendToRenderer("CONNECTED");
   });
 
   port.on("close", function () {
     notify({
-      title: 'Port is disconnected.',
+      title: "Port is disconnected.",
     });
 
-    sendToRenderer("DISCONNECTED")
+    sendToRenderer("DISCONNECTED");
   });
 }
 
@@ -71,10 +71,10 @@ function onData(data) {
   }
   // console.log(data);
 
-  if (data.includes("CATS is now ready")){
+  if (data.includes("CATS is now ready")) {
     command("version");
   }
-  
+
   // Catch confirmation response
   if (data.includes("^._.^") || data === "version") {
     currentCommand = data === "version" ? "version" : parseCommand(data);
