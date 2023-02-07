@@ -108,12 +108,16 @@ export const EVENT_SETTINGS = [
 ];
 
 export const CONFIG_SETTINGS = {
-  //boot_state: { name: "Mode", unit: null },
   main_altitude: { name: "Main Altitude", unit: "m" },
   liftoff_detection_agl: {name: "Liftoff Detection Height", unit: "m"},
   acc_threshold: { name: "Liftoff Detection Acceleration", unit: "m/s^2" },
   servo1_init_pos: { name: "Initial Position Servo 1", unit: "‰" },
   servo2_init_pos: { name: "Initial Position Servo 2", unit: "‰" },
+};
+
+export const TELEMETRY_SETTINGS = {
+  tele_power_level: { name: "Telemetry Power Level", unit: "dBm" },
+  tele_adaptive_power: {name: "Adaptive Power Level", unit: null},
 };
 
 export const LOG_ELEMENTS = [
@@ -155,6 +159,6 @@ export const LOG_ELEMENTS = [
 // ERROR IN set: INVALID NAME:
 // ^._.^:/> save
 // Successfully written to flash
-export const TIMER_KEYS = ["timer1", "timer2"]; //, "timer3", "timer4"];
+export const TIMER_KEYS = ["timer1", "timer2", "timer3", "timer4"];
 export const EVENT_KEYS = ["ev_liftoff", "ev_burnout", "ev_apogee", "ev_main_deployment", "ev_touchdown", "ev_custom1", "ev_custom2"];
 export const LOG_KEYS = ["rec_speed", "rec_elements"];

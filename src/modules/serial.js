@@ -69,25 +69,43 @@ function onData(data) {
   if (cliMode) {
     return sendToRenderer("CLI_COMMAND", data);
   }
-  // console.log(data);
+  console.log(data);
 
   if (data.includes("CATS is now ready")) {
     command("version");
   }
-
   // Catch confirmation response
   if (data.includes("^._.^") || data === "version") {
     currentCommand = data === "version" ? "version" : parseCommand(data);
-
     return;
   }
 
   if (!currentCommand) return;
 
   // Handle actual data
-  if (["version", "status", "rec_info"].includes(currentCommand)) {
+  if (["version"].includes(currentCommand)) {
     const parsedData = parseData(currentCommand, data);
+    sendToRenderer("BOARD:STATIC_DATA", parsedData);
 
+    // Check if it's CATS board
+    if (currentCommand === "version" && data.includes("Board: CATS")) {
+      notify({
+        title: `Connected to: ${port.path}`,
+        body: data,
+      });
+
+      sendToRenderer("SET_ACTIVE", true);
+    } else {
+      disconnect();
+    }
+
+    return;
+  }
+
+  // Handle actual data
+  if (["status", "rec_info"].includes(currentCommand)) {
+    const parsedData = parseData(currentCommand, data);
+    console.log(parsedData)
     sendToRenderer("BOARD:STATIC_DATA", parsedData);
 
     // Check if it's CATS board
@@ -251,6 +269,7 @@ function parseEventData(value, maxLength) {
 
 async function command(cmd) {
   cliMode = false;
+  console.log(cmd);
   port.write(`${cmd}\n`, function (err) {
     if (err) {
       return sendAlert(err.message);
