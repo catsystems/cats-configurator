@@ -263,7 +263,7 @@ export default {
     window.renderer.on("BOARD:DUMP", () => (this.backupLoading = false));
     window.renderer.on("BOARD:RESTORE", () => {
       this.restoreLoading = false;
-      this.init();
+      setTimeout(this.init, 100);
     });
   },
   beforeDestroy() {

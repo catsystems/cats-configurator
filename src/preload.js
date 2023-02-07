@@ -23,6 +23,7 @@ const CHANNELS = [
   "BOARD:LOG_INFO",
   "BOARD:SAVE",
   "CLI_COMMAND",
+  "LOAD_FLIGHTLOG",
 ];
 
 // Expose ipcRenderer to the client
