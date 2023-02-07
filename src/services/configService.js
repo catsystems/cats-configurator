@@ -1,4 +1,4 @@
-import { CONFIG_SETTINGS } from "@/modules/settings.js";
+import { CONFIG_SETTINGS, TELEMETRY_SETTINGS } from "@/modules/settings.js";
 
 export function getConfigs() {
   Object.keys(CONFIG_SETTINGS).forEach((key) =>
