@@ -108,16 +108,14 @@ export const EVENT_SETTINGS = [
 ];
 
 export const CONFIG_SETTINGS = {
-  main_altitude: { name: "Main Altitude", unit: "m" },
-  liftoff_detection_agl: {name: "Liftoff Detection Height", unit: "m"},
-  acc_threshold: { name: "Liftoff Detection Acceleration", unit: "m/s^2" },
-  servo1_init_pos: { name: "Initial Position Servo 1", unit: "‰" },
-  servo2_init_pos: { name: "Initial Position Servo 2", unit: "‰" },
-};
-
-export const TELEMETRY_SETTINGS = {
-  tele_power_level: { name: "Telemetry Power Level", unit: "dBm" },
-  tele_adaptive_power: {name: "Adaptive Power Level", unit: null},
+  main_altitude: {section: "general", name: "Main Altitude", unit: "m" },
+  liftoff_detection_agl: {section: "general",name: "Liftoff Detection Height", unit: "m"},
+  acc_threshold: {section: "general", name: "Liftoff Detection Acceleration", unit: "m/s^2" },
+  servo1_init_pos: {section: "general", name: "Initial Position Servo 1", unit: "‰" },
+  servo2_init_pos: {section: "general", name: "Initial Position Servo 2", unit: "‰" },
+  tele_link_phrase: {section: "telemetry", name: "Link Phrase", unit: null},
+  tele_power_level: {section: "telemetry", name: "Telemetry Power Level", unit: "dBm" },
+  tele_adaptive_power: {section: "telemetry", name: "Adaptive Power Level", unit: null},
 };
 
 export const LOG_ELEMENTS = [

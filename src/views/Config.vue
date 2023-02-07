@@ -8,13 +8,13 @@
             <v-card-text>
               <v-form ref="form">
                 <v-row v-for="key in Object.keys(data)" :key="key" dense>
-                  <v-col cols="6">
+                  <v-col cols="6" v-if="data[key].section === 'general'">
                     <div
                       class="text-capitalize py-2"
                       v-text="data[key].name"
                     />
                   </v-col>
-                  <v-col cols="6">
+                  <v-col cols="6" v-if="data[key].section === 'general'">
                     <v-select
                       v-if="data[key].type === 'SELECT'"
                       v-model="data[key].value"
@@ -38,6 +38,34 @@
                       ]"
                       :hint="data[key].allowedRange.join(' to ')"
                       type="number"
+                      hide-details="auto"
+                      solo
+                      dense
+                    >
+                      <template v-slot:append>
+                        {{ data[key].unit }}
+                      </template>
+                    </v-text-field>
+                    <v-text-field
+                      v-if="data[key].type === 'STRING'"
+                      v-model.number="data[key].value"
+                      :min="data[key].allowedRange[0]"
+                      :max="data[key].allowedRange[1]"
+                      :rules="[
+                        (v) => {
+                          if (v.length < data[key].allowedRange[0] ||
+                            v.length > data[key].allowedRange[1]) {
+                            return `String must have length between ${data[key].allowedRange.join(
+                              ' and '
+                            )}`
+                          } else if (v.match(/^[a-z0-9]+$/i) === null) {
+                            return `String may only contain alphanumeric characters`
+                          }
+                          return true
+                        }
+                      ]"
+                      :hint="data[key].allowedRange.join(' to ')"
+                      type="text"
                       hide-details="auto"
                       solo
                       dense
@@ -103,13 +131,13 @@
             <v-card-text>
               <v-form ref="form">
                 <v-row v-for="key in Object.keys(data)" :key="key" dense>
-                  <v-col cols="6">
+                  <v-col cols="6" v-if="data[key].section === 'telemetry'">
                     <div
                       class="text-capitalize py-2"
                       v-text="data[key].name"
                     />
                   </v-col>
-                  <v-col cols="6">
+                  <v-col cols="6" v-if="data[key].section === 'telemetry'">
                     <v-select
                       v-if="data[key].type === 'SELECT'"
                       v-model="data[key].value"
@@ -141,6 +169,34 @@
                         {{ data[key].unit }}
                       </template>
                     </v-text-field>
+                    <v-text-field
+                      v-if="data[key].type === 'STRING'"
+                      v-model.number="data[key].value"
+                      :min="data[key].allowedRange[0]"
+                      :max="data[key].allowedRange[1]"
+                      :rules="[
+                        (v) => {
+                          if (v.length < data[key].allowedRange[0] ||
+                            v.length > data[key].allowedRange[1]) {
+                            return `String must have length between ${data[key].allowedRange.join(
+                              ' and '
+                            )}`
+                          } else if (v.match(/^[a-z0-9]+$/i) === null) {
+                            return `String may only contain alphanumeric characters`
+                          }
+                          return true
+                        }
+                      ]"
+                      :hint="data[key].allowedRange.join(' to ')"
+                      type="text"
+                      hide-details="auto"
+                      solo
+                      dense
+                    >
+                      <template v-slot:append>
+                        {{ data[key].unit }}
+                      </template>
+                    </v-text-field>
                   </v-col>
                 </v-row>
               </v-form>
@@ -148,12 +204,6 @@
           </v-card>
         </v-col>
         <v-col>
-          <v-card v-if="status && status.length" height="100%">
-            <v-card-title>Info</v-card-title>
-            <v-card-text>
-              <p>Test</p>
-            </v-card-text>
-          </v-card>
         </v-col>
       </v-row>
     </v-container>
@@ -163,7 +213,7 @@
 
 <script>
 import { mapState, mapActions } from "vuex";
-import { getConfigs, getTelemetry, setConfigs } from "@/services/configService";
+import { getConfigs, setConfigs } from "@/services/configService";
 import ActionsBar from "@/components/ActionsBar";
 
 export default {
@@ -223,7 +273,6 @@ export default {
     ...mapActions(["setChangedTab"]),
     init() {
       getConfigs();
-      getTelemetry();
       this.getInfo();
     },
     getInfo() {
@@ -231,14 +280,13 @@ export default {
       if (this.timer) clearInterval(this.timer);
       this.timer = setInterval(() => {
         window.renderer.send("BOARD:INFO");
-      }, 25000); // every 250 ms
+      }, 250); // every 250 ms
     },
     onSave() {
       if (!this.$refs.form.validate()) return;
 
       setConfigs(this.data);
       getConfigs();
-      getTelemetry();
     },
     backupConfig() {
       this.backupLoading = true;

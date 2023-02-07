@@ -69,7 +69,6 @@ function onData(data) {
   if (cliMode) {
     return sendToRenderer("CLI_COMMAND", data);
   }
-  console.log(data);
 
   if (data.includes("CATS is now ready")) {
     command("version");
@@ -105,7 +104,6 @@ function onData(data) {
   // Handle actual data
   if (["status", "rec_info"].includes(currentCommand)) {
     const parsedData = parseData(currentCommand, data);
-    console.log(parsedData)
     sendToRenderer("BOARD:STATIC_DATA", parsedData);
 
     // Check if it's CATS board
@@ -135,6 +133,11 @@ function onData(data) {
         // Parse config allowed values
         config.type = "NUMBER";
         config.value = Number(config.value);
+        config.allowedRange = parseAllowedRange(data);
+      } else if (data.includes("String length:")) {
+        // Parse config allowed values
+        config.type = "STRING";
+        config.value = String(config.value);
         config.allowedRange = parseAllowedRange(data);
       } else if (data.includes("Array length:")) {
         // Parse config array length
@@ -269,7 +272,6 @@ function parseEventData(value, maxLength) {
 
 async function command(cmd) {
   cliMode = false;
-  console.log(cmd);
   port.write(`${cmd}\n`, function (err) {
     if (err) {
       return sendAlert(err.message);

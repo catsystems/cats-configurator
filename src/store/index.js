@@ -72,13 +72,17 @@ export default new Vuex.Store({
     },
     setConfig({ commit }, payload) {
       if (!payload.key) return;
-      
+
       payload.name = CONFIG_SETTINGS[payload.key]
       ? CONFIG_SETTINGS[payload.key].name
       : null;
 
       payload.unit = CONFIG_SETTINGS[payload.key]
         ? CONFIG_SETTINGS[payload.key].unit
+        : null;
+
+      payload.section = CONFIG_SETTINGS[payload.key]
+        ? CONFIG_SETTINGS[payload.key].section
         : null;
 
       commit("SET_CONFIG", payload);

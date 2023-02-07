@@ -6,12 +6,6 @@ export function getConfigs() {
   );
 }
 
-export function getTelemetry() {
-  Object.keys(TELEMETRY_SETTINGS).forEach((key) =>
-    window.renderer.send("BOARD:CONFIG", key)
-  );
-}
-
 export function setConfigs(data) {
   Object.keys(CONFIG_SETTINGS).forEach((key) => {
     window.renderer.send("BOARD:SET_CONFIG", [key, data[key].value]);
