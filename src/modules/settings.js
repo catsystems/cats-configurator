@@ -20,70 +20,7 @@ export const EVENT_SETTINGS = [
     unit: null,
   },
   {
-    name: "Pyro 3",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
-    name: "Pyro 4",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
-    name: "Pyro 5",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
-    name: "Pyro 6",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
     name: "IO 1",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
-    name: "IO 2",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
-    name: "IO 3",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
-    name: "IO 4",
     args: [
       { text: "OFF", value: 0 },
       { text: "ON", value: 1 },
@@ -93,8 +30,6 @@ export const EVENT_SETTINGS = [
   },
   { name: "Servo 1", args: [0, 1000], type: "NUMBER", unit: "‰" },
   { name: "Servo 2", args: [0, 1000], type: "NUMBER", unit: "‰" },
-  { name: "Servo 3", args: [0, 1000], type: "NUMBER", unit: "‰" },
-  { name: "Servo 4", args: [0, 1000], type: "NUMBER", unit: "‰" },
   {
     name: "Recorder",
     args: [
