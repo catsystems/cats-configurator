@@ -22,23 +22,38 @@
       </v-row>
       <v-row>
         <v-col>
-          <v-card>
-            <v-card-title> Load a flight log file </v-card-title>
+          <v-card
+            @drop.prevent="onDrop($event)"
+            @dragover.prevent="dragover = true"
+            @dragenter.prevent="dragover = true"
+            @dragleave.prevent="dragover = false"
+            :class="{ 'grey lighten-2': dragover }">
+            <v-card-title> Flight Log Graphs </v-card-title>
             <v-card-text>
               <p v-if="errorString" v-text="errorString" style="color: red"></p>
-              <v-row>
-                <v-col>
+              <v-file-input
+                    v-model="fileInput"
+                    @drop.prevent="onDrop($event)"
+                    accept="(x) => {x.endsWith('.cfl')}"
+                    validation-run="input"
+                    placeholder="Pick a flight log file"
+                    prepend-icon="mdi-file"
+                    label="Load flight log file "
+                    :loading="fileLoading"
+                    @change=loadFlightLog
+                  ></v-file-input>
+              <v-row v-if="flightLog" justify="end">
+                <v-col cols="auto">
                   <v-btn
                     color="primary"
-                    block
-                    @click="loadFlightLog"
-                    :loading="loadButtonLoading">Load file</v-btn>
+                    @click="exportFlightLogCsv"
+                    :loading="exportButtonLoading">Export CSV</v-btn>
                 </v-col>
-                <v-col cols="2" v-if="flightLog">
+                <v-col cols="auto">
                   <v-btn
                     color="primary"
-                    @click="exportFlightLogJson"
-                    :loading="exportButtonLoading">Export JSON</v-btn>
+                    @click="exportFlightLogHtml"
+                    :loading="exportButtonLoading">Export HTML</v-btn>
                 </v-col>
               </v-row>
               <v-row>
@@ -65,10 +80,14 @@ export default {
       errorString: "",
       flightLog: null,
       resizeTimer: null,
+      dragover: false,
+      fileInput: undefined,
+      fileLoading: false,
     };
   },
   mounted() {
     window.renderer.on("LOAD_FLIGHTLOG", (flightLog) => {
+      this.fileLoading = false
       let el = this.$refs.flightLogPlotContainer
       this.loadButtonLoading = false;
       if (flightLog.error) {
@@ -82,19 +101,28 @@ export default {
 
       if (el) makePlots(flightLog, el)
     });
-    window.renderer.on("EXPORT_FLIGHTLOG_JSON", (flightLog) => {
+    window.renderer.on("EXPORT_FLIGHTLOG_CSV", (flightLog) => {
+      this.exportButtonLoading = false;
+    });
+    window.renderer.on("EXPORT_FLIGHTLOG_HTML", (flightLog) => {
       this.exportButtonLoading = false;
     });
   },
   methods: {
-    loadFlightLog() {
+    loadFlightLog(file) {
       this.loadButtonLoading = true;
       this.flightLog = null
-      window.renderer.send("LOAD_FLIGHTLOG");
+      if (file?.path) {
+        window.renderer.send("LOAD_FLIGHTLOG", file.path);
+      }
     },
-    exportFlightLogJson() {
+    exportFlightLogCsv() {
       this.exportButtonLoading = true;
-      window.renderer.send("EXPORT_FLIGHTLOG_JSON", this.flightLog);
+      window.renderer.send("EXPORT_FLIGHTLOG_CSV", this.flightLog);
+    },
+    exportFlightLogHtml() {
+      this.exportButtonLoading = true;
+      window.renderer.send("EXPORT_FLIGHTLOG_HTML", this.$refs.flightLogPlotContainer.innerHTML);
     },
     setResizeTimer() {
       clearTimeout(this.resizeTimer)
@@ -102,8 +130,18 @@ export default {
     },
     replot() {
       let el = this.$refs.flightLogPlotContainer
-      if (el && this.flightLog) makePlots(this.flightLog, el)
+      if (el && this.flightLog) {
+        makePlots(this.flightLog, el)
+      }
     },
+    onDrop(event) {
+      this.dragover = false;
+      if (event.dataTransfer.files.length == 1) {
+        this.fileLoading = true
+        this.loadFlightLog(event.dataTransfer.files[0])
+        this.fileInput = event.dataTransfer.files[0]
+      }
+    }
   },
 };
 </script>
