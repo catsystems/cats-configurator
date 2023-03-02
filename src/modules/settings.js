@@ -20,70 +20,7 @@ export const EVENT_SETTINGS = [
     unit: null,
   },
   {
-    name: "Pyro 3",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
-    name: "Pyro 4",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
-    name: "Pyro 5",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
-    name: "Pyro 6",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
     name: "IO 1",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
-    name: "IO 2",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
-    name: "IO 3",
-    args: [
-      { text: "OFF", value: 0 },
-      { text: "ON", value: 1 },
-    ],
-    type: "SELECT",
-    unit: null,
-  },
-  {
-    name: "IO 4",
     args: [
       { text: "OFF", value: 0 },
       { text: "ON", value: 1 },
@@ -93,8 +30,6 @@ export const EVENT_SETTINGS = [
   },
   { name: "Servo 1", args: [0, 1000], type: "NUMBER", unit: "‰" },
   { name: "Servo 2", args: [0, 1000], type: "NUMBER", unit: "‰" },
-  { name: "Servo 3", args: [0, 1000], type: "NUMBER", unit: "‰" },
-  { name: "Servo 4", args: [0, 1000], type: "NUMBER", unit: "‰" },
   {
     name: "Recorder",
     args: [
@@ -108,12 +43,14 @@ export const EVENT_SETTINGS = [
 ];
 
 export const CONFIG_SETTINGS = {
-  //boot_state: { name: "Mode", unit: null },
-  main_altitude: { name: "Main Altitude", unit: "m" },
-  liftoff_detection_agl: {name: "Liftoff Detection Height", unit: "m"},
-  acc_threshold: { name: "Liftoff Detection Acceleration", unit: "m/s^2" },
-  servo1_init_pos: { name: "Initial Position Servo 1", unit: "‰" },
-  servo2_init_pos: { name: "Initial Position Servo 2", unit: "‰" },
+  main_altitude: {section: "general", name: "Main Altitude", unit: "m" },
+  liftoff_detection_agl: {section: "general",name: "Liftoff Detection Height", unit: "m"},
+  acc_threshold: {section: "general", name: "Liftoff Detection Acceleration", unit: "m/s^2" },
+  servo1_init_pos: {section: "general", name: "Initial Position Servo 1", unit: "‰" },
+  servo2_init_pos: {section: "general", name: "Initial Position Servo 2", unit: "‰" },
+  tele_link_phrase: {section: "telemetry", name: "Link Phrase", unit: null},
+  tele_power_level: {section: "telemetry", name: "Telemetry Power Level", unit: "dBm" },
+  tele_adaptive_power: {section: "telemetry", name: "Adaptive Power Level", unit: null},
 };
 
 export const LOG_ELEMENTS = [
@@ -155,6 +92,6 @@ export const LOG_ELEMENTS = [
 // ERROR IN set: INVALID NAME:
 // ^._.^:/> save
 // Successfully written to flash
-export const TIMER_KEYS = ["timer1", "timer2"]; //, "timer3", "timer4"];
+export const TIMER_KEYS = ["timer1", "timer2", "timer3", "timer4"];
 export const EVENT_KEYS = ["ev_liftoff", "ev_burnout", "ev_apogee", "ev_main_deployment", "ev_touchdown", "ev_custom1", "ev_custom2"];
 export const LOG_KEYS = ["rec_speed", "rec_elements"];

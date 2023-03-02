@@ -69,25 +69,41 @@ function onData(data) {
   if (cliMode) {
     return sendToRenderer("CLI_COMMAND", data);
   }
-  // console.log(data);
 
   if (data.includes("CATS is now ready")) {
     command("version");
   }
-
   // Catch confirmation response
   if (data.includes("^._.^") || data === "version") {
     currentCommand = data === "version" ? "version" : parseCommand(data);
-
     return;
   }
 
   if (!currentCommand) return;
 
   // Handle actual data
-  if (["version", "status", "rec_info"].includes(currentCommand)) {
+  if (["version"].includes(currentCommand)) {
     const parsedData = parseData(currentCommand, data);
+    sendToRenderer("BOARD:STATIC_DATA", parsedData);
 
+    // Check if it's CATS board
+    if (currentCommand === "version" && data.includes("Board: CATS")) {
+      notify({
+        title: `Connected to: ${port.path}`,
+        body: data,
+      });
+
+      sendToRenderer("SET_ACTIVE", true);
+    } else {
+      disconnect();
+    }
+
+    return;
+  }
+
+  // Handle actual data
+  if (["status", "rec_info"].includes(currentCommand)) {
+    const parsedData = parseData(currentCommand, data);
     sendToRenderer("BOARD:STATIC_DATA", parsedData);
 
     // Check if it's CATS board
@@ -117,6 +133,11 @@ function onData(data) {
         // Parse config allowed values
         config.type = "NUMBER";
         config.value = Number(config.value);
+        config.allowedRange = parseAllowedRange(data);
+      } else if (data.includes("String length:")) {
+        // Parse config allowed values
+        config.type = "STRING";
+        config.value = String(config.value);
         config.allowedRange = parseAllowedRange(data);
       } else if (data.includes("Array length:")) {
         // Parse config array length

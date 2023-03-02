@@ -51,6 +51,31 @@ export function subscribeListeners() {
     event.sender.send("BOARD:RESTORE");
   });
 
+  ipcMain.on("LOAD_FLIGHTLOG", (event) => {
+    let paths = dialog.showOpenDialogSync({
+      properties: ["openFile"],
+      options: {
+        filters: [{ name: "Log Files", extensions: ["cfl"] }]
+      }
+    });
+
+    console.log(paths)
+
+    if (paths) {
+      if (!paths[0].toLowerCase().endsWith(".cfl")) {
+        event.sender.send("LOAD_FLIGHTLOG", null)
+      }
+
+      let data = fs.readFileSync(paths[0], { encoding: "binary" });
+
+      if (data && data.length) {
+        parseFlightLog(data, function(parsed) {
+          event.sender.send("LOAD_FLIGHTLOG", parsed)
+        })
+      }
+    }
+  });
+
   ipcMain.on("BOARD:RESET_CONFIG", () => {
     command("defaults");
   });
@@ -75,4 +100,13 @@ export function subscribeListeners() {
     const ports = await getList();
     event.sender.send("FETCH_SERIAL_PORTS", ports);
   });
+}
+
+function parseFlightLog(data, callback) {
+  console.log("yey")
+  console.log(data.length)
+
+  setTimeout(function(){
+    callback("I parsed this shit");
+  }, 1000)
 }
