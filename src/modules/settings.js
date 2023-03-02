@@ -48,9 +48,12 @@ export const CONFIG_SETTINGS = {
   acc_threshold: {section: "general", name: "Liftoff Detection Acceleration", unit: "m/s^2" },
   servo1_init_pos: {section: "general", name: "Initial Position Servo 1", unit: "‰" },
   servo2_init_pos: {section: "general", name: "Initial Position Servo 2", unit: "‰" },
+  tele_enable: {section: "telemetry", name: "Enable Telemetry", unit: null},
   tele_link_phrase: {section: "telemetry", name: "Link Phrase", unit: null},
   tele_power_level: {section: "telemetry", name: "Telemetry Power Level", unit: "dBm" },
   tele_adaptive_power: {section: "telemetry", name: "Adaptive Power Level", unit: null},
+  test_mode: {section: "testing", name: "Enable Testing Mode", unit: null},
+  tele_test_phrase: {section: "testing", name: "Testing Phrase", unit: null},
 };
 
 export const LOG_ELEMENTS = [
