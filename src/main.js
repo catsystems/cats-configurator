@@ -6,6 +6,18 @@ import vuetify from "./plugins/vuetify";
 
 Vue.config.productionTip = false;
 
+/* Add new vue directive that calls a function every time an element is resized */
+Vue.directive('resize', {
+  inserted: function(el, binding) {
+    const onResizeCallback = binding.value;
+    window.addEventListener('resize', () => {
+      const width = document.documentElement.clientWidth;
+      const height = document.documentElement.clientHeight;
+      onResizeCallback({ width, height });
+    })
+  }
+});
+
 new Vue({
   router,
   store,
