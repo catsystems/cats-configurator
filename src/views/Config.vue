@@ -48,9 +48,7 @@
                     </v-text-field>
                     <v-text-field
                       v-if="data[key].type === 'STRING'"
-                      v-model.number="data[key].value"
-                      :min="data[key].allowedRange[0]"
-                      :max="data[key].allowedRange[1]"
+                      v-model="data[key].value"
                       :rules="[
                         (v) => {
                           if (v.length < data[key].allowedRange[0] ||
@@ -58,7 +56,7 @@
                             return `String must have length between ${data[key].allowedRange.join(
                               ' and '
                             )}`
-                          } else if (v.match(/^[a-z0-9]+$/i) === null) {
+                          } else if (v.match(/^[_a-z0-9]+$/i) === null) {
                             return `String may only contain alphanumeric characters`
                           }
                           return true
@@ -171,9 +169,7 @@
                     </v-text-field>
                     <v-text-field
                       v-if="data[key].type === 'STRING'"
-                      v-model.number="data[key].value"
-                      :min="data[key].allowedRange[0]"
-                      :max="data[key].allowedRange[1]"
+                      v-model="data[key].value"
                       :rules="[
                         (v) => {
                           if (v.length < data[key].allowedRange[0] ||
@@ -181,7 +177,7 @@
                             return `String must have length between ${data[key].allowedRange.join(
                               ' and '
                             )}`
-                          } else if (v.match(/^[a-z0-9]+$/i) === null) {
+                          } else if (v.match(/^[_a-z0-9]+$/i) === null) {
                             return `String may only contain alphanumeric characters`
                           }
                           return true
@@ -265,7 +261,13 @@ export default {
       this.restoreLoading = false;
       setTimeout(this.init, 100);
     });
+    window.renderer.on("DISCONNECTED", () => {
+      if (this.timer) {
+        clearInterval(this.timer);
+      }
+    });
   },
+
   beforeDestroy() {
     clearInterval(this.timer);
   },
