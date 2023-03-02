@@ -1,0 +1,80 @@
+name: Build/release
+
+on: push
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    
+    steps: 
+      - name: Check out Git repository
+        uses: actions/checkout@v1
+
+      - name: Install Node.js, NPM and Yarn
+        uses: actions/setup-node@v1
+        with:
+          node-version: 18
+
+      - name: Install Packages
+        run: npm install
+      
+      - name: Build for Windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          npm run build --windows nsis zip --x64  --publish never
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build for MacOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          npm run build --macos dmg --x64  --publish never
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build for Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          npm run build --linux AppImage --x64  --publish never
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload Artifacts for Windows Zip
+        if: matrix.os == 'windows-latest' 
+        uses: actions/upload-artifact@v2
+        with: 
+          name: ${{ github.event.repository.name }}-Zip Package
+          path: builds/*.zip
+       
+      - name: Upload Artifacts for Windows Installer
+        if: matrix.os == 'windows-latest' 
+        uses: actions/upload-artifact@v2
+        with: 
+          name: ${{ github.event.repository.name }}-Windows Installer
+          path: builds/*.exe
+      - name: Upload Artifacts for MacOS
+        if: matrix.os == 'macos-latest' 
+        uses: actions/upload-artifact@v2
+        with: 
+          name: ${{ github.event.repository.name }}-Dmg Package
+          path: builds/*.dmg
+      - name: Upload Artifacts for Linux
+        if: matrix.os == 'ubuntu-latest' 
+        uses: actions/upload-artifact@v2
+        with: 
+          name: ${{ github.event.repository.name }}-AppImage Package
+          path: builds/*.AppImage
+          
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/' )
+        with: 
+          files: |
+            builds/*.zip
+            builds/*.exe
+            builds/*.dmg
+            builds/*.AppImage
+        env: 
+          GITHUB_TOKEN : ${{ secrets.GITHUB_TOKEN }}
