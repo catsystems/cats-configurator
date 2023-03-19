@@ -14,9 +14,9 @@ All CATS code is open source and can be used free of charge without warranty.
 npm install
 
 # serve with hot reload at localhost:9080
-npm run electron:serve
+npm start
 
 # build electron application for production
-npm run electron:build
+npm run build
 
 ```
