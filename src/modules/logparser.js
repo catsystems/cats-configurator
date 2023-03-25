@@ -35,11 +35,26 @@ export function parseFlightLog(logString) {
   let firstTs = -1;
   let lastTs = -1;
 
-  let lB = Buffer.from(logString, 'binary')
+  let bin = Buffer.from(logString, 'binary')
 
   try {
-    while (i < lB.length) {
-      let [ts, t] = [lB.readUInt32LE(i), lB.readUInt32LE(i + 4)];
+    // Read out the code version
+    let codeVersion = "";
+
+    let charCode = bin.readUInt8(i++);
+
+    // Read until the null terminator is encountered
+    while (charCode != 0) {
+      // Convert the byte to a char
+      codeVersion += String.fromCharCode(charCode);
+      charCode = bin.readUInt8(i++);
+    }
+
+    console.log("Code version: " + codeVersion);
+
+
+    while (i < bin.length) {
+      let [ts, t] = [bin.readUInt32LE(i), bin.readUInt32LE(i + 4)];
       let sensorId = getIdFromRecordType(t);
       let tWithoutId = getRecordTypeWithoutId(t);
       i += 8;
@@ -47,8 +62,8 @@ export function parseFlightLog(logString) {
         firstTs = ts;
       }
       if (tWithoutId === REC_TYPE.IMU) {
-        let [accX, accY, accZ, gyroX, gyroY, gyroZ] = [lB.readInt16LE(i), lB.readInt16LE(i + 2), lB.readInt16LE(i + 4),
-        lB.readInt16LE(i + 6), lB.readInt16LE(i + 8), lB.readInt16LE(i + 10)];
+        let [accX, accY, accZ, gyroX, gyroY, gyroZ] = [bin.readInt16LE(i), bin.readInt16LE(i + 2), bin.readInt16LE(i + 4),
+        bin.readInt16LE(i + 6), bin.readInt16LE(i + 8), bin.readInt16LE(i + 10)];
         imu.push({
           ts: ts,
           id: `IMU${sensorId}`,
@@ -61,7 +76,7 @@ export function parseFlightLog(logString) {
         });
         i += 12;
       } else if (tWithoutId === REC_TYPE.BARO) {
-        let [pressure, temperature] = [lB.readUint32LE(i), lB.readUint32LE(i + 4)];
+        let [pressure, temperature] = [bin.readUint32LE(i), bin.readUint32LE(i + 4)];
         baro.push({
           ts: ts,
           id: `BARO${sensorId}`,
@@ -70,7 +85,7 @@ export function parseFlightLog(logString) {
         });
         i += 8;
       } else if (tWithoutId === REC_TYPE.FLIGHT_INFO) {
-        let [height, velocity, acceleration] = [lB.readFloatLE(i), lB.readFloatLE(i + 4), lB.readFloatLE(i + 8)];
+        let [height, velocity, acceleration] = [bin.readFloatLE(i), bin.readFloatLE(i + 4), bin.readFloatLE(i + 8)];
 
         flightInfo.push({
           ts: ts,
@@ -80,7 +95,7 @@ export function parseFlightLog(logString) {
         });
         i += 12;
       } else if (tWithoutId === REC_TYPE.ORIENTATION_INFO) {
-        let [est_0, est_1, est_2, est_3] = [lB.readInt16LE(i), lB.readInt16LE(i + 2), lB.readInt16LE(i + 4), lB.readInt16LE(i + 6)];
+        let [est_0, est_1, est_2, est_3] = [bin.readInt16LE(i), bin.readInt16LE(i + 2), bin.readInt16LE(i + 4), bin.readInt16LE(i + 6)];
 
         orientationInfo.push({
           ts: ts,
@@ -91,7 +106,7 @@ export function parseFlightLog(logString) {
         });
         i += 8;
       } else if (tWithoutId === REC_TYPE.FILTERED_DATA_INFO) {
-        let [filteredAltitudeAGL, filteredAcceleration] = [lB.readFloatLE(i), lB.readFloatLE(i + 4)];
+        let [filteredAltitudeAGL, filteredAcceleration] = [bin.readFloatLE(i), bin.readFloatLE(i + 4)];
         filteredDataInfo.push({
           ts: ts,
           filteredAltitudeAGL: filteredAltitudeAGL,
@@ -99,14 +114,14 @@ export function parseFlightLog(logString) {
         });
         i += 8;
       } else if (tWithoutId === REC_TYPE.FLIGHT_STATE) {
-        let state = lB.readUint32LE(i);
+        let state = bin.readUint32LE(i);
         flightStates.push({
           ts: ts,
           state: state
         });
         i += 4;
       } else if (tWithoutId === REC_TYPE.EVENT_INFO) {
-        let [event, action, argument] = [lB.readUint32LE(i), lB.readUint16LE(i + 4), lB.readUint16LE(i + 6)];
+        let [event, action, argument] = [bin.readUint32LE(i), bin.readUint16LE(i + 4), bin.readUint16LE(i + 6)];
         eventInfo.push({
           ts: ts,
           event: event,
@@ -115,7 +130,7 @@ export function parseFlightLog(logString) {
         });
         i += 8;
       } else if (tWithoutId === REC_TYPE.ERROR_INFO) {
-        let error = lB.readUint32LE(i);
+        let error = bin.readUint32LE(i);
         errorInfo.push({
           ts: ts,
           error: error
@@ -125,7 +140,7 @@ export function parseFlightLog(logString) {
         // Nothing to plot yet
         i += 9;
       } else if (tWithoutId === REC_TYPE.VOLTAGE_INFO) {
-        let voltage = lB.readUint16LE(i);
+        let voltage = bin.readUint16LE(i);
         voltageInfo.push({
           ts: ts,
           voltage: voltage
