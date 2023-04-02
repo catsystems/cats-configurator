@@ -1,7 +1,7 @@
 import { ipcMain, dialog } from "electron";
 import fs from "fs";
 import { parseFlightLog } from "./logparser.js"
-import { exportCSV } from "./flightlog.js"
+import { exportFlightLogToCSVs } from "./flightlog.js"
 import { connect, disconnect, command, cliCommand, getList } from "./serial.js";
 
 export function subscribeListeners() {
@@ -69,9 +69,9 @@ export function subscribeListeners() {
     event.sender.send("LOAD_FLIGHTLOG", flightLog);
   });
 
-  ipcMain.on("EXPORT_FLIGHTLOG_CSV", (event, flightLog) => {
-    exportCSV(flightLog)
-    event.sender.send("EXPORT_FLIGHTLOG_CSV");
+  ipcMain.on("EXPORT_FLIGHTLOG_CSVS", (event, flightLog) => {
+    exportFlightLogToCSVs(flightLog)
+    event.sender.send("EXPORT_FLIGHTLOG_CSVS");
   });
 
   ipcMain.on("EXPORT_FLIGHTLOG_HTML", (event, flightLogHtmlStr) => {
