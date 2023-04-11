@@ -13,6 +13,20 @@ const REC_TYPE = {
 
 const REC_ID_MASK = 0x0000000F;
 
+// TODO: These constants are duplicated from plots.js, no idea how to import them here
+const COLOR = "rgb(100, 100, 100)"
+const EVENT_MAP = {
+  0: { name: "ev_moving", color: COLOR },
+  1: { name: "ev_ready", color: COLOR },
+  2: { name: "ev_liftoff", color: COLOR },
+  3: { name: "ev_burnout", color: COLOR },
+  4: { name: "ev_apogee", color: COLOR },
+  5: { name: "ev_main_deployment", color: COLOR },
+  6: { name: "ev_touchdown", color: COLOR },
+  7: { name: "ev_custom1", color: COLOR },
+  8: { name: "ev_custom2", color: COLOR },
+}
+
 function getIdFromRecordType(recType) {
   return recType & REC_ID_MASK;
 }
@@ -21,16 +35,91 @@ function getRecordTypeWithoutId(recType) {
   return recType & ~REC_ID_MASK;
 }
 
+function offsetProperty(readings, prop, offset) {
+  readings.forEach(function (reading) {
+    if (prop in reading) {
+      reading[prop] -= offset;
+    }
+  });
+}
+
+function scaleProperty(readings, prop, scaleFactor) {
+  readings.forEach(function (reading) {
+    if (prop in reading) {
+      reading[prop] /= scaleFactor;
+    }
+  });
+}
+
+function scaleAndOffsetFlightLog(flightLog) {
+  // Find start of launch
+
+  let zeroTs = flightLog.firstTs;
+
+  for (let ev of flightLog.eventInfo) {
+    if (EVENT_MAP[ev.event].name == "ev_liftoff") {
+      zeroTs = ev.ts;
+      console.log("Zero TS found: " + ev.ts);
+      break;
+    }
+  }
+
+  flightLog.firstTs -= zeroTs
+  flightLog.lastTs -= zeroTs
+  flightLog.firstTs /= 1000
+  flightLog.lastTs /= 1000
+
+  offsetProperty(flightLog.imu, 'ts', zeroTs)
+  offsetProperty(flightLog.baro, 'ts', zeroTs)
+  offsetProperty(flightLog.orientationInfo, 'ts', zeroTs)
+  offsetProperty(flightLog.flightInfo, 'ts', zeroTs)
+  offsetProperty(flightLog.filteredDataInfo, 'ts', zeroTs)
+  offsetProperty(flightLog.voltageInfo, 'ts', zeroTs)
+  offsetProperty(flightLog.eventInfo, 'ts', zeroTs)
+  offsetProperty(flightLog.flightStates, 'ts', zeroTs)
+  offsetProperty(flightLog.errorInfo, 'ts', zeroTs)
+
+  scaleProperty(flightLog.imu, 'ts', 1000)
+  scaleProperty(flightLog.baro, 'ts', 1000)
+  scaleProperty(flightLog.orientationInfo, 'ts', 1000)
+  scaleProperty(flightLog.flightInfo, 'ts', 1000)
+  scaleProperty(flightLog.filteredDataInfo, 'ts', 1000)
+  scaleProperty(flightLog.voltageInfo, 'ts', 1000)
+  scaleProperty(flightLog.eventInfo, 'ts', 1000)
+  scaleProperty(flightLog.flightStates, 'ts', 1000)
+  scaleProperty(flightLog.errorInfo, 'ts', 1000)
+
+  scaleProperty(flightLog.imu, 'Gx', 14.28)
+  scaleProperty(flightLog.imu, 'Gy', 14.28)
+  scaleProperty(flightLog.imu, 'Gz', 14.28)
+  scaleProperty(flightLog.imu, 'Ax', 2048)
+  scaleProperty(flightLog.imu, 'Ay', 2048)
+  scaleProperty(flightLog.imu, 'Az', 2048)
+
+  scaleProperty(flightLog.orientationInfo, 'q0_estimated', 1000)
+  scaleProperty(flightLog.orientationInfo, 'q1_estimated', 1000)
+  scaleProperty(flightLog.orientationInfo, 'q2_estimated', 1000)
+  scaleProperty(flightLog.orientationInfo, 'q3_estimated', 1000)
+
+  scaleProperty(flightLog.baro, 'T', 100)
+
+  scaleProperty(flightLog.voltageInfo, 'voltage', 1000)
+
+  console.log(flightLog)
+
+  return flightLog;
+}
+
 export function parseFlightLog(logString) {
   let imu = [];
   let baro = [];
   let flightInfo = [];
   let orientationInfo = [];
   let filteredDataInfo = [];
+  let voltageInfo = [];
   let flightStates = [];
   let eventInfo = [];
   let errorInfo = [];
-  let voltageInfo = [];
   let i = 0;
   let firstTs = -1;
   let lastTs = -1;
@@ -172,5 +261,6 @@ export function parseFlightLog(logString) {
     firstTs: firstTs,
     lastTs: lastTs,
   }
-  return flightLog
+
+  return scaleAndOffsetFlightLog(flightLog);
 }
