@@ -1,5 +1,7 @@
 import Plotly from 'plotly.js-dist';
 
+import { EVENT_MAP, COLOR } from "./logparser.js"
+
 function makePlot(data, elementId, ylabel, traceNames, eventInfo) {
 
     let lines = []
@@ -44,7 +46,6 @@ function makeEventInfoTraces(flightlog) {
     const ACTION_COLOR = "rgb(0, 0, 255)"
     const STATE_COLOR = "#ffa726"
     const EVENT_COLOR = "rgb(200, 0, 0)"
-    const COLOR = "rgb(100, 100, 100)"
 
     const ACTION_MAP = {
         1: { name: "Delay", arguments: (x) => x + "ms", color: "red" },
@@ -54,17 +55,6 @@ function makeEventInfoTraces(flightlog) {
         5: { name: "Servo 1", arguments: (x) => x + "‰", color: "red" },
         6: { name: "Servo 2", arguments: (x) => x + "‰", color: "red" },
         7: { name: "Recorder", arguments: (x) => ["OFF", "PRE", "LOG"][x], color: "red" },
-    }
-
-    const EVENT_MAP = {
-        1: { name: "ev_ready", color: COLOR },
-        2: { name: "ev_liftoff", color: COLOR },
-        3: { name: "ev_burnout", color: COLOR },
-        4: { name: "ev_apogee", color: COLOR },
-        5: { name: "ev_main_deployment", color: COLOR },
-        6: { name: "ev_touchdown", color: COLOR },
-        7: { name: "ev_custom1", color: COLOR },
-        8: { name: "ev_custom2", color: COLOR },
     }
 
     const STATE_MAP = {

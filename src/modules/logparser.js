@@ -13,6 +13,19 @@ const REC_TYPE = {
 
 const REC_ID_MASK = 0x0000000F;
 
+const COLOR = "rgb(100, 100, 100)"
+const EVENT_MAP = {
+  0: { name: "ev_moving", color: COLOR },
+  1: { name: "ev_ready", color: COLOR },
+  2: { name: "ev_liftoff", color: COLOR },
+  3: { name: "ev_burnout", color: COLOR },
+  4: { name: "ev_apogee", color: COLOR },
+  5: { name: "ev_main_deployment", color: COLOR },
+  6: { name: "ev_touchdown", color: COLOR },
+  7: { name: "ev_custom1", color: COLOR },
+  8: { name: "ev_custom2", color: COLOR },
+}
+
 function getIdFromRecordType(recType) {
   return recType & REC_ID_MASK;
 }
@@ -21,16 +34,85 @@ function getRecordTypeWithoutId(recType) {
   return recType & ~REC_ID_MASK;
 }
 
+function offsetProperty(readings, prop, offset) {
+  for (reading in readings) {
+    if (prop in reading) {
+      reading -= offset;
+    }
+  }
+}
+
+function scaleProperty(readings, prop, scaleFactor) {
+  for (reading in readings) {
+    if (prop in reading) {
+      reading /= scaleFactor;
+    }
+  }
+}
+
+function scaleAndOffsetFlightLog(flightLog) {
+  // Find start of launch
+
+  let zeroTs = flightLog.firstTs;
+
+  for (ev in flightLog.eventInfo) {
+    if (EVENT_MAP[ev.event].name == "ev_liftoff") {
+      zeroTs = ev.ts;
+      break;
+    }
+  }
+
+  offsetProperty(flightLog.imu, 'ts', zeroTs)
+  offsetProperty(flightLog.baro, 'ts', zeroTs)
+  offsetProperty(flightLog.orientationInfo, 'ts', zeroTs)
+  offsetProperty(flightLog.flightInfo, 'ts', zeroTs)
+  offsetProperty(flightLog.filteredDataInfo, 'ts', zeroTs)
+  offsetProperty(flightLog.voltageInfo, 'ts', zeroTs)
+  offsetProperty(flightLog.eventInfo, 'ts', zeroTs)
+  offsetProperty(flightLog.flightStates, 'ts', zeroTs)
+  offsetProperty(flightLog.errorInfo, 'ts', zeroTs)
+
+  
+  scaleProperty(flightLog.imu, 'ts', 1000)
+  scaleProperty(flightLog.baro, 'ts', 1000)
+  scaleProperty(flightLog.orientationInfo, 'ts', 1000)
+  scaleProperty(flightLog.flightInfo, 'ts', 1000)
+  scaleProperty(flightLog.filteredDataInfo, 'ts', 1000)
+  scaleProperty(flightLog.voltageInfo, 'ts', 1000)
+  scaleProperty(flightLog.eventInfo, 'ts', 1000)
+  scaleProperty(flightLog.flightStates, 'ts', 1000)
+  scaleProperty(flightLog.errorInfo, 'ts', 1000)
+
+  scaleProperty(flightLog.imu, 'Gx', 14.28)
+  scaleProperty(flightLog.imu, 'Gy', 14.28)
+  scaleProperty(flightLog.imu, 'Gz', 14.28)
+  scaleProperty(flightLog.imu, 'Ax', 2048)
+  scaleProperty(flightLog.imu, 'Ay', 2048)
+  scaleProperty(flightLog.imu, 'Az', 2048)
+
+  scaleProperty(flightLog.orientationInfo, 'q0_estimated', 1000)
+  scaleProperty(flightLog.orientationInfo, 'q1_estimated', 1000)
+  scaleProperty(flightLog.orientationInfo, 'q2_estimated', 1000)
+  scaleProperty(flightLog.orientationInfo, 'q3_estimated', 1000)
+
+  scaleProperty(flightLog.baro, 'T', 100)
+
+  scaleProperty(flightLog.voltageInfo, 'voltage', 1000)
+
+
+  return flightLog;
+}
+
 export function parseFlightLog(logString) {
   let imu = [];
   let baro = [];
   let flightInfo = [];
   let orientationInfo = [];
   let filteredDataInfo = [];
+  let voltageInfo = [];
   let flightStates = [];
   let eventInfo = [];
   let errorInfo = [];
-  let voltageInfo = [];
   let i = 0;
   let firstTs = -1;
   let lastTs = -1;
@@ -172,5 +254,7 @@ export function parseFlightLog(logString) {
     firstTs: firstTs,
     lastTs: lastTs,
   }
-  return flightLog
+
+
+  return scaleAndOffsetFlightLog(flightLog);
 }
