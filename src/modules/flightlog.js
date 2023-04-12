@@ -9,7 +9,7 @@ export function exportFlightLogToCSVs(flightLog) {
   }
 
   for (let flightLogSection of flightLogSections) {
-    fs.writeFile(`${flightLogDir}/${flightLogSection}.csv`, objectArrayToCSV(flightLog.imu), "utf8", function (err) {
+    fs.writeFile(`${flightLogDir}/${flightLogSection}.csv`, objectArrayToCSV(flightLog[flightLogSection]), "utf8", function (err) {
       if (err) {
         console.log("An error occurred while writing CSV object to file.");
         return console.log(err);
