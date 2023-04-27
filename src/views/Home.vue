@@ -46,7 +46,7 @@
                 <v-col cols="auto">
                   <v-btn
                     color="primary"
-                    @click="exportFlightLogCsv"
+                    @click="exportFlightLogCSVs"
                     :loading="exportButtonLoading">Export CSV</v-btn>
                 </v-col>
                 <v-col cols="auto">
@@ -101,7 +101,7 @@ export default {
 
       if (el) makePlots(flightLog, el)
     });
-    window.renderer.on("EXPORT_FLIGHTLOG_CSV", (flightLog) => {
+    window.renderer.on("EXPORT_FLIGHTLOG_CSVS", (flightLog) => {
       this.exportButtonLoading = false;
     });
     window.renderer.on("EXPORT_FLIGHTLOG_HTML", (flightLog) => {
@@ -116,9 +116,9 @@ export default {
         window.renderer.send("LOAD_FLIGHTLOG", file.path);
       }
     },
-    exportFlightLogCsv() {
+    exportFlightLogCSVs() {
       this.exportButtonLoading = true;
-      window.renderer.send("EXPORT_FLIGHTLOG_CSV", this.flightLog);
+      window.renderer.send("EXPORT_FLIGHTLOG_CSVS", this.flightLog);
     },
     exportFlightLogHtml() {
       this.exportButtonLoading = true;
