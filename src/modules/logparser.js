@@ -92,9 +92,9 @@ function scaleAndOffsetFlightLog(flightLog) {
   scaleProperty(flightLog.imu, 'Gx', 14.28)
   scaleProperty(flightLog.imu, 'Gy', 14.28)
   scaleProperty(flightLog.imu, 'Gz', 14.28)
-  scaleProperty(flightLog.imu, 'Ax', 2048)
-  scaleProperty(flightLog.imu, 'Ay', 2048)
-  scaleProperty(flightLog.imu, 'Az', 2048)
+  scaleProperty(flightLog.imu, 'Ax', 1024)
+  scaleProperty(flightLog.imu, 'Ay', 1024)
+  scaleProperty(flightLog.imu, 'Az', 1024)
 
   scaleProperty(flightLog.orientationInfo, 'q0_estimated', 1000)
   scaleProperty(flightLog.orientationInfo, 'q1_estimated', 1000)
