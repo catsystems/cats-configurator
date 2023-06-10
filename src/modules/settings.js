@@ -44,7 +44,6 @@ export const EVENT_SETTINGS = [
 
 export const CONFIG_SETTINGS = {
   main_altitude: {section: "general", name: "Main Altitude", unit: "m" },
-  liftoff_detection_agl: {section: "general",name: "Liftoff Detection Height", unit: "m"},
   acc_threshold: {section: "general", name: "Liftoff Detection Acceleration", unit: "m/s^2" },
   servo1_init_pos: {section: "general", name: "Initial Position Servo 1", unit: "‰" },
   servo2_init_pos: {section: "general", name: "Initial Position Servo 2", unit: "‰" },
