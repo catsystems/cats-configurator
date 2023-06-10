@@ -66,10 +66,20 @@ jobs:
         with: 
           name: ${{ github.event.repository.name }}-AppImage Package
           path: builds/*.AppImage
+      
+      - name: Get changelog entry
+        uses: mindsers/changelog-reader-action@v2
+        if: startsWith(github.ref, 'refs/tags/' )
+        with:
+          validation_level: warn
+          version: ${{ steps.tag_name.outputs.current_version }}
+          path: ./CHANGELOG.md
           
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/' )
+        name: "CATS Configurator ${{  github.ref_name }}"
+        body: ${{ steps.changelog_reader.outputs.changes }}
         with: 
           files: |
             builds/*.zip
