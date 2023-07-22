@@ -75,6 +75,7 @@ function scaleAndOffsetFlightLog(flightLog) {
   offsetProperty(flightLog.flightInfo, 'ts', zeroTs)
   offsetProperty(flightLog.filteredDataInfo, 'ts', zeroTs)
   offsetProperty(flightLog.voltageInfo, 'ts', zeroTs)
+  offsetProperty(flightLog.gnssInfo, 'ts', zeroTs)
   offsetProperty(flightLog.eventInfo, 'ts', zeroTs)
   offsetProperty(flightLog.flightStates, 'ts', zeroTs)
   offsetProperty(flightLog.errorInfo, 'ts', zeroTs)
@@ -85,6 +86,7 @@ function scaleAndOffsetFlightLog(flightLog) {
   scaleProperty(flightLog.flightInfo, 'ts', 1000)
   scaleProperty(flightLog.filteredDataInfo, 'ts', 1000)
   scaleProperty(flightLog.voltageInfo, 'ts', 1000)
+  scaleProperty(flightLog.gnssInfo, 'ts', 1000)
   scaleProperty(flightLog.eventInfo, 'ts', 1000)
   scaleProperty(flightLog.flightStates, 'ts', 1000)
   scaleProperty(flightLog.errorInfo, 'ts', 1000)
@@ -92,9 +94,9 @@ function scaleAndOffsetFlightLog(flightLog) {
   scaleProperty(flightLog.imu, 'Gx', 14.28)
   scaleProperty(flightLog.imu, 'Gy', 14.28)
   scaleProperty(flightLog.imu, 'Gz', 14.28)
-  scaleProperty(flightLog.imu, 'Ax', 1024)
-  scaleProperty(flightLog.imu, 'Ay', 1024)
-  scaleProperty(flightLog.imu, 'Az', 1024)
+  scaleProperty(flightLog.imu, 'Ax', 1024 / 9.81)
+  scaleProperty(flightLog.imu, 'Ay', 1024 / 9.81)
+  scaleProperty(flightLog.imu, 'Az', 1024 / 9.81)
 
   scaleProperty(flightLog.orientationInfo, 'q0_estimated', 1000)
   scaleProperty(flightLog.orientationInfo, 'q1_estimated', 1000)
@@ -117,6 +119,7 @@ export function parseFlightLog(logString) {
   let orientationInfo = [];
   let filteredDataInfo = [];
   let voltageInfo = [];
+  let gnssInfo = [];
   let flightStates = [];
   let eventInfo = [];
   let errorInfo = [];
@@ -226,7 +229,13 @@ export function parseFlightLog(logString) {
         });
         i += 4;
       } else if (tWithoutId === REC_TYPE.GNSS_INFO) {
-        // Nothing to plot yet
+        let [latitude, longitude, satellites] = [bin.readFloatLE(i), bin.readFloatLE(i + 4), bin.readUInt8(i + 8)];
+        gnssInfo.push({
+          ts: ts,
+          latitude: latitude,
+          longitude: longitude,
+          satellites: satellites
+        });
         i += 9;
       } else if (tWithoutId === REC_TYPE.VOLTAGE_INFO) {
         let voltage = bin.readUint16LE(i);
@@ -253,6 +262,7 @@ export function parseFlightLog(logString) {
     flightInfo: flightInfo,
     orientationInfo: orientationInfo,
     filteredDataInfo: filteredDataInfo,
+    gnssInfo: gnssInfo,
     flightStates: flightStates,
     eventInfo: eventInfo,
     errorInfo: errorInfo,
