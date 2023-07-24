@@ -14,7 +14,7 @@ const EVENT_MAP = {
 }
 
 
-function makePlot(data, elementId, ylabel, traceNames, eventInfo) {
+function makePlot(data, elementId, title, ylabel, traceNames, eventInfo) {
 
     let lines = []
     let x = []
@@ -43,7 +43,8 @@ function makePlot(data, elementId, ylabel, traceNames, eventInfo) {
         elementId,
         lines,
         {
-            margin: { t: 20 },
+            title: { text: title},
+            margin: { t: 50 },
             xaxis: { title: "Timestamp [s]" },
             yaxis: { title: ylabel },
             shapes: eventInfo.shapes,
@@ -206,37 +207,37 @@ export function makePlots(flightlog, element) {
     let el = document.createElement("div")
     document.create
     element.append(el)
-    makePlot(flightlog.flightInfo, el, "Altitude [m]", ["height"], eventInfo)
+    makePlot(flightlog.flightInfo, el, "State Estimation - Altitude", "Altitude [m]", ["height"], eventInfo)
 
     el = document.createElement("div")
     element.append(el)
-    makePlot(flightlog.flightInfo, el, "Velocity [m/s]", ["velocity"], eventInfo)
+    makePlot(flightlog.flightInfo, el, "State Estimation - Velocity", "Velocity [m/s]", ["velocity"], eventInfo)
+
+    // el = document.createElement("div")
+    // element.append(el)
+    // makePlot(flightlog.flightInfo, el, "Acceleration [m/s^2]", ["acceleration"], eventInfo)
 
     el = document.createElement("div")
     element.append(el)
-    makePlot(flightlog.flightInfo, el, "Acceleration [m/s^2]", ["acceleration"], eventInfo)
+    makePlot(flightlog.imu, el,  "IMU - Acceleration", "Acceleration [m/s^2]", ["Ax", "Ay", "Az"], eventInfo)
 
     el = document.createElement("div")
     element.append(el)
-    makePlot(flightlog.imu, el, "Acceleration [m/s^2]", ["Ax", "Ay", "Az"], eventInfo)
+    makePlot(flightlog.imu, el, "IMU - Gyroscope", "Angular Movement [deg/s]", ["Gx", "Gy", "Gz"], eventInfo)
 
     el = document.createElement("div")
     element.append(el)
-    makePlot(flightlog.imu, el, "Angular Movement [deg/s]", ["Gx", "Gy", "Gz"], eventInfo)
+    makePlot(flightlog.baro, el, "Temperature", "Temperature [°C]", ["T"], eventInfo)
 
     el = document.createElement("div")
     element.append(el)
-    makePlot(flightlog.baro, el, "Pressure [hPa]", ["P"], eventInfo)
+    makePlot(flightlog.baro, el, "Pressure", "Pressure [hPa]", ["P"], eventInfo)
 
     el = document.createElement("div")
     element.append(el)
-    makePlot(flightlog.baro, el, "Temperature [°C]", ["T"], eventInfo)
+    makePlot(flightlog.filteredDataInfo, el, "Filtered Barometer Altitude", "Altitude [m]", ["filteredAltitudeAGL"], eventInfo)
 
     el = document.createElement("div")
     element.append(el)
-    makePlot(flightlog.filteredDataInfo, el, "Altitude [m]", ["filteredAltitudeAGL"], eventInfo)
-
-    el = document.createElement("div")
-    element.append(el)
-    makePlot(flightlog.voltageInfo, el, "Voltage [V]", ["voltage"], eventInfo)
+    makePlot(flightlog.voltageInfo, el, "Battery Voltage", "Voltage [V]", ["voltage"], eventInfo)
 }

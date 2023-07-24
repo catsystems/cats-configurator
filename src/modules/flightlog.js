@@ -2,7 +2,7 @@ import fs from "fs";
 
 export function exportFlightLogToCSVs(flightLog) {
   const flightLogDir = "flight-log-export"
-  let flightLogSections = ["imu", "baro", "flightInfo", "orientationInfo", "filteredDataInfo", "flightStates", "eventInfo", "voltageInfo"];
+  let flightLogSections = ["imu", "baro", "flightInfo", "orientationInfo", "filteredDataInfo", "gnssInfo", "flightStates", "eventInfo", "voltageInfo"];
 
   if (!fs.existsSync(flightLogDir)){
     fs.mkdirSync(flightLogDir);
