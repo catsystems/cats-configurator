@@ -4,12 +4,12 @@ export function exportFlightLogToCSVs(flightLog) {
   const flightLogDir = "flight-log-export"
   let flightLogSections = ["imu", "baro", "flightInfo", "orientationInfo", "filteredDataInfo", "gnssInfo", "flightStates", "eventInfo", "voltageInfo"];
 
-  if (!fs.existsSync(flightLogDir)){
+  if (!fs.existsSync(flightLogDir)) {
     fs.mkdirSync(flightLogDir);
   }
 
   for (let flightLogSection of flightLogSections) {
-    fs.writeFile(`${flightLogDir}/${flightLogSection}.csv`, objectArrayToCSV(flightLog[flightLogSection]), "utf8", function (err) {
+    fs.writeFile(`${flightLogDir}/${flightLogSection}.csv`, objectArrayToCSV(flightLogSection, flightLog[flightLogSection]), "utf8", function (err) {
       if (err) {
         console.log("An error occurred while writing CSV object to file.");
         return console.log(err);
@@ -29,20 +29,26 @@ export function exportJSON(flightLog) {
   });
 }
 
-function objectArrayToCSV(arr, separator = ",") {
+function objectArrayToCSV(section, arr, separator = ",") {
   if (!Array.isArray(arr)) {
     console.log("objectArrayToCSV first argument must be an array.");
     return;
   }
 
-  let CSVColumnNames = getCSVColumnNames(arr[0]);
+  if (arr.length > 0) {
+    console.log("Section " + section + " :" + arr[0])
+    let CSVColumnNames = getCSVColumnNames(arr[0]);
 
-  let CSVHeader = CSVColumnNames.join(separator);
-  let CSVBody = arr.map(obj => 
-    CSVColumnNames.map(header => getObjectValue(obj, header)).join(separator)
-  ).join("\n");
+    let CSVHeader = CSVColumnNames.join(separator);
+    let CSVBody = arr.map(obj => 
+      CSVColumnNames.map(header => getObjectValue(obj, header)).join(separator)
+    ).join("\n");
 
-  return CSVHeader + "\n" + CSVBody;
+    return CSVHeader + "\n" + CSVBody;
+  } else {
+    console.log("Array length of " + section + " is 0!");
+    return "No data recorded"
+  }
 }
 
 function getCSVColumnNames(obj) {
