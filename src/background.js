@@ -31,8 +31,10 @@ async function createWindow() {
     },
   });
 
-  browserWindow.removeMenu();
-  
+  if (!isDevelopment) {
+    browserWindow.removeMenu();
+  }
+
   browserWindow.webContents.on('did-finish-load',() => {
     browserWindow.setTitle("CATS Configurator");
   });
