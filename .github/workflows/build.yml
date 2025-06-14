@@ -12,10 +12,10 @@ jobs:
     
     steps: 
       - name: Check out Git repository
-        uses: actions/checkout@v1
+        uses: actions/checkout@v4
 
       - name: Install Node.js, NPM and Yarn
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
           node-version: 18
 
@@ -43,26 +43,26 @@ jobs:
       
       - name: Upload Artifacts for Windows Zip
         if: matrix.os == 'windows-latest' 
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with: 
           name: ${{ github.event.repository.name }}-Zip Package
           path: builds/*.zip
        
       - name: Upload Artifacts for Windows Installer
         if: matrix.os == 'windows-latest' 
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with: 
           name: ${{ github.event.repository.name }}-Windows Installer
           path: builds/*.exe
       - name: Upload Artifacts for MacOS
         if: matrix.os == 'macos-latest' 
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with: 
           name: ${{ github.event.repository.name }}-Dmg Package
           path: builds/*.dmg
       - name: Upload Artifacts for Linux
         if: matrix.os == 'ubuntu-latest' 
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with: 
           name: ${{ github.event.repository.name }}-AppImage Package
           path: builds/*.AppImage
@@ -76,7 +76,7 @@ jobs:
           path: ./CHANGELOG.md
           
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/' )
         with: 
           name: "CATS Configurator ${{  github.ref_name }}"
