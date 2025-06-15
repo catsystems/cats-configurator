@@ -1,6 +1,6 @@
 <template>
   <v-footer app dark>
-    <div class="d-flex caption">
+    <div class="d-flex caption" style="width: 100%">
       <div class="mr-12">
         Status: {{ active ? "Connected" : "Disconnected" }}
       </div>
@@ -9,6 +9,9 @@
           {{ item }}
         </div>
       </template>
+      <div class="ml-auto">
+        App version: {{ appVersion }}
+      </div>
     </div>
   </v-footer>
 </template>
@@ -18,6 +21,11 @@ import { mapState } from "vuex";
 
 export default {
   name: "Footer",
+  data() {
+    return {
+      appVersion: __APP_VERSION__
+    };
+  },
   computed: {
     ...mapState({
       version: (state) => state.static.version,
