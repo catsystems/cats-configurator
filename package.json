@@ -45,5 +45,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "optionalDependencies": {
+    "dmg-license": "^1.0.11"
   }
 }
