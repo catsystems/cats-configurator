@@ -2,11 +2,13 @@
 
 import { app, protocol, BrowserWindow } from "electron";
 import { createProtocol } from "vue-cli-plugin-electron-builder/lib";
-import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
+import installExtension from "electron-devtools-installer";
 import { subscribeListeners } from "./modules/ipc.js";
 import path from "path";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
+
+let browserWindow;
 
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([
@@ -15,7 +17,7 @@ protocol.registerSchemesAsPrivileged([
 
 async function createWindow() {
   // Create the browser window.
-  const win = new BrowserWindow({
+  browserWindow = new BrowserWindow({
     width: 1700,
     height: 1000,
     minWidth: 1200,
@@ -29,20 +31,21 @@ async function createWindow() {
     },
   });
 
-  win.removeMenu();
-  
-  win.webContents.on('did-finish-load',() => {
-    win.setTitle("CATS Configurator");
+  if (!isDevelopment) {
+    browserWindow.removeMenu();
+  }
+
+  browserWindow.webContents.on('did-finish-load',() => {
+    browserWindow.setTitle("CATS Configurator");
   });
 
   if (process.env.WEBPACK_DEV_SERVER_URL) {
     // Load the url of the dev server if in development mode
-    await win.loadURL(process.env.WEBPACK_DEV_SERVER_URL);
-    if (!process.env.IS_TEST) win.webContents.openDevTools();
+    await browserWindow.loadURL(process.env.WEBPACK_DEV_SERVER_URL);
   } else {
     createProtocol("app");
     // Load the index.html when not in development
-    win.loadURL("app://./index.html");
+    browserWindow.loadURL("app://./index.html");
   }
 }
 
@@ -66,16 +69,22 @@ app.on("activate", () => {
 // Some APIs can only be used after this event occurs.
 app.on("ready", async () => {
   subscribeListeners();
-  
-  if (isDevelopment && !process.env.IS_TEST) {
+
+  if (isDevelopment) {
     // Install Vue Devtools
     try {
-      await installExtension(VUEJS_DEVTOOLS);
+      // Provide legacy Vue.js devtools ID
+      await installExtension('iaajmlceplecbljialhhkmedjlpdblhp');
     } catch (e) {
       console.error("Vue Devtools failed to install:", e.toString());
     }
   }
-  createWindow();
+
+  await createWindow();
+
+  if (isDevelopment && browserWindow) {
+    browserWindow.webContents.openDevTools();
+  }
 });
 
 // Exit cleanly on request from parent process in development mode.

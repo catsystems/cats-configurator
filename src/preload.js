@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 const CHANNELS = [
   "FETCH_SERIAL_PORTS",
@@ -43,4 +43,9 @@ contextBridge.exposeInMainWorld("renderer", {
       ipcRenderer.on(channel, (event, ...args) => func(...args));
     }
   },
+});
+
+// Expose webUtils to the client
+contextBridge.exposeInMainWorld("webUtils", {
+  getPathForFile: webUtils.getPathForFile,
 });

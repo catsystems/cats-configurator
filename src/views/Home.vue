@@ -112,8 +112,9 @@ export default {
     loadFlightLog(file) {
       this.loadButtonLoading = true;
       this.flightLog = null
-      if (file?.path) {
-        window.renderer.send("LOAD_FLIGHTLOG", file.path);
+      let filePath = window.webUtils.getPathForFile(file);
+      if (filePath) {
+        window.renderer.send("LOAD_FLIGHTLOG", filePath);
       }
     },
     exportFlightLogCSVs() {
