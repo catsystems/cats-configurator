@@ -3,57 +3,57 @@
     <v-container fluid>
       <v-row>
         <v-col>
-          <v-card v-if="data" height="100%">
+          <v-card v-if="displayData" height="100%">
             <v-card-title>General</v-card-title>
             <v-card-text>
               <v-form ref="form">
-                <v-row v-for="key in Object.keys(data)" :key="key" dense>
-                  <v-col cols="6" v-if="data[key].section === 'general'">
+                <v-row v-for="key in Object.keys(displayData)" :key="key" dense>
+                  <v-col cols="6" v-if="displayData[key].section === 'general'">
                     <div
                       class="text-capitalize py-2"
-                      v-text="data[key].name"
+                      v-text="displayData[key].name"
                     />
                   </v-col>
-                  <v-col cols="6" v-if="data[key].section === 'general'">
+                  <v-col cols="6" v-if="displayData[key].section === 'general'">
                     <v-select
-                      v-if="data[key].type === 'SELECT'"
-                      v-model="data[key].value"
-                      :items="data[key].allowedValues"
+                      v-if="displayData[key].type === 'SELECT'"
+                      v-model="displayData[key].value"
+                      :items="displayData[key].allowedValues"
                       solo
                       dense
                       hide-details
                     ></v-select>
                     <v-text-field
-                      v-if="data[key].type === 'NUMBER'"
-                      v-model.number="data[key].value"
-                      :min="data[key].allowedRange[0]"
-                      :max="data[key].allowedRange[1]"
+                      v-if="displayData[key].type === 'NUMBER'"
+                      v-model.number="displayData[key].value"
+                      :min="displayData[key].allowedRange[0]"
+                      :max="displayData[key].allowedRange[1]"
                       :rules="[
                         (v) =>
-                          (v >= data[key].allowedRange[0] &&
-                            v <= data[key].allowedRange[1]) ||
-                          `Value should be from ${data[key].allowedRange.join(
+                          (v >= displayData[key].allowedRange[0] &&
+                            v <= displayData[key].allowedRange[1]) ||
+                          `Value should be from ${displayData[key].allowedRange.join(
                             ' to '
                           )}`,
                       ]"
-                      :hint="data[key].allowedRange.join(' to ')"
+                      :hint="displayData[key].allowedRange.join(' to ')"
                       type="number"
                       hide-details="auto"
                       solo
                       dense
                     >
                       <template v-slot:append>
-                        {{ data[key].unit }}
+                        {{ displayData[key].unit }}
                       </template>
                     </v-text-field>
                     <v-text-field
-                      v-if="data[key].type === 'STRING'"
-                      v-model="data[key].value"
+                      v-if="displayData[key].type === 'STRING'"
+                      v-model="displayData[key].value"
                       :rules="[
                         (v) => {
-                          if (v.length < data[key].allowedRange[0] ||
-                            v.length > data[key].allowedRange[1]) {
-                            return `String must have length between ${data[key].allowedRange.join(
+                          if (v.length < displayData[key].allowedRange[0] ||
+                            v.length > displayData[key].allowedRange[1]) {
+                            return `String must have length between ${displayData[key].allowedRange.join(
                               ' and '
                             )}`
                           } else if (v.match(/^[_a-z0-9]+$/i) === null) {
@@ -62,14 +62,14 @@
                           return true
                         }
                       ]"
-                      :hint="data[key].allowedRange.join(' to ')"
+                      :hint="displayData[key].allowedRange.join(' to ')"
                       type="text"
                       hide-details="auto"
                       solo
                       dense
                     >
                       <template v-slot:append>
-                        {{ data[key].unit }}
+                        {{ displayData[key].unit }}
                       </template>
                     </v-text-field>
                   </v-col>
@@ -112,12 +112,8 @@
           <v-card v-if="status && status.length" height="100%">
             <v-card-title>Info</v-card-title>
             <v-card-text>
-              <div
-                v-for="item in status"
-                :key="item"
-                class="mb-2"
-                v-text="item"
-              />
+              <div v-for="(item, index) in status.slice(0, 3)" :key="index" class="mb-2" v-text="item"></div>
+              <div v-if="processedStatus && processedStatus.length > 3" class="mb-2" v-text="processedStatus[3]"></div>
             </v-card-text>
           </v-card>
         </v-col>
@@ -128,53 +124,53 @@
             <v-card-title>Telemetry</v-card-title>
             <v-card-text>
               <v-form ref="form">
-                <v-row v-for="key in Object.keys(data)" :key="key" dense>
-                  <v-col cols="6" v-if="data[key].section === 'telemetry'">
+                <v-row v-for="key in Object.keys(displayData)" :key="key" dense>
+                  <v-col cols="6" v-if="displayData[key].section === 'telemetry'">
                     <div
                       class="text-capitalize py-2"
-                      v-text="data[key].name"
+                      v-text="displayData[key].name"
                     />
                   </v-col>
-                  <v-col cols="6" v-if="data[key].section === 'telemetry'">
+                  <v-col cols="6" v-if="displayData[key].section === 'telemetry'">
                     <v-select
-                      v-if="data[key].type === 'SELECT'"
-                      v-model="data[key].value"
-                      :items="data[key].allowedValues"
+                      v-if="displayData[key].type === 'SELECT'"
+                      v-model="displayData[key].value"
+                      :items="displayData[key].allowedValues"
                       solo
                       dense
                       hide-details
                     ></v-select>
                     <v-text-field
-                      v-if="data[key].type === 'NUMBER'"
-                      v-model.number="data[key].value"
-                      :min="data[key].allowedRange[0]"
-                      :max="data[key].allowedRange[1]"
+                      v-if="displayData[key].type === 'NUMBER'"
+                      v-model.number="displayData[key].value"
+                      :min="displayData[key].allowedRange[0]"
+                      :max="displayData[key].allowedRange[1]"
                       :rules="[
                         (v) =>
-                          (v >= data[key].allowedRange[0] &&
-                            v <= data[key].allowedRange[1]) ||
-                          `Value should be from ${data[key].allowedRange.join(
+                          (v >= displayData[key].allowedRange[0] &&
+                            v <= displayData[key].allowedRange[1]) ||
+                          `Value should be from ${displayData[key].allowedRange.join(
                             ' to '
                           )}`,
                       ]"
-                      :hint="data[key].allowedRange.join(' to ')"
+                      :hint="displayData[key].allowedRange.join(' to ')"
                       type="number"
                       hide-details="auto"
                       solo
                       dense
                     >
                       <template v-slot:append>
-                        {{ data[key].unit }}
+                        {{ displayData[key].unit }}
                       </template>
                     </v-text-field>
                     <v-text-field
-                      v-if="data[key].type === 'STRING'"
-                      v-model="data[key].value"
+                      v-if="displayData[key].type === 'STRING'"
+                      v-model="displayData[key].value"
                       :rules="[
                         (v) => {
-                          if (v.length < data[key].allowedRange[0] ||
-                            v.length > data[key].allowedRange[1]) {
-                            return `String must have length between ${data[key].allowedRange.join(
+                          if (v.length < displayData[key].allowedRange[0] ||
+                            v.length > displayData[key].allowedRange[1]) {
+                            return `String must have length between ${displayData[key].allowedRange.join(
                               ' and '
                             )}`
                           } else if (v.match(/^[_a-z0-9]+$/i) === null) {
@@ -183,14 +179,14 @@
                           return true
                         }
                       ]"
-                      :hint="data[key].allowedRange.join(' to ')"
+                      :hint="displayData[key].allowedRange.join(' to ')"
                       type="text"
                       hide-details="auto"
                       solo
                       dense
                     >
                       <template v-slot:append>
-                        {{ data[key].unit }}
+                        {{ displayData[key].unit }}
                       </template>
                     </v-text-field>
                   </v-col>
@@ -204,53 +200,53 @@
             <v-card-title>Testing</v-card-title>
             <v-card-text>
               <v-form ref="form">
-                <v-row v-for="key in Object.keys(data)" :key="key" dense>
-                  <v-col cols="6" v-if="data[key].section === 'testing'">
+                <v-row v-for="key in Object.keys(displayData)" :key="key" dense>
+                  <v-col cols="6" v-if="displayData[key].section === 'testing'">
                     <div
                       class="text-capitalize py-2"
-                      v-text="data[key].name"
+                      v-text="displayData[key].name"
                     />
                   </v-col>
-                  <v-col cols="6" v-if="data[key].section === 'testing'">
+                  <v-col cols="6" v-if="displayData[key].section === 'testing'">
                     <v-select
-                      v-if="data[key].type === 'SELECT'"
-                      v-model="data[key].value"
-                      :items="data[key].allowedValues"
+                      v-if="displayData[key].type === 'SELECT'"
+                      v-model="displayData[key].value"
+                      :items="displayData[key].allowedValues"
                       solo
                       dense
                       hide-details
                     ></v-select>
                     <v-text-field
-                      v-if="data[key].type === 'NUMBER'"
-                      v-model.number="data[key].value"
-                      :min="data[key].allowedRange[0]"
-                      :max="data[key].allowedRange[1]"
+                      v-if="displayData[key].type === 'NUMBER'"
+                      v-model.number="displayData[key].value"
+                      :min="displayData[key].allowedRange[0]"
+                      :max="displayData[key].allowedRange[1]"
                       :rules="[
                         (v) =>
-                          (v >= data[key].allowedRange[0] &&
-                            v <= data[key].allowedRange[1]) ||
-                          `Value should be from ${data[key].allowedRange.join(
+                          (v >= displayData[key].allowedRange[0] &&
+                            v <= displayData[key].allowedRange[1]) ||
+                          `Value should be from ${displayData[key].allowedRange.join(
                             ' to '
                           )}`,
                       ]"
-                      :hint="data[key].allowedRange.join(' to ')"
+                      :hint="displayData[key].allowedRange.join(' to ')"
                       type="number"
                       hide-details="auto"
                       solo
                       dense
                     >
                       <template v-slot:append>
-                        {{ data[key].unit }}
+                        {{ displayData[key].unit }}
                       </template>
                     </v-text-field>
                     <v-text-field
-                      v-if="data[key].type === 'STRING'"
-                      v-model="data[key].value"
+                      v-if="displayData[key].type === 'STRING'"
+                      v-model="displayData[key].value"
                       :rules="[
                         (v) => {
-                          if (v.length < data[key].allowedRange[0] ||
-                            v.length > data[key].allowedRange[1]) {
-                            return `String must have length between ${data[key].allowedRange.join(
+                          if (v.length < displayData[key].allowedRange[0] ||
+                            v.length > displayData[key].allowedRange[1]) {
+                            return `String must have length between ${displayData[key].allowedRange.join(
                               ' and '
                             )}`
                           } else if (v.match(/^[_a-z0-9]+$/i) === null) {
@@ -259,14 +255,14 @@
                           return true
                         }
                       ]"
-                      :hint="data[key].allowedRange.join(' to ')"
+                      :hint="displayData[key].allowedRange.join(' to ')"
                       type="text"
                       hide-details="auto"
                       solo
                       dense
                     >
                       <template v-slot:append>
-                        {{ data[key].unit }}
+                        {{ displayData[key].unit }}
                       </template>
                     </v-text-field>
                   </v-col>
@@ -285,6 +281,64 @@
 import { mapState, mapActions } from "vuex";
 import { getConfigs, setConfigs } from "@/services/configService";
 import ActionsBar from "@/components/ActionsBar";
+import { getDisplayValue } from "@/utils/unitConversions";
+import { convertLengthToImperial, convertAccelerationToImperial, convertLengthToMetric, convertAccelerationToMetric } from "../utils/unitConversions";
+
+function convertMetricDataToImperial(data) {
+  const imperialData = structuredClone(data);
+      
+  imperialData["main_altitude"].value = Math.round(convertLengthToImperial(
+    data["main_altitude"].value
+  ));
+  imperialData["main_altitude"].allowedRange[0] = Math.round(convertLengthToImperial(
+    data["main_altitude"].allowedRange[0]
+  ));
+  imperialData["main_altitude"].allowedRange[1] = Math.round(convertLengthToImperial(
+    data["main_altitude"].allowedRange[1]
+  ));
+  imperialData["main_altitude"].unit = "ft";
+
+  imperialData["acc_threshold"].value = Math.round(convertAccelerationToImperial(
+    data["acc_threshold"].value
+  ));
+  imperialData["acc_threshold"].allowedRange[0] = Math.round(convertAccelerationToImperial(
+    data["acc_threshold"].allowedRange[0]
+  ));
+  imperialData["acc_threshold"].allowedRange[1] = Math.round(convertAccelerationToImperial(
+    data["acc_threshold"].allowedRange[1]
+  ));
+  imperialData["acc_threshold"].unit = "ft/s²";
+
+  return imperialData;
+}
+
+function convertImperialDataToMetric(data) {
+  const metricData = structuredClone(data);
+
+  metricData["main_altitude"].value = Math.round(convertLengthToMetric(
+    data["main_altitude"].value
+  ));
+  metricData["main_altitude"].allowedRange[0] = Math.round(convertLengthToMetric(
+    data["main_altitude"].allowedRange[0]
+  ));
+  metricData["main_altitude"].allowedRange[1] = Math.round(convertLengthToMetric(
+    data["main_altitude"].allowedRange[1]
+  ));
+  metricData["main_altitude"].unit = "m";
+
+  metricData["acc_threshold"].value = Math.round(convertAccelerationToMetric(
+    data["acc_threshold"].value
+  ));
+  metricData["acc_threshold"].allowedRange[0] = Math.round(convertAccelerationToMetric(
+    data["acc_threshold"].allowedRange[0]
+  ));
+  metricData["acc_threshold"].allowedRange[1] = Math.round(convertAccelerationToMetric(
+    data["acc_threshold"].allowedRange[1]
+  ));
+  metricData["acc_threshold"].unit = "m/s²";
+
+  return metricData;
+}
 
 export default {
   name: "ConfigView",
@@ -297,6 +351,7 @@ export default {
       backupLoading: false,
       restoreLoading: false,
       data: {},
+      imperialData: {}
     };
   },
   watch: {
@@ -317,16 +372,35 @@ export default {
       deep: true,
       immediate: true,
     },
+    useImperialUnits(newValue) {
+      if (!newValue) return;
+      this.imperialData = convertMetricDataToImperial(structuredClone(this.data));
+    }
   },
   computed: {
     ...mapState({
       config: (state) => state.config,
       status: (state) => state.static.status,
       changedTab: (state) => state.changedTab,
+      useImperialUnits: (state) => state.useImperialUnits
     }),
     changed() {
       return this.changedTab === "config";
     },
+    processedStatus() {
+      if (!this.status || !Array.isArray(this.status)) {
+        return [];
+      }
+      return this.status.map((line, index) => {
+        if (index === 3 && this.useImperialUnits) {
+          return this.convertStatusLine4(line);
+        }
+        return line;
+      });
+    },
+    displayData() {
+      return this.useImperialUnits ? this.imperialData : this.data;
+    }
   },
   mounted() {
     this.init();
@@ -340,6 +414,9 @@ export default {
         clearInterval(this.timer);
       }
     });
+    if (this.useImperialUnits) {
+      this.imperialData = convertMetricDataToImperial(structuredClone(this.data));
+    }
   },
 
   beforeDestroy() {
@@ -361,7 +438,12 @@ export default {
     onSave() {
       if (!this.$refs.form.validate()) return;
 
-      setConfigs(this.data);
+      if (this.useImperialUnits) {
+        setConfigs(convertImperialDataToMetric(structuredClone(this.displayData)));
+      } else {
+        setConfigs(this.displayData);
+      }
+
       getConfigs();
     },
     backupConfig() {
@@ -388,6 +470,25 @@ export default {
         this.init();
       }
     },
+    convertStatusLine4(statusLine) {
+      const regex = /h:\s*(-?\d*\.?\d+)\s*m,\s*v:\s*(-?\d*\.?\d+)\s*m\/s,\s*a:\s*(-?\d*\.?\d+)\s*m\/s\^2/;
+      const match = statusLine.match(regex);
+
+      if (match) {
+        const rawAltitude = parseFloat(match[1]);
+        const rawVelocity = parseFloat(match[2]);
+        const rawAcceleration = parseFloat(match[3]);
+
+        const displayAltitude = getDisplayValue(rawAltitude, 'altitude', 'imperial');
+        const displayVelocity = getDisplayValue(rawVelocity, 'velocity', 'imperial');
+        const displayAcceleration = getDisplayValue(rawAcceleration, 'acceleration', 'imperial');
+
+        return `h: ${displayAltitude}, v: ${displayVelocity}, a: ${displayAcceleration}`;
+      } else {
+        console.warn("Could not parse status line for conversion:", statusLine);
+        return statusLine;
+      }
+    }
   },
 };
 </script>

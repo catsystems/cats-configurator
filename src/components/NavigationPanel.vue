@@ -1,15 +1,9 @@
 <template>
-  <v-navigation-drawer app dark clipped permanent width="300">
+  <v-navigation-drawer app dark clipped permanent width="300" class="navigation-panel">
     <v-alert v-if="!active" dense text type="info" class="mx-2 mt-2 caption">
-      Plug in CATS board and connect to activate this panel.
+      Plug in CATS board and connect to activate this area.
     </v-alert>
-    <v-alert
-      v-if="changedTab"
-      dense
-      text
-      type="warning"
-      class="mx-2 mt-2 caption"
-    >
+    <v-alert v-if="changedTab" dense text type="warning" class="mx-2 mt-2 caption">
       <div class="d-flex justify-space-between align-center">
         <div>Unsaved changes.</div>
         <v-btn small text @click="discard">discard</v-btn>
@@ -26,6 +20,7 @@
         </v-list-item-group>
       </v-list>
     </v-card>
+    <UnitSwitch class="unit-switch" />
   </v-navigation-drawer>
 </template>
 
@@ -35,9 +30,13 @@ import { getConfigs } from "@/services/configService";
 import { getEvents } from "@/services/eventService";
 import { getTimers } from "@/services/timerService";
 import { getLogData } from "@/services/logService";
+import UnitSwitch from "./UnitSwitch.vue";
 
 export default {
   name: "NavigationPanel",
+  components: {
+    UnitSwitch,
+  },
   props: {
     items: {
       type: Array,
@@ -71,4 +70,13 @@ export default {
 };
 </script>
 
-<style></style>
+<style scoped>
+.navigation-panel ::v-deep .v-navigation-drawer__content {
+  display: flex;
+  flex-direction: column;
+}
+
+.unit-switch {
+  margin-top: auto;
+}
+</style>
