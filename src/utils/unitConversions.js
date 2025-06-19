@@ -131,26 +131,25 @@ export function convertTemperatureToMetric(fahrenheit) {
  *
  * @param {number} rawValue - The raw numeric value from the board (always in metric SI base units).
  * @param {string} paramName - The name of the parameter (e.g., 'altitude', 'acceleration').
- * @param {string} targetUnitSystem - The desired display unit system ('metric' or 'imperial').
  * @param {object} [options={}] - Optional display settings.
+ * @param {boolean} [options.numeric=true] - If true, returns a numeric value; if false, returns a formatted string.
  * @param {number} [options.decimals=2] - Number of decimal places for rounding.
- * @param {boolean} [options.displayInGs=false] - For 'acceleration', display in G-forces.
- * @param {boolean} [options.displayInBar=false] - For 'pressure', display in Bar.
- * @param {boolean} [options.displayInKelvin=false] - For 'temperature', display in Kelvin.
- * @returns {string} The formatted string with value and unit (e.g., "123.45 m", "3.2 g").
+ * @param {string} [options.targetUnitSystem='imperial'] - The target unit system for conversion ('metric' or 'imperial').
+ * @param {boolean} [options.excludeLabel=false] - If true, excludes the unit label from the returned string.
+ * @returns {number|string} The formatted value, either as a number or a string with unit label.
  */
-export function getDisplayValue(rawValue, paramName, targetUnitSystem, options = {}) {
+export function getDisplayValue(rawValue, paramName, options = {}) {
   // Handle null/undefined values
   if (rawValue === null || rawValue === undefined) {
-    return '-'; // Or 'N/A' or similar placeholder
+    return '-';
   }
 
   // Ensure options have defaults
-  const { decimals = 2, excludeLabel = false } = options;
-  const isTargetImperial = targetUnitSystem === 'imperial';
-  let valueToDisplay = parseFloat(rawValue);
+  const { numeric = true, decimals = 2, targetUnitSystem = "imperial", excludeLabel = false } = options;
+  let parsedValue = parseFloat(rawValue);
+  let convertedValue;
 
-  if (isNaN(valueToDisplay)) {
+  if (isNaN(parsedValue)) {
     return '-';
   }
 
@@ -158,24 +157,26 @@ export function getDisplayValue(rawValue, paramName, targetUnitSystem, options =
 
   switch (paramName) {
     case 'altitude':
-      valueToDisplay = convertLengthToImperial(rawValue);
+      convertedValue = convertLengthToImperial(rawValue);
       break;
     case 'velocity':
-      valueToDisplay = convertVelocityToImperial(rawValue);
+      convertedValue = convertVelocityToImperial(rawValue);
       break;
     case 'acceleration':
-      valueToDisplay = convertAccelerationToImperial(rawValue);
+      convertedValue = convertAccelerationToImperial(rawValue);
       break;
     case 'pressure':
-      valueToDisplay = convertPressureToImperial(rawValue);
+      convertedValue = convertPressureToImperial(rawValue);
       break;
     case 'temperature':
-      valueToDisplay = convertTemperatureToImperial(rawValue);
+      convertedValue = convertTemperatureToImperial(rawValue);
       break;
     default:
       break;
   }
   unitLabel = getUnitLabel(paramName, targetUnitSystem);
 
-  return options.excludeLabel ? `${valueToDisplay.toFixed(decimals)}` : `${valueToDisplay.toFixed(decimals)}${unitLabel}`
+  if (numeric) return convertedValue;
+
+  return options.excludeLabel ? `${convertedValue.toFixed(decimals)}` : `${convertedValue.toFixed(decimals)}${unitLabel}`
 }

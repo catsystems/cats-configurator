@@ -16,9 +16,16 @@ const EVENT_MAP = {
 
 function adaptTraceNameForConverterFunction(name) {
     if (name === 'height') return 'altitude';
+    if (name === 'Ax') return 'acceleration';
+    if (name === 'Ay') return 'acceleration';
+    if (name === 'Az') return 'acceleration';
+    if (name === 'T') return 'temperature';
+    if (name === 'P') return 'pressure';
     if (name === 'filteredAltitudeAGL') return 'altitude';
     return name;
 }
+
+const TRACES_TO_CONVERT = ['height', 'acceleration', 'velocity', 'Ax', 'Ay', 'Az', 'T', 'P', 'filteredAltitudeAGL'];
 
 function makePlot(data, elementId, title, ylabel, traceNames, eventInfo, useImperialUnits) {
 
@@ -33,11 +40,20 @@ function makePlot(data, elementId, title, ylabel, traceNames, eventInfo, useImpe
             })
         }
     }
+
+    if (useImperialUnits) {
+        data = structuredClone(data)
+        for (const o of data) {
+            for (let key of traceNames.filter(value => TRACES_TO_CONVERT.includes(value))) {
+                o[key] = getDisplayValue(o[key], adaptTraceNameForConverterFunction(key));
+            }
+        }
+    }
+
     for (const o of data) {
         let i = 0;
         for (let key of traceNames) {
             let value = o[key]
-            if (useImperialUnits) value = getDisplayValue(value, adaptTraceNameForConverterFunction(key), "imperial")
             lines[i].y.push(value)
             i++;
         }
