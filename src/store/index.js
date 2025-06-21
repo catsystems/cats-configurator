@@ -18,6 +18,7 @@ export default new Vuex.Store({
       rec_speed: {},
       rec_elements: {},
     },
+    useImperialUnits: false,
   },
   mutations: {
     SET_SERIAL_PORTS(state, ports) {
@@ -59,6 +60,9 @@ export default new Vuex.Store({
     SET_SUCCESS_MESSAGE(state, value) {
       state.successSetMessage = value;
     },
+    SET_USE_IMPERIAL_UNITS(state, value) {
+      state.useImperialUnits = value;
+    }
   },
   actions: {
     setSerialPorts({ commit }, ports) {
@@ -74,8 +78,8 @@ export default new Vuex.Store({
       if (!payload.key) return;
 
       payload.name = CONFIG_SETTINGS[payload.key]
-      ? CONFIG_SETTINGS[payload.key].name
-      : null;
+        ? CONFIG_SETTINGS[payload.key].name
+        : null;
 
       payload.unit = CONFIG_SETTINGS[payload.key]
         ? CONFIG_SETTINGS[payload.key].unit
@@ -124,6 +128,10 @@ export default new Vuex.Store({
       commit("SET_SUCCESS_MESSAGE", value);
       setTimeout(() => commit("SET_SUCCESS_MESSAGE", null), 5000);
     },
+    toggleUnitSystem({ commit, state }) {
+      const newValue = !state.useImperialUnits;
+      commit("SET_USE_IMPERIAL_UNITS", newValue);
+    },
   },
   getters: {
     isEventsChanged(state) {
@@ -144,5 +152,8 @@ export default new Vuex.Store({
 
       return changed;
     },
+    useImperialUnits(state) {
+      return state.useImperialUnits;
+    }
   },
 });
