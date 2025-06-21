@@ -148,5 +148,13 @@ export default {
       }
     }
   },
+  watch: {
+    useImperialUnits(newValue) {
+      if (this.flightLog) {
+        this.$refs.flightLogPlotContainer.innerHTML = "";
+        this.replot();
+      }
+    }
+  }
 };
 </script>

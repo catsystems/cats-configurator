@@ -1,5 +1,5 @@
 <template>
-  <v-navigation-drawer app dark clipped permanent width="300" class="navigation-panel">
+  <v-navigation-drawer app dark clipped permanent width="300" class="navigation-panel pb-4">
     <v-alert v-if="!active" dense text type="info" class="mx-2 mt-2 caption">
       Plug in CATS board and connect to activate this area.
     </v-alert>
@@ -20,7 +20,7 @@
         </v-list-item-group>
       </v-list>
     </v-card>
-    <UnitSwitch class="unit-switch" />
+    <UnitSwitch class="unit-switch mb-2" />
   </v-navigation-drawer>
 </template>
 

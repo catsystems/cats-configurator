@@ -5,6 +5,18 @@
         <v-switch v-model="useImperialUnitsState" label="Use imperial units" hide-details inset class="mt-0 pt-0"
           color="primary"></v-switch>
       </v-col>
+      <v-tooltip top>
+        <template v-slot:activator="{ on, attrs }">
+        <v-icon
+              color="primary"
+              v-on="on"
+              v-bind="attrs"
+            >
+              mdi-information-variant-box-outline
+            </v-icon>
+            </template>
+        <span>Configuration values using imperial system will be rounded to nearest whole metric value</span>
+      </v-tooltip>
     </v-row>
   </v-container>
 </template>

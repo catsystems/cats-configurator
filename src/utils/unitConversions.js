@@ -1,10 +1,8 @@
-// --- Conversion Constants ---
 const METERS_TO_FEET = 3.28084;
 const MPS_TO_FPS = 3.28084; // Meters per second to feet per second
 const MPS2_TO_FPS2 = 3.28084; // Meters per second squared to feet per second squared
 const PSI_TO_KPA = 6.89476; // Pounds per square inch to Kilopascals
 
-// --- Core Unit Label Getter ---
 /**
  * Gets the appropriate unit label for a given parameter and unit system.
  * @param {string} paramName - The name of the parameter (e.g., 'altitude', 'velocity').
@@ -20,19 +18,16 @@ export function getUnitLabel(paramName, unitSystem) {
     case 'velocity':
       return isImperial ? 'ft/s' : 'm/s';
     case 'acceleration':
-      return isImperial ? 'ft/s²' : 'm/s²'; // Base label for acceleration
+      return isImperial ? 'ft/s²' : 'm/s²';
     case 'pressure':
-      return isImperial ? 'psi' : 'kPa';   // Base label for pressure
+      return isImperial ? 'psi' : 'kPa';
     case 'temperature':
-      return isImperial ? '°F' : '°C';     // Base label for temperature
-    // Add more parameters as needed (e.g., 'angularVelocity', 'batteryVoltage')
+      return isImperial ? '°F' : '°C';
     default:
       console.warn(`Unknown parameter for unit label: ${paramName}`);
-      return ''; // Return empty for unknown parameters
+      return '';
   }
 }
-
-// --- Specific Value Conversion Functions (from Metric Base Units) ---
 
 /**
  * Converts length from meters to feet.
@@ -155,28 +150,54 @@ export function getDisplayValue(rawValue, paramName, options = {}) {
 
   let unitLabel = '';
 
-  switch (paramName) {
-    case 'altitude':
-      convertedValue = convertLengthToImperial(rawValue);
-      break;
-    case 'velocity':
-      convertedValue = convertVelocityToImperial(rawValue);
-      break;
-    case 'acceleration':
-      convertedValue = convertAccelerationToImperial(rawValue);
-      break;
-    case 'pressure':
-      convertedValue = convertPressureToImperial(rawValue);
-      break;
-    case 'temperature':
-      convertedValue = convertTemperatureToImperial(rawValue);
-      break;
-    default:
-      break;
+  if (targetUnitSystem === 'imperial') {
+    switch (paramName) {
+      case 'altitude':
+        convertedValue = convertLengthToImperial(rawValue);
+        break;
+      case 'velocity':
+        convertedValue = convertVelocityToImperial(rawValue);
+        break;
+      case 'acceleration':
+        convertedValue = convertAccelerationToImperial(rawValue);
+        break;
+      case 'pressure':
+        convertedValue = convertPressureToImperial(rawValue);
+        break;
+      case 'temperature':
+        convertedValue = convertTemperatureToImperial(rawValue);
+        break;
+      default:
+        convertedValue = rawValue;
+    }
+  } else if (targetUnitSystem === 'metric') {
+    switch (paramName) {
+      case 'altitude':
+        convertedValue = convertLengthToMetric(rawValue);
+        break;
+      case 'velocity':
+        convertedValue = convertVelocityToMetric(rawValue);
+        break;
+      case 'acceleration':
+        convertedValue = convertAccelerationToMetric(rawValue);
+        break;
+      case 'pressure':
+        convertedValue = convertPressureToMetric(rawValue);
+        break;
+      case 'temperature':
+        convertedValue = convertTemperatureToMetric(rawValue);
+        break;
+      default:
+        convertedValue = rawValue;
+    }
+  } else {
+    console.warn(`Unknown target unit system: ${targetUnitSystem}`);
+    return '-';
   }
+
   unitLabel = getUnitLabel(paramName, targetUnitSystem);
 
   if (numeric) return convertedValue;
 
-  return options.excludeLabel ? `${convertedValue.toFixed(decimals)}` : `${convertedValue.toFixed(decimals)}${unitLabel}`
+  return excludeLabel ? `${convertedValue.toFixed(decimals)}` : `${convertedValue.toFixed(decimals)}${unitLabel}`
 }

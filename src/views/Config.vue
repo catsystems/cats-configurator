@@ -479,9 +479,9 @@ export default {
         const rawVelocity = parseFloat(match[2]);
         const rawAcceleration = parseFloat(match[3]);
 
-        const displayAltitude = getDisplayValue(rawAltitude, 'altitude', 'imperial');
-        const displayVelocity = getDisplayValue(rawVelocity, 'velocity', 'imperial');
-        const displayAcceleration = getDisplayValue(rawAcceleration, 'acceleration', 'imperial');
+        const displayAltitude = getDisplayValue(rawAltitude, 'altitude', {targetUnitSystem: 'imperial', numeric: false});
+        const displayVelocity = getDisplayValue(rawVelocity, 'velocity', {targetUnitSystem: 'imperial', numeric: false});
+        const displayAcceleration = getDisplayValue(rawAcceleration, 'acceleration', {targetUnitSystem: 'imperial', numeric: false});
 
         return `h: ${displayAltitude}, v: ${displayVelocity}, a: ${displayAcceleration}`;
       } else {

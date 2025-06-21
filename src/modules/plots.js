@@ -240,7 +240,7 @@ export function makePlots(flightlog, element, useImperialUnits) {
 
     el = document.createElement("div")
     element.append(el)
-    const accelerationYLabel = useImperialUnits ? "Acceleration [ft/s^2]" : "Acceleration [m/s^2]"
+    const accelerationYLabel = useImperialUnits ? "Acceleration [ft/s²]" : "Acceleration [m/s²]"
     makePlot(flightlog.imu, el, "IMU - Acceleration", accelerationYLabel, ["Ax", "Ay", "Az"], eventInfo, useImperialUnits)
 
     el = document.createElement("div")
