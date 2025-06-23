@@ -151,8 +151,9 @@ export default {
   watch: {
     useImperialUnits(newValue) {
       if (this.flightLog) {
-        this.$refs.flightLogPlotContainer.innerHTML = "";
+        const savedWindowScrollY = window.scrollY;
         this.replot();
+        window.scrollTo(0, savedWindowScrollY);
       }
     }
   }
