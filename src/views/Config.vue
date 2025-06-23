@@ -124,73 +124,75 @@
             <v-card-title>Telemetry</v-card-title>
             <v-card-text>
               <v-form ref="form">
-                <v-row v-for="key in Object.keys(displayData)" :key="key" dense>
-                  <v-col cols="6" v-if="displayData[key].section === 'telemetry'">
-                    <div
-                      class="text-capitalize py-2"
-                      v-text="displayData[key].name"
-                    />
-                  </v-col>
-                  <v-col cols="6" v-if="displayData[key].section === 'telemetry'">
-                    <v-select
-                      v-if="displayData[key].type === 'SELECT'"
-                      v-model="displayData[key].value"
-                      :items="displayData[key].allowedValues"
-                      solo
-                      dense
-                      hide-details
-                    ></v-select>
-                    <v-text-field
-                      v-if="displayData[key].type === 'NUMBER'"
-                      v-model.number="displayData[key].value"
-                      :min="displayData[key].allowedRange[0]"
-                      :max="displayData[key].allowedRange[1]"
-                      :rules="[
-                        (v) =>
-                          (v >= displayData[key].allowedRange[0] &&
-                            v <= displayData[key].allowedRange[1]) ||
-                          `Value should be from ${displayData[key].allowedRange.join(
-                            ' to '
-                          )}`,
-                      ]"
-                      :hint="displayData[key].allowedRange.join(' to ')"
-                      type="number"
-                      hide-details="auto"
-                      solo
-                      dense
-                    >
-                      <template v-slot:append>
-                        {{ displayData[key].unit }}
-                      </template>
-                    </v-text-field>
-                    <v-text-field
-                      v-if="displayData[key].type === 'STRING'"
-                      v-model="displayData[key].value"
-                      :rules="[
-                        (v) => {
-                          if (v.length < displayData[key].allowedRange[0] ||
-                            v.length > displayData[key].allowedRange[1]) {
-                            return `String must have length between ${displayData[key].allowedRange.join(
-                              ' and '
-                            )}`
-                          } else if (v.match(/^[_a-z0-9]+$/i) === null) {
-                            return `String may only contain alphanumeric characters`
+                <template v-if="displayData">
+                  <v-row v-for="key in Object.keys(displayData)" :key="key" dense>
+                    <v-col cols="6" v-if="displayData[key].section === 'telemetry'">
+                      <div
+                        class="text-capitalize py-2"
+                        v-text="displayData[key].name"
+                      />
+                    </v-col>
+                    <v-col cols="6" v-if="displayData[key].section === 'telemetry'">
+                      <v-select
+                        v-if="displayData[key].type === 'SELECT'"
+                        v-model="displayData[key].value"
+                        :items="displayData[key].allowedValues"
+                        solo
+                        dense
+                        hide-details
+                      ></v-select>
+                      <v-text-field
+                        v-if="displayData[key].type === 'NUMBER'"
+                        v-model.number="displayData[key].value"
+                        :min="displayData[key].allowedRange[0]"
+                        :max="displayData[key].allowedRange[1]"
+                        :rules="[
+                          (v) =>
+                            (v >= displayData[key].allowedRange[0] &&
+                              v <= displayData[key].allowedRange[1]) ||
+                            `Value should be from ${displayData[key].allowedRange.join(
+                              ' to '
+                            )}`,
+                        ]"
+                        :hint="displayData[key].allowedRange.join(' to ')"
+                        type="number"
+                        hide-details="auto"
+                        solo
+                        dense
+                      >
+                        <template v-slot:append>
+                          {{ displayData[key].unit }}
+                        </template>
+                      </v-text-field>
+                      <v-text-field
+                        v-if="displayData[key].type === 'STRING'"
+                        v-model="displayData[key].value"
+                        :rules="[
+                          (v) => {
+                            if (v.length < displayData[key].allowedRange[0] ||
+                              v.length > displayData[key].allowedRange[1]) {
+                              return `String must have length between ${displayData[key].allowedRange.join(
+                                ' and '
+                              )}`
+                            } else if (v.match(/^[_a-z0-9]+$/i) === null) {
+                              return `String may only contain alphanumeric characters`
+                            }
+                            return true
                           }
-                          return true
-                        }
-                      ]"
-                      :hint="displayData[key].allowedRange.join(' to ')"
-                      type="text"
-                      hide-details="auto"
-                      solo
-                      dense
-                    >
-                      <template v-slot:append>
-                        {{ displayData[key].unit }}
-                      </template>
-                    </v-text-field>
-                  </v-col>
-                </v-row>
+                        ]"
+                        :hint="displayData[key].allowedRange.join(' to ')"
+                        type="text"
+                        hide-details="auto"
+                        solo
+                        dense
+                      >
+                        <template v-slot:append>
+                          {{ displayData[key].unit }}
+                        </template>
+                      </v-text-field>
+                    </v-col>
+                  </v-row>
+                </template>
               </v-form>
             </v-card-text>
           </v-card>
@@ -200,73 +202,75 @@
             <v-card-title>Testing</v-card-title>
             <v-card-text>
               <v-form ref="form">
-                <v-row v-for="key in Object.keys(displayData)" :key="key" dense>
-                  <v-col cols="6" v-if="displayData[key].section === 'testing'">
-                    <div
-                      class="text-capitalize py-2"
-                      v-text="displayData[key].name"
-                    />
-                  </v-col>
-                  <v-col cols="6" v-if="displayData[key].section === 'testing'">
-                    <v-select
-                      v-if="displayData[key].type === 'SELECT'"
-                      v-model="displayData[key].value"
-                      :items="displayData[key].allowedValues"
-                      solo
-                      dense
-                      hide-details
-                    ></v-select>
-                    <v-text-field
-                      v-if="displayData[key].type === 'NUMBER'"
-                      v-model.number="displayData[key].value"
-                      :min="displayData[key].allowedRange[0]"
-                      :max="displayData[key].allowedRange[1]"
-                      :rules="[
-                        (v) =>
-                          (v >= displayData[key].allowedRange[0] &&
-                            v <= displayData[key].allowedRange[1]) ||
-                          `Value should be from ${displayData[key].allowedRange.join(
-                            ' to '
-                          )}`,
-                      ]"
-                      :hint="displayData[key].allowedRange.join(' to ')"
-                      type="number"
-                      hide-details="auto"
-                      solo
-                      dense
-                    >
-                      <template v-slot:append>
-                        {{ displayData[key].unit }}
-                      </template>
-                    </v-text-field>
-                    <v-text-field
-                      v-if="displayData[key].type === 'STRING'"
-                      v-model="displayData[key].value"
-                      :rules="[
-                        (v) => {
-                          if (v.length < displayData[key].allowedRange[0] ||
-                            v.length > displayData[key].allowedRange[1]) {
-                            return `String must have length between ${displayData[key].allowedRange.join(
-                              ' and '
-                            )}`
-                          } else if (v.match(/^[_a-z0-9]+$/i) === null) {
-                            return `String may only contain alphanumeric characters`
+                <template v-if="displayData">
+                  <v-row v-for="key in Object.keys(displayData)" :key="key" dense>
+                    <v-col cols="6" v-if="displayData[key].section === 'testing'">
+                      <div
+                        class="text-capitalize py-2"
+                        v-text="displayData[key].name"
+                      />
+                    </v-col>
+                    <v-col cols="6" v-if="displayData[key].section === 'testing'">
+                      <v-select
+                        v-if="displayData[key].type === 'SELECT'"
+                        v-model="displayData[key].value"
+                        :items="displayData[key].allowedValues"
+                        solo
+                        dense
+                        hide-details
+                      ></v-select>
+                      <v-text-field
+                        v-if="displayData[key].type === 'NUMBER'"
+                        v-model.number="displayData[key].value"
+                        :min="displayData[key].allowedRange[0]"
+                        :max="displayData[key].allowedRange[1]"
+                        :rules="[
+                          (v) =>
+                            (v >= displayData[key].allowedRange[0] &&
+                              v <= displayData[key].allowedRange[1]) ||
+                            `Value should be from ${displayData[key].allowedRange.join(
+                              ' to '
+                            )}`,
+                        ]"
+                        :hint="displayData[key].allowedRange.join(' to ')"
+                        type="number"
+                        hide-details="auto"
+                        solo
+                        dense
+                      >
+                        <template v-slot:append>
+                          {{ displayData[key].unit }}
+                        </template>
+                      </v-text-field>
+                      <v-text-field
+                        v-if="displayData[key].type === 'STRING'"
+                        v-model="displayData[key].value"
+                        :rules="[
+                          (v) => {
+                            if (v.length < displayData[key].allowedRange[0] ||
+                              v.length > displayData[key].allowedRange[1]) {
+                              return `String must have length between ${displayData[key].allowedRange.join(
+                                ' and '
+                              )}`
+                            } else if (v.match(/^[_a-z0-9]+$/i) === null) {
+                              return `String may only contain alphanumeric characters`
+                            }
+                            return true
                           }
-                          return true
-                        }
-                      ]"
-                      :hint="displayData[key].allowedRange.join(' to ')"
-                      type="text"
-                      hide-details="auto"
-                      solo
-                      dense
-                    >
-                      <template v-slot:append>
-                        {{ displayData[key].unit }}
-                      </template>
-                    </v-text-field>
-                  </v-col>
-                </v-row>
+                        ]"
+                        :hint="displayData[key].allowedRange.join(' to ')"
+                        type="text"
+                        hide-details="auto"
+                        solo
+                        dense
+                      >
+                        <template v-slot:append>
+                          {{ displayData[key].unit }}
+                        </template>
+                      </v-text-field>
+                    </v-col>
+                  </v-row>
+                </template>
               </v-form>
             </v-card-text>
           </v-card>
@@ -350,8 +354,8 @@ export default {
       timer: null,
       backupLoading: false,
       restoreLoading: false,
-      data: {},
-      imperialData: {}
+      data: null,
+      imperialData: null
     };
   },
   watch: {
@@ -368,9 +372,9 @@ export default {
     config: {
       handler(config) {
         this.data = JSON.parse(JSON.stringify(config));
+        this.imperialData = convertMetricDataToImperial(structuredClone(this.data));
       },
-      deep: true,
-      immediate: true,
+      deep: true
     },
     useImperialUnits(newValue) {
       if (!newValue) return;
@@ -414,7 +418,7 @@ export default {
         clearInterval(this.timer);
       }
     });
-    if (this.useImperialUnits) {
+    if (this.useImperialUnits && this.data !== null) {
       this.imperialData = convertMetricDataToImperial(structuredClone(this.data));
     }
   },
