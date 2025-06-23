@@ -359,9 +359,14 @@ export default {
     };
   },
   watch: {
-    data: {
+    displayData: {
       handler(data) {
-        let changed = JSON.stringify(data) !== JSON.stringify(this.config);
+        let changed;
+        if (this.useImperialUnits) {
+          changed = JSON.stringify(data) !== JSON.stringify(this.lastSavedImperialData);
+        } else {
+          changed = JSON.stringify(data) !== JSON.stringify(this.lastSavedData);
+        }
 
         if (this.changed !== changed) {
           this.setChangedTab(changed ? "config" : null);
@@ -371,6 +376,9 @@ export default {
     },
     config: {
       handler(config) {
+        this.lastSavedData = JSON.parse(JSON.stringify(config));
+        this.lastSavedImperialData = convertMetricDataToImperial(structuredClone(config));
+
         this.data = JSON.parse(JSON.stringify(config));
         this.imperialData = convertMetricDataToImperial(structuredClone(this.data));
       },
