@@ -377,8 +377,11 @@ export default {
       deep: true
     },
     useImperialUnits(newValue) {
-      if (!newValue) return;
-      this.imperialData = convertMetricDataToImperial(structuredClone(this.data));
+      if (!newValue) {
+        this.data = convertImperialDataToMetric(structuredClone(this.imperialData));
+      } else {
+        this.imperialData = convertMetricDataToImperial(structuredClone(this.data));
+      }
     }
   },
   computed: {
