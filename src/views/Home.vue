@@ -58,7 +58,43 @@
               </v-row>
               <v-row>
                 <v-col>
-                <div v-resize="setResizeTimer" ref="flightLogPlotContainer"></div>
+                <template v-if="fileLoading">
+                  <v-skeleton-loader
+                    class="mx-auto mb-4"
+                    type="card"
+                  ></v-skeleton-loader>
+                  <v-skeleton-loader
+                    class="mx-auto mb-4"
+                    type="card"
+                  ></v-skeleton-loader>
+                  <v-skeleton-loader
+                    class="mx-auto mb-4"
+                    type="card"
+                  ></v-skeleton-loader>
+                  <v-skeleton-loader
+                    class="mx-auto mb-4"
+                    type="card"
+                  ></v-skeleton-loader>
+                  <v-skeleton-loader
+                    class="mx-auto mb-4"
+                    type="card"
+                  ></v-skeleton-loader>
+                  <v-skeleton-loader
+                    class="mx-auto mb-4"
+                    type="card"
+                  ></v-skeleton-loader>
+                  <v-skeleton-loader
+                    class="mx-auto mb-4"
+                    type="card"
+                  ></v-skeleton-loader>
+                  <v-skeleton-loader
+                    class="mx-auto"
+                    type="card"
+                  ></v-skeleton-loader>
+                </template>
+                <template v-else-if="flightLog">
+                  <div v-resize="setResizeTimer" ref="flightLogPlotContainer"></div>
+                </template>
                 </v-col>
               </v-row>
             </v-card-text>
@@ -110,6 +146,7 @@ export default {
   },
   methods: {
     loadFlightLog(file) {
+      this.fileLoading = true;
       this.loadButtonLoading = true;
       this.flightLog = null
       let filePath = window.webUtils.getPathForFile(file);
