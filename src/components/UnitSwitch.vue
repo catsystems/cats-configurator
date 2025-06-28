@@ -15,7 +15,7 @@
               mdi-information-variant-box-outline
             </v-icon>
             </template>
-        <span>Configuration values using imperial system will be rounded to nearest whole metric value</span>
+        <span>Flight Computer natively uses metric units; Imperial values will be converted to the nearest metric integer.</span>
       </v-tooltip>
     </v-row>
   </v-container>
