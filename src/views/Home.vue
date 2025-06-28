@@ -69,6 +69,7 @@
 </template>
 
 <script>
+import { mapActions } from "vuex";
 import { makePlots } from '../modules/plots'
 
 export default {
@@ -98,17 +99,21 @@ export default {
       }
       this.errorString = "";
       this.flightLog = flightLog;
+      this.showSuccessSnackbar("Flight logs loaded successfully!");
 
       if (el) makePlots(flightLog, el)
     });
     window.renderer.on("EXPORT_FLIGHTLOG_CSVS", (flightLog) => {
       this.exportButtonLoading = false;
+      this.showSuccessSnackbar("Exported flight log CSVs!");
     });
     window.renderer.on("EXPORT_FLIGHTLOG_HTML", (flightLog) => {
       this.exportButtonLoading = false;
+      this.showSuccessSnackbar("Exported flight log HTML charts!");
     });
   },
   methods: {
+    ...mapActions(["showSuccessSnackbar"]),
     loadFlightLog(file) {
       this.loadButtonLoading = true;
       this.flightLog = null

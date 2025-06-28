@@ -330,7 +330,10 @@ export default {
   },
   mounted() {
     this.init();
-    window.renderer.on("BOARD:DUMP", () => (this.backupLoading = false));
+    window.renderer.on("BOARD:DUMP", () => {
+      this.backupLoading = false
+      this.showSuccessSnackbar("Backup created!");
+    });
     window.renderer.on("BOARD:RESTORE", () => {
       this.restoreLoading = false;
       setTimeout(this.init, 100);
@@ -346,7 +349,7 @@ export default {
     clearInterval(this.timer);
   },
   methods: {
-    ...mapActions(["setChangedTab"]),
+    ...mapActions(["setChangedTab", "showSuccessSnackbar"]),
     init() {
       getConfigs();
       this.getInfo();

@@ -8,7 +8,6 @@ export default new Vuex.Store({
   state: {
     serialPorts: [],
     active: false,
-    successSetMessage: null,
     changedTab: null,
     static: {},
     config: {},
@@ -17,6 +16,12 @@ export default new Vuex.Store({
     logs: {
       rec_speed: {},
       rec_elements: {},
+    },
+    snackbar: {
+      isVisible: false,
+      message: "",
+      color: "success",
+      timeout: 3000,
     },
   },
   mutations: {
@@ -56,8 +61,18 @@ export default new Vuex.Store({
     REMOVE_EVENT_ACTION(state, { key, index }) {
       state.events[key].actions.splice(index, 1);
     },
-    SET_SUCCESS_MESSAGE(state, value) {
-      state.successSetMessage = value;
+    SET_SNACKBAR_PROPS(state, payload) {
+      state.snackbar = { ...state.snackbar, ...payload };
+    },
+    SHOW_SNACKBAR(state, { message, color = "success", timeout = 3000 }) {
+      state.snackbar.isVisible = true;
+      state.snackbar.message = message;
+      state.snackbar.color = color;
+      state.snackbar.timeout = timeout;
+    },
+    HIDE_SNACKBAR(state) {
+      state.snackbar.isVisible = false;
+      state.snackbar.message = "";
     },
   },
   actions: {
@@ -74,8 +89,8 @@ export default new Vuex.Store({
       if (!payload.key) return;
 
       payload.name = CONFIG_SETTINGS[payload.key]
-      ? CONFIG_SETTINGS[payload.key].name
-      : null;
+        ? CONFIG_SETTINGS[payload.key].name
+        : null;
 
       payload.unit = CONFIG_SETTINGS[payload.key]
         ? CONFIG_SETTINGS[payload.key].unit
@@ -120,9 +135,11 @@ export default new Vuex.Store({
     removeEventAction({ commit }, payload) {
       commit("REMOVE_EVENT_ACTION", payload);
     },
-    setSuccessMessage({ commit }, value) {
-      commit("SET_SUCCESS_MESSAGE", value);
-      setTimeout(() => commit("SET_SUCCESS_MESSAGE", null), 5000);
+    showSuccessSnackbar({ commit }, message) {
+      commit("SHOW_SNACKBAR", { message, color: "success" });
+    },
+    hideSnackbar({ commit }) {
+      commit("HIDE_SNACKBAR");
     },
   },
   getters: {
@@ -143,6 +160,9 @@ export default new Vuex.Store({
       }
 
       return changed;
+    },
+    snackbarState(state) {
+      return state.snackbar;
     },
   },
 });

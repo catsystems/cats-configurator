@@ -2,6 +2,7 @@
   <v-app>
     <AppBar />
     <NavPanel :items="navItems" />
+    <Snackbar />
     <Footer />
 
     <v-main>
@@ -11,9 +12,10 @@
 </template>
 
 <script>
-import { mapState, mapActions } from "vuex";
+import { mapActions } from "vuex";
 import AppBar from "@/components/AppBar";
 import NavPanel from "@/components/NavigationPanel";
+import Snackbar from "@/components/Snackbar";
 import Footer from "@/components/Footer";
 
 export default {
@@ -21,6 +23,7 @@ export default {
   components: {
     AppBar,
     NavPanel,
+    Snackbar,
     Footer,
   },
   data() {
@@ -33,11 +36,6 @@ export default {
         { title: "CLI", link: "/cli" },
       ],
     };
-  },
-  computed: {
-    ...mapState({
-      successSetMessage: (state) => state.successSetMessage,
-    }),
   },
   mounted() {
     if (this.$route.path !== "/") this.$router.push("/");
@@ -59,8 +57,7 @@ export default {
       else this.setConfig(config);
     });
     window.renderer.on("SET_CONFIG_RESPONSE", () => {
-      if (this.successSetMessage) return;
-      this.setSuccessMessage("Values saved successfully!");
+      this.showSuccessSnackbar("Values saved successfully!");
     });
   },
   methods: {
@@ -71,7 +68,7 @@ export default {
       "setEvent",
       "setTimer",
       "setLog",
-      "setSuccessMessage",
+      "showSuccessSnackbar",
     ]),
   },
 };
