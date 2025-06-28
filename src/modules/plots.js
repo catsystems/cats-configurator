@@ -264,7 +264,4 @@ export function makePlots(flightlog, element, useImperialUnits) {
     el = document.createElement("div")
     element.append(el)
     makePlot(flightlog.voltageInfo, el, "Battery Voltage", "Voltage [V]", ["voltage"], eventInfo)
-
-    // restore scroll position
-    element.scrollTop = scrollTop;
 }
