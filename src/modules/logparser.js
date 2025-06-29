@@ -107,8 +107,6 @@ function scaleAndOffsetFlightLog(flightLog) {
 
   scaleProperty(flightLog.voltageInfo, 'voltage', 1000)
 
-  console.log(flightLog)
-
   return flightLog;
 }
 
