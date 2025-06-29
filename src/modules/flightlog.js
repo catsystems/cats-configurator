@@ -1,22 +1,69 @@
 import fs from "fs";
+import path from "path";
+import { dialog } from "electron";
 
 export function exportFlightLogToCSVs(flightLog) {
-  const flightLogDir = "flight-log-export"
   let flightLogSections = ["imu", "baro", "flightInfo", "orientationInfo", "filteredDataInfo", "gnssInfo", "flightStates", "eventInfo", "voltageInfo"];
 
-  if (!fs.existsSync(flightLogDir)) {
-    fs.mkdirSync(flightLogDir);
+  let paths = dialog.showOpenDialogSync({ properties: ["openDirectory"] });
+
+  if (!paths) {
+    console.log("No directory selected for export.");
+    // TODO: after snackbar is merged print error message to user
+    return;
+  }
+
+  const exportFolderPath = path.join(paths[0]);
+
+  if (!fs.existsSync(exportFolderPath)) {
+    fs.mkdirSync(exportFolderPath);
   }
 
   for (let flightLogSection of flightLogSections) {
-    fs.writeFile(`${flightLogDir}/${flightLogSection}.csv`, objectArrayToCSV(flightLogSection, flightLog[flightLogSection]), "utf8", function (err) {
+    fs.writeFile(`${exportFolderPath}/${flightLogSection}.csv`, objectArrayToCSV(flightLogSection, flightLog[flightLogSection]), "utf8", function (err) {
       if (err) {
         console.log("An error occurred while writing CSV object to file.");
+        // TODO: after snackbar is merged print error message to user
         return console.log(err);
       }
-      console.log("CSV file has been saved.");
     });
   }
+}
+
+export function exportFlightLogChartsToHTML(flightLogChartsHTML) {
+  let paths = dialog.showOpenDialogSync({ properties: ["openDirectory"] });
+
+  if (!paths) {
+    console.log("No directory selected for export.");
+    return;
+    // TODO: after snackbar is merged print error message to user
+  }
+
+  const exportFolderPath = path.join(paths[0]);
+
+  if (!fs.existsSync(exportFolderPath)) {
+    fs.mkdirSync(exportFolderPath);
+  }
+
+  const flightLogHtmlDocument = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <script src="https://cdn.plot.ly/plotly-2.18.2.min.js"></script>
+      </head>
+      <body>
+      ${flightLogChartsHTML}
+      </body>
+    </html>
+  `;
+
+  fs.writeFile(`${exportFolderPath}/plots.html`, flightLogHtmlDocument, 'utf8', function (err) {
+    if (err) {
+      console.log("An error occurred while writing HTML Object to File.");
+      return console.log(err);
+      // TODO: after snackbar is merged print error message to user
+    }
+  });
 }
 
 export function exportJSON(flightLog) {

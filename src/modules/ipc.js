@@ -1,7 +1,7 @@
 import { ipcMain, dialog } from "electron";
 import fs from "fs";
 import { parseFlightLog } from "./logparser.js"
-import { exportFlightLogToCSVs } from "./flightlog.js"
+import { exportFlightLogToCSVs, exportFlightLogChartsToHTML } from "./flightlog.js"
 import { connect, disconnect, command, cliCommand, getList } from "./serial.js";
 
 export function subscribeListeners() {
@@ -74,24 +74,8 @@ export function subscribeListeners() {
     event.sender.send("EXPORT_FLIGHTLOG_CSVS");
   });
 
-  ipcMain.on("EXPORT_FLIGHTLOG_HTML", (event, flightLogHtmlStr) => {
-
-    flightLogHtmlStr = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <script src="https://cdn.plot.ly/plotly-2.18.2.min.js"></script>
-        </head>
-      <body>
-    ` + flightLogHtmlStr + "</body></html>"
-    fs.writeFile("plots.html", flightLogHtmlStr, 'utf8', function (err) {
-      if (err) {
-        console.log("An error occurred while writing CSV Object to File.");
-        return console.log(err);
-      }
-      console.log("HTML file has been saved.");
-    });
-
+  ipcMain.on("EXPORT_FLIGHTLOG_HTML", (event, flightLogChartsHTML) => {
+    exportFlightLogChartsToHTML(flightLogChartsHTML);
     event.sender.send("EXPORT_FLIGHTLOG_HTML");
   });
 
