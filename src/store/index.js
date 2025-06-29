@@ -23,6 +23,7 @@ export default new Vuex.Store({
       color: "success",
       timeout: 3000,
     },
+    useImperialUnits: false,
   },
   mutations: {
     SET_SERIAL_PORTS(state, ports) {
@@ -74,6 +75,9 @@ export default new Vuex.Store({
       state.snackbar.isVisible = false;
       state.snackbar.message = "";
     },
+    SET_USE_IMPERIAL_UNITS(state, value) {
+      state.useImperialUnits = value;
+    }
   },
   actions: {
     setSerialPorts({ commit }, ports) {
@@ -141,6 +145,10 @@ export default new Vuex.Store({
     hideSnackbar({ commit }) {
       commit("HIDE_SNACKBAR");
     },
+    toggleUnitSystem({ commit, state }) {
+      const newValue = !state.useImperialUnits;
+      commit("SET_USE_IMPERIAL_UNITS", newValue);
+    },
   },
   getters: {
     isEventsChanged(state) {
@@ -164,5 +172,8 @@ export default new Vuex.Store({
     snackbarState(state) {
       return state.snackbar;
     },
+    useImperialUnits(state) {
+      return state.useImperialUnits;
+    }
   },
 });
