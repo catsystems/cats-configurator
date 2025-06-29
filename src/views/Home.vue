@@ -105,11 +105,11 @@ export default {
     });
     window.renderer.on("EXPORT_FLIGHTLOG_CSVS", (flightLog) => {
       this.exportButtonLoading = false;
-      this.showSuccessSnackbar("Exported flight log CSVs!");
+      this.showSuccessSnackbar("Flight log CSVs exported!");
     });
     window.renderer.on("EXPORT_FLIGHTLOG_HTML", (flightLog) => {
       this.exportButtonLoading = false;
-      this.showSuccessSnackbar("Exported flight log HTML charts!");
+      this.showSuccessSnackbar("Flight log HTML plots exported!");
     });
   },
   methods: {
