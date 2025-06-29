@@ -3,6 +3,9 @@ import fs from "fs";
 import { parseFlightLog } from "./logparser.js"
 import { exportFlightLogToCSVs, exportFlightLogChartsToHTML } from "./flightlog.js"
 import { connect, disconnect, command, cliCommand, getList } from "./serial.js";
+import { getFilename } from "../utils/file.js";
+
+export let flightLogFilename = "";
 
 export function subscribeListeners() {
   ipcMain.on("BOARD:CONFIG", async (event, key) => {
@@ -58,6 +61,8 @@ export function subscribeListeners() {
       event.sender.send("LOAD_FLIGHTLOG", { error: "File does not end with .cfl" });
       return
     }
+
+    flightLogFilename = getFilename(file.slice(0, -4)); // Remove the .cfl extension
 
     let data = fs.readFileSync(file, { encoding: "binary" });
     if (!data || !data.length) {

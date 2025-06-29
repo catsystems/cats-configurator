@@ -1,6 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { dialog } from "electron";
+import { formatDateTime } from "@/utils/date.js";
+import { flightLogFilename } from "./ipc.js";
 
 export function exportFlightLogToCSVs(flightLog) {
   let flightLogSections = ["imu", "baro", "flightInfo", "orientationInfo", "filteredDataInfo", "gnssInfo", "flightStates", "eventInfo", "voltageInfo"];
@@ -13,11 +15,10 @@ export function exportFlightLogToCSVs(flightLog) {
     return;
   }
 
-  const exportFolderPath = path.join(paths[0]);
+  const userFolderPath = path.join(paths[0]);
+  const exportFolderPath = `${userFolderPath}/${flightLogFilename}_export_${formatDateTime(new Date())}`;
 
-  if (!fs.existsSync(exportFolderPath)) {
-    fs.mkdirSync(exportFolderPath);
-  }
+  fs.mkdirSync(`${exportFolderPath}`);
 
   for (let flightLogSection of flightLogSections) {
     fs.writeFile(`${exportFolderPath}/${flightLogSection}.csv`, objectArrayToCSV(flightLogSection, flightLog[flightLogSection]), "utf8", function (err) {
@@ -41,10 +42,6 @@ export function exportFlightLogChartsToHTML(flightLogChartsHTML) {
 
   const exportFolderPath = path.join(paths[0]);
 
-  if (!fs.existsSync(exportFolderPath)) {
-    fs.mkdirSync(exportFolderPath);
-  }
-
   const flightLogHtmlDocument = `
     <!DOCTYPE html>
     <html>
@@ -57,7 +54,7 @@ export function exportFlightLogChartsToHTML(flightLogChartsHTML) {
     </html>
   `;
 
-  fs.writeFile(`${exportFolderPath}/plots.html`, flightLogHtmlDocument, 'utf8', function (err) {
+  fs.writeFile(`${exportFolderPath}/${flightLogFilename}_plots_${formatDateTime(new Date())}.html`, flightLogHtmlDocument, 'utf8', function (err) {
     if (err) {
       console.log("An error occurred while writing HTML Object to File.");
       return console.log(err);
