@@ -480,7 +480,7 @@ export default {
     },
     resetConfig() {
       const confirmed = window.confirm(
-        "Configuration is about to be reseted,\nwould you like to proceed?"
+        "Configuration is about to be reset to default values,\nwould you like to proceed?"
       );
 
       if (confirmed) {
