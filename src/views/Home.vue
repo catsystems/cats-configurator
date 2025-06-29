@@ -69,6 +69,7 @@
 </template>
 
 <script>
+import { mapState } from 'vuex';
 import { makePlots } from '../modules/plots'
 
 export default {
@@ -85,6 +86,9 @@ export default {
       fileLoading: false,
     };
   },
+  computed: {
+    ...mapState(['useImperialUnits']),
+  },
   mounted() {
     window.renderer.on("LOAD_FLIGHTLOG", (flightLog) => {
       this.fileLoading = false
@@ -99,7 +103,7 @@ export default {
       this.errorString = "";
       this.flightLog = flightLog;
 
-      if (el) makePlots(flightLog, el)
+      if (el) makePlots(flightLog, el, this.useImperialUnits);
     });
     window.renderer.on("EXPORT_FLIGHTLOG_CSVS", (flightLog) => {
       this.exportButtonLoading = false;
@@ -132,7 +136,7 @@ export default {
     replot() {
       let el = this.$refs.flightLogPlotContainer
       if (el && this.flightLog) {
-        makePlots(this.flightLog, el)
+        makePlots(this.flightLog, el, this.useImperialUnits);
       }
     },
     onDrop(event) {
@@ -144,5 +148,14 @@ export default {
       }
     }
   },
+  watch: {
+    useImperialUnits(newValue) {
+      if (this.flightLog) {
+        const savedWindowScrollY = window.scrollY;
+        this.replot();
+        window.scrollTo(0, savedWindowScrollY);
+      }
+    }
+  }
 };
 </script>

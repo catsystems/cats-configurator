@@ -1,20 +1,33 @@
 import Plotly from 'plotly.js-dist';
+import { getDisplayValue } from "@/utils/unitConversions.js";
 
 const COLOR = "rgb(100, 100, 100)"
 const EVENT_MAP = {
-  0: { name: "ev_moving", color: COLOR },
-  1: { name: "ev_ready", color: COLOR },
-  2: { name: "ev_liftoff", color: COLOR },
-  3: { name: "ev_burnout", color: COLOR },
-  4: { name: "ev_apogee", color: COLOR },
-  5: { name: "ev_main_deployment", color: COLOR },
-  6: { name: "ev_touchdown", color: COLOR },
-  7: { name: "ev_custom1", color: COLOR },
-  8: { name: "ev_custom2", color: COLOR },
+    0: { name: "ev_moving", color: COLOR },
+    1: { name: "ev_ready", color: COLOR },
+    2: { name: "ev_liftoff", color: COLOR },
+    3: { name: "ev_burnout", color: COLOR },
+    4: { name: "ev_apogee", color: COLOR },
+    5: { name: "ev_main_deployment", color: COLOR },
+    6: { name: "ev_touchdown", color: COLOR },
+    7: { name: "ev_custom1", color: COLOR },
+    8: { name: "ev_custom2", color: COLOR },
 }
 
+function adaptTraceNameForConverterFunction(name) {
+    if (name === 'height') return 'altitude';
+    if (name === 'Ax') return 'acceleration';
+    if (name === 'Ay') return 'acceleration';
+    if (name === 'Az') return 'acceleration';
+    if (name === 'T') return 'temperature';
+    if (name === 'P') return 'pressure';
+    if (name === 'filteredAltitudeAGL') return 'altitude';
+    return name;
+}
 
-function makePlot(data, elementId, title, ylabel, traceNames, eventInfo) {
+const TRACES_TO_CONVERT = ['height', 'acceleration', 'velocity', 'Ax', 'Ay', 'Az', 'T', 'P', 'filteredAltitudeAGL'];
+
+function makePlot(data, elementId, title, ylabel, traceNames, eventInfo, useImperialUnits) {
 
     let lines = []
     let x = []
@@ -27,6 +40,16 @@ function makePlot(data, elementId, title, ylabel, traceNames, eventInfo) {
             })
         }
     }
+
+    if (useImperialUnits) {
+        data = structuredClone(data)
+        for (const o of data) {
+            for (let key of traceNames.filter(value => TRACES_TO_CONVERT.includes(value))) {
+                o[key] = getDisplayValue(o[key], adaptTraceNameForConverterFunction(key));
+            }
+        }
+    }
+
     for (const o of data) {
         let i = 0;
         for (let key of traceNames) {
@@ -43,10 +66,10 @@ function makePlot(data, elementId, title, ylabel, traceNames, eventInfo) {
         elementId,
         lines,
         {
-            title: { text: title},
+            title: { text: title },
             margin: { t: 50 },
             xaxis: { title: "Timestamp [s]" },
-            yaxis: { title: ylabel },
+            yaxis: { title: ylabel, tickFormat: ',.0f' },
             shapes: eventInfo.shapes,
             annotations: eventInfo.annotations,
             template: 'plotly_dark',
@@ -199,27 +222,25 @@ function makeEventInfoTraces(flightlog) {
     return { shapes: shapes, annotations: annotations }
 }
 
-export function makePlots(flightlog, element) {
+export function makePlots(flightlog, element, useImperialUnits) {
     let eventInfo = makeEventInfoTraces(flightlog)
 
     element.replaceChildren([])
 
     let el = document.createElement("div")
-    document.create
     element.append(el)
-    makePlot(flightlog.flightInfo, el, "State Estimation - Altitude", "Altitude [m]", ["height"], eventInfo)
+    const altitudeYLabel = useImperialUnits ? "Altitude [ft]" : "Altitude [m]"
+    makePlot(flightlog.flightInfo, el, "State Estimation - Altitude", altitudeYLabel, ["height"], eventInfo, useImperialUnits)
 
     el = document.createElement("div")
     element.append(el)
-    makePlot(flightlog.flightInfo, el, "State Estimation - Velocity", "Velocity [m/s]", ["velocity"], eventInfo)
-
-    // el = document.createElement("div")
-    // element.append(el)
-    // makePlot(flightlog.flightInfo, el, "Acceleration [m/s^2]", ["acceleration"], eventInfo)
+    const velocityYLabel = useImperialUnits ? "Velocity [ft/s]" : "Velocity [m/s]"
+    makePlot(flightlog.flightInfo, el, "State Estimation - Velocity", velocityYLabel, ["velocity"], eventInfo, useImperialUnits)
 
     el = document.createElement("div")
     element.append(el)
-    makePlot(flightlog.imu, el,  "IMU - Acceleration", "Acceleration [m/s^2]", ["Ax", "Ay", "Az"], eventInfo)
+    const accelerationYLabel = useImperialUnits ? "Acceleration [ft/s²]" : "Acceleration [m/s²]"
+    makePlot(flightlog.imu, el, "IMU - Acceleration", accelerationYLabel, ["Ax", "Ay", "Az"], eventInfo, useImperialUnits)
 
     el = document.createElement("div")
     element.append(el)
@@ -227,15 +248,18 @@ export function makePlots(flightlog, element) {
 
     el = document.createElement("div")
     element.append(el)
-    makePlot(flightlog.baro, el, "Temperature", "Temperature [°C]", ["T"], eventInfo)
+    const temperatureYLabel = useImperialUnits ? "Temperature [°F]" : "Temperature [°C]"
+    makePlot(flightlog.baro, el, "Temperature", temperatureYLabel, ["T"], eventInfo, useImperialUnits)
 
     el = document.createElement("div")
     element.append(el)
-    makePlot(flightlog.baro, el, "Pressure", "Pressure [hPa]", ["P"], eventInfo)
+    const pressureYLabel = useImperialUnits ? "Pressure [psi]" : "Pressure [hPa]"
+    makePlot(flightlog.baro, el, "Pressure", pressureYLabel, ["P"], eventInfo, useImperialUnits)
 
     el = document.createElement("div")
     element.append(el)
-    makePlot(flightlog.filteredDataInfo, el, "Filtered Barometer Altitude", "Altitude [m]", ["filteredAltitudeAGL"], eventInfo)
+    const filteredAltitudeYLabel = useImperialUnits ? "Altitude [ft]" : "Altitude [m]"
+    makePlot(flightlog.filteredDataInfo, el, "Filtered Barometer Altitude", filteredAltitudeYLabel, ["filteredAltitudeAGL"], eventInfo, useImperialUnits)
 
     el = document.createElement("div")
     element.append(el)
