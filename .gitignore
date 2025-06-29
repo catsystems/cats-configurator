@@ -22,6 +22,10 @@ pnpm-debug.log*
 *.sln
 *.sw?
 
-#Electron-builder output
+# Electron-builder output
 /dist_electron
 /builds
+
+# Exports
+flight-log-export
+plots.html

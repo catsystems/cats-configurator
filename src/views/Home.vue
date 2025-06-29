@@ -69,7 +69,7 @@
 </template>
 
 <script>
-import { mapState } from 'vuex';
+import { mapState, mapActions } from 'vuex';
 import { makePlots } from '../modules/plots'
 
 export default {
@@ -102,17 +102,21 @@ export default {
       }
       this.errorString = "";
       this.flightLog = flightLog;
+      this.showSuccessSnackbar("Flight logs loaded successfully!");
 
       if (el) makePlots(flightLog, el, this.useImperialUnits);
     });
     window.renderer.on("EXPORT_FLIGHTLOG_CSVS", (flightLog) => {
       this.exportButtonLoading = false;
+      this.showSuccessSnackbar("Flight log CSVs exported!");
     });
     window.renderer.on("EXPORT_FLIGHTLOG_HTML", (flightLog) => {
       this.exportButtonLoading = false;
+      this.showSuccessSnackbar("Flight log HTML plots exported!");
     });
   },
   methods: {
+    ...mapActions(["showSuccessSnackbar"]),
     loadFlightLog(file) {
       this.loadButtonLoading = true;
       this.flightLog = null
