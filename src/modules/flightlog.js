@@ -10,9 +10,7 @@ export function exportFlightLogToCSVs(flightLog) {
   let paths = dialog.showOpenDialogSync({ properties: ["openDirectory"] });
 
   if (!paths) {
-    console.log("No directory selected for export.");
-    // TODO: after snackbar is merged print error message to user
-    return;
+    throw new Error("No directory selected for export.");
   }
 
   const userFolderPath = path.join(paths[0]);
@@ -23,9 +21,7 @@ export function exportFlightLogToCSVs(flightLog) {
   for (let flightLogSection of flightLogSections) {
     fs.writeFile(`${exportFolderPath}/${flightLogSection}.csv`, objectArrayToCSV(flightLogSection, flightLog[flightLogSection]), "utf8", function (err) {
       if (err) {
-        console.log("An error occurred while writing CSV object to file.");
-        // TODO: after snackbar is merged print error message to user
-        return console.log(err);
+        throw new Error(`An error occurred while writing CSV object to file.`);
       }
     });
   }
@@ -35,9 +31,7 @@ export function exportFlightLogChartsToHTML(flightLogChartsHTML) {
   let paths = dialog.showOpenDialogSync({ properties: ["openDirectory"] });
 
   if (!paths) {
-    console.log("No directory selected for export.");
-    return;
-    // TODO: after snackbar is merged print error message to user
+    throw new Error("No directory selected for export.");
   }
 
   const exportFolderPath = path.join(paths[0]);
@@ -56,9 +50,7 @@ export function exportFlightLogChartsToHTML(flightLogChartsHTML) {
 
   fs.writeFile(`${exportFolderPath}/${flightLogFilename}_plots_${formatDateTime(new Date())}.html`, flightLogHtmlDocument, 'utf8', function (err) {
     if (err) {
-      console.log("An error occurred while writing HTML Object to File.");
-      return console.log(err);
-      // TODO: after snackbar is merged print error message to user
+      throw new Error(`An error occurred while writing HTML Object to File.`);
     }
   });
 }

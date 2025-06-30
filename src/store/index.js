@@ -142,6 +142,9 @@ export default new Vuex.Store({
     showSuccessSnackbar({ commit }, message) {
       commit("SHOW_SNACKBAR", { message, color: "success" });
     },
+    showErrorSnackbar({ commit }, message) {
+      commit("SHOW_SNACKBAR", { message, color: "error" });
+    },
     hideSnackbar({ commit }) {
       commit("HIDE_SNACKBAR");
     },

@@ -75,13 +75,21 @@ export function subscribeListeners() {
   });
 
   ipcMain.on("EXPORT_FLIGHTLOG_CSVS", (event, flightLog) => {
-    exportFlightLogToCSVs(flightLog)
-    event.sender.send("EXPORT_FLIGHTLOG_CSVS");
+    try {
+      exportFlightLogToCSVs(flightLog)
+      event.sender.send("EXPORT_FLIGHTLOG_CSVS");
+    } catch (error) {
+      event.sender.send("EXPORT_FLIGHTLOG_CSVS", { error: error.message });
+    }
   });
 
   ipcMain.on("EXPORT_FLIGHTLOG_HTML", (event, flightLogChartsHTML) => {
-    exportFlightLogChartsToHTML(flightLogChartsHTML);
-    event.sender.send("EXPORT_FLIGHTLOG_HTML");
+    try {
+      exportFlightLogChartsToHTML(flightLogChartsHTML);
+      event.sender.send("EXPORT_FLIGHTLOG_HTML");
+    } catch (error) {
+      event.sender.send("EXPORT_FLIGHTLOG_HTML", { error: error.message });
+    }    
   });
 
   ipcMain.on("BOARD:RESET_CONFIG", () => {
