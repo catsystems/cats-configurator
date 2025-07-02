@@ -1,5 +1,6 @@
 import { ipcMain, dialog } from "electron";
 import fs from "fs";
+import path from "path";
 import { parseFlightLog } from "./logparser.js"
 import { exportFlightLogToCSVs, exportFlightLogChartsToHTML } from "./flightlog.js"
 import { connect, disconnect, command, cliCommand, getList } from "./serial.js";
@@ -83,13 +84,13 @@ export function subscribeListeners() {
     }
   });
 
-  ipcMain.on("EXPORT_FLIGHTLOG_HTML", (event, flightLogChartsHTML) => {
+  ipcMain.on("EXPORT_FLIGHTLOG_HTML", (event, args) => { 
     try {
-      exportFlightLogChartsToHTML(flightLogChartsHTML);
+      exportFlightLogChartsToHTML(args.flightLog, args.useImperialUnits);
       event.sender.send("EXPORT_FLIGHTLOG_HTML");
     } catch (error) {
       event.sender.send("EXPORT_FLIGHTLOG_HTML", { error: error.message });
-    }    
+    }
   });
 
   ipcMain.on("BOARD:RESET_CONFIG", () => {

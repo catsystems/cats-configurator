@@ -141,7 +141,10 @@ export default {
     },
     exportFlightLogHtml() {
       this.exportButtonLoading = true;
-      window.renderer.send("EXPORT_FLIGHTLOG_HTML", this.$refs.flightLogPlotContainer.innerHTML);
+      window.renderer.send("EXPORT_FLIGHTLOG_HTML", {
+        flightLog: this.flightLog, 
+        useImperialUnits: this.useImperialUnits
+      });
     },
     setResizeTimer() {
       clearTimeout(this.resizeTimer)

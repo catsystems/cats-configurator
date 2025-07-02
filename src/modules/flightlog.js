@@ -27,7 +27,7 @@ export function exportFlightLogToCSVs(flightLog) {
   }
 }
 
-export function exportFlightLogChartsToHTML(flightLogChartsHTML) {
+export function exportFlightLogChartsToHTML(flightLog, useImperialUnits) {
   let paths = dialog.showOpenDialogSync({ properties: ["openDirectory"] });
 
   if (!paths) {
@@ -36,22 +36,20 @@ export function exportFlightLogChartsToHTML(flightLogChartsHTML) {
 
   const exportFolderPath = path.join(paths[0]);
 
-  const flightLogHtmlDocument = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <script src="https://cdn.plot.ly/plotly-2.18.2.min.js"></script>
-      </head>
-      <body>
-      ${flightLogChartsHTML}
-      </body>
-    </html>
-  `;
+  const flightlogJson = JSON.stringify(flightLog);
+  const useImperialUnitsString = String(useImperialUnits);
 
-  fs.writeFile(`${exportFolderPath}/${flightLogFilename}_plots_${formatDateTime(new Date())}.html`, flightLogHtmlDocument, 'utf8', function (err) {
+  let plotsHTML = fs.readFileSync(path.join(__dirname, '../templates/plots.html'), 'utf8');
+
+  plotsHTML = plotsHTML.replace("/* FLIGHTLOG_PLACEHOLDER */", flightlogJson);
+  plotsHTML = plotsHTML.replace("/* USE_IMPERIAL_UNITS_PLACEHOLDER */", useImperialUnitsString);
+
+  fs.writeFile(`${exportFolderPath}/${flightLogFilename}_plots_${formatDateTime(new Date())}.html`, plotsHTML, 'utf8', function (err) {
     if (err) {
-      throw new Error(`An error occurred while writing HTML Object to File.`);
+      console.log("An error occurred while writing HTML Object to File.");
+      return console.log(err);
     }
+    console.log("HTML file has been saved.");
   });
 }
 
