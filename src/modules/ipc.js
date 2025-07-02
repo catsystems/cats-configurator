@@ -1,8 +1,11 @@
 import { ipcMain, dialog } from "electron";
 import fs from "fs";
 import { parseFlightLog } from "./logparser.js"
-import { exportFlightLogToCSVs } from "./flightlog.js"
+import { exportFlightLogToCSVs, exportFlightLogChartsToHTML } from "./flightlog.js"
 import { connect, disconnect, command, cliCommand, getList } from "./serial.js";
+import { getFilename } from "../utils/file.js";
+
+export let flightLogFilename = "";
 
 export function subscribeListeners() {
   ipcMain.on("BOARD:CONFIG", async (event, key) => {
@@ -59,6 +62,8 @@ export function subscribeListeners() {
       return
     }
 
+    flightLogFilename = getFilename(file.slice(0, -4)); // Remove the .cfl extension
+
     let data = fs.readFileSync(file, { encoding: "binary" });
     if (!data || !data.length) {
       event.sender.send("LOAD_FLIGHTLOG", { error: "File is empty" });
@@ -70,29 +75,21 @@ export function subscribeListeners() {
   });
 
   ipcMain.on("EXPORT_FLIGHTLOG_CSVS", (event, flightLog) => {
-    exportFlightLogToCSVs(flightLog)
-    event.sender.send("EXPORT_FLIGHTLOG_CSVS");
+    try {
+      exportFlightLogToCSVs(flightLog)
+      event.sender.send("EXPORT_FLIGHTLOG_CSVS");
+    } catch (error) {
+      event.sender.send("EXPORT_FLIGHTLOG_CSVS", { error: error.message });
+    }
   });
 
-  ipcMain.on("EXPORT_FLIGHTLOG_HTML", (event, flightLogHtmlStr) => {
-
-    flightLogHtmlStr = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <script src="https://cdn.plot.ly/plotly-2.18.2.min.js"></script>
-        </head>
-      <body>
-    ` + flightLogHtmlStr + "</body></html>"
-    fs.writeFile("plots.html", flightLogHtmlStr, 'utf8', function (err) {
-      if (err) {
-        console.log("An error occurred while writing CSV Object to File.");
-        return console.log(err);
-      }
-      console.log("HTML file has been saved.");
-    });
-
-    event.sender.send("EXPORT_FLIGHTLOG_HTML");
+  ipcMain.on("EXPORT_FLIGHTLOG_HTML", (event, flightLogChartsHTML) => {
+    try {
+      exportFlightLogChartsToHTML(flightLogChartsHTML);
+      event.sender.send("EXPORT_FLIGHTLOG_HTML");
+    } catch (error) {
+      event.sender.send("EXPORT_FLIGHTLOG_HTML", { error: error.message });
+    }    
   });
 
   ipcMain.on("BOARD:RESET_CONFIG", () => {

@@ -419,9 +419,14 @@ export default {
   },
   mounted() {
     this.init();
-    window.renderer.on("BOARD:DUMP", () => {
+    window.renderer.on("BOARD:DUMP", (result) => {
       this.backupLoading = false
-      this.showSuccessSnackbar("Backup created!");
+      if (result?.error) {
+        this.showErrorSnackbar(`${result.error}`);
+        return;
+      } else {
+        this.showSuccessSnackbar("Backup created!");
+      }
     });
     window.renderer.on("BOARD:RESTORE", () => {
       this.restoreLoading = false;
@@ -441,7 +446,7 @@ export default {
     clearInterval(this.timer);
   },
   methods: {
-    ...mapActions(["setChangedTab", "showSuccessSnackbar"]),
+    ...mapActions(["setChangedTab", "showSuccessSnackbar", "showErrorSnackbar"]),
     init() {
       getConfigs();
       this.getInfo();
@@ -480,7 +485,7 @@ export default {
     },
     resetConfig() {
       const confirmed = window.confirm(
-        "Configuration is about to be reseted,\nwould you like to proceed?"
+        "Configuration is about to be reset to default values,\nwould you like to proceed?"
       );
 
       if (confirmed) {

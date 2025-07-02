@@ -165,8 +165,12 @@ function onData(data) {
   if (currentCommand === "dump") {
     if (data === "#Configuration dump") return;
     else if (data === "#End of configuration dump") {
-      saveDumpDataToFile(backupConfig.trim());
-      sendToRenderer("BOARD:DUMP");
+      try {
+        saveDumpDataToFile(backupConfig.trim());
+        sendToRenderer("BOARD:DUMP");
+      } catch (error) {
+        return sendToRenderer("BOARD:DUMP", { error: error.message });
+      }
       backupConfig = "";
     } else backupConfig += data + "\n";
 
@@ -294,6 +298,8 @@ function saveDumpDataToFile(data) {
   if (paths) {
     const file = path.join(paths[0], "backup_cats_config.txt");
     fs.writeFileSync(file, data);
+  } else {
+    throw new Error("No directory selected for backup.");
   }
 }
 

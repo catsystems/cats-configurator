@@ -106,17 +106,27 @@ export default {
 
       if (el) makePlots(flightLog, el, this.useImperialUnits);
     });
-    window.renderer.on("EXPORT_FLIGHTLOG_CSVS", (flightLog) => {
+    window.renderer.on("EXPORT_FLIGHTLOG_CSVS", (result) => {
       this.exportButtonLoading = false;
-      this.showSuccessSnackbar("Flight log CSVs exported!");
+      if (result?.error) {
+        this.showErrorSnackbar(`${result.error}`);
+        return;
+      } else {
+        this.showSuccessSnackbar("Flight log CSVs exported!");
+      }
     });
-    window.renderer.on("EXPORT_FLIGHTLOG_HTML", (flightLog) => {
+    window.renderer.on("EXPORT_FLIGHTLOG_HTML", (result) => {
       this.exportButtonLoading = false;
-      this.showSuccessSnackbar("Flight log HTML plots exported!");
+      if (result?.error) {
+        this.showErrorSnackbar(`${result.error}`);
+        return;
+      } else {
+        this.showSuccessSnackbar("Flight log HTML plots exported!");
+      }
     });
   },
   methods: {
-    ...mapActions(["showSuccessSnackbar"]),
+    ...mapActions(["showSuccessSnackbar", "showErrorSnackbar"]),
     loadFlightLog(file) {
       this.loadButtonLoading = true;
       this.flightLog = null
