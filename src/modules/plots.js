@@ -1,19 +1,6 @@
 import Plotly from 'plotly.js-dist';
 import { getDisplayValue } from "@/utils/unitConversions.js";
 
-const COLOR = "rgb(100, 100, 100)"
-const EVENT_MAP = {
-    0: { name: "ev_moving", color: COLOR },
-    1: { name: "ev_ready", color: COLOR },
-    2: { name: "ev_liftoff", color: COLOR },
-    3: { name: "ev_burnout", color: COLOR },
-    4: { name: "ev_apogee", color: COLOR },
-    5: { name: "ev_main_deployment", color: COLOR },
-    6: { name: "ev_touchdown", color: COLOR },
-    7: { name: "ev_custom1", color: COLOR },
-    8: { name: "ev_custom2", color: COLOR },
-}
-
 function adaptTraceNameForConverterFunction(name) {
     if (name === 'height') return 'altitude';
     if (name === 'Ax') return 'acceleration';

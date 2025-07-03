@@ -1,7 +1,7 @@
 const path = require("path");
 const webpack = require("webpack");
 
-const packageJson = require('./package.json');
+const packageJson = require("./package.json");
 
 module.exports = {
   lintOnSave: false,
@@ -11,6 +11,16 @@ module.exports = {
       preload: "src/preload.js",
       externals: ["serialport"],
       outputDir: "builds",
+      builderOptions: {
+        appId: "com.cats.cats-configurator",
+        extraResources: [
+          {
+            from: "templates/",
+            to: "templates",
+            filter: "**/*",
+          },
+        ],
+      },
     },
   },
   configureWebpack: {
@@ -24,8 +34,8 @@ module.exports = {
       new webpack.DefinePlugin({
         // Define a global constant '__APP_VERSION__' that can be accessed in the Vue app
         // JSON.stringify is important because it makes '1.0.0' become '"1.0.0"' in the bundled code
-        __APP_VERSION__: JSON.stringify(packageJson.version)
-      })
+        __APP_VERSION__: JSON.stringify(packageJson.version),
+      }),
     ],
   },
   css: {

@@ -28,4 +28,4 @@ pnpm-debug.log*
 
 # Exports
 flight-log-export
-plots.html
+/plots.html
