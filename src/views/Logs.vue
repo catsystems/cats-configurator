@@ -7,7 +7,7 @@
             <v-card-title>Logs</v-card-title>
             <v-card-text>
               <v-form ref="form">
-                <v-row dense>
+                <v-row density="compact">
                   <v-col cols="6">
                     <div class="py-2">Speed</div>
                   </v-col>
@@ -15,8 +15,8 @@
                     <v-select
                       v-model="rec_speed"
                       :items="logs.rec_speed.allowedValues"
-                      solo
-                      dense
+                      variant="solo"
+                      density="compact"
                       hide-details
                     ></v-select>
                   </v-col>
@@ -24,16 +24,16 @@
               </v-form>
             </v-card-text>
             <v-card-actions>
-              <v-row dense>
+              <v-row density="compact">
                 <v-col cols="6">
                   <v-btn color="primary" block>
-                    <v-icon left>mdi-arrow-down</v-icon>
+                    <v-icon start>mdi-arrow-down</v-icon>
                     Download
                   </v-btn>
                 </v-col>
                 <v-col cols="6">
                   <v-btn color="error" block>
-                    <v-icon left>mdi-delete</v-icon>
+                    <v-icon start>mdi-delete</v-icon>
                     Erase
                   </v-btn>
                 </v-col>
@@ -64,7 +64,7 @@
           <v-card>
             <v-card-title>Elements</v-card-title>
             <v-card-text>
-              <v-row dense>
+              <v-row density="compact">
                 <v-col
                   cols="4"
                   v-for="element in logElements"
@@ -88,10 +88,11 @@
 </template>
 
 <script>
-import { mapState, mapActions } from "vuex";
+import { mapActions, mapState } from "pinia";
+import { useAppStore } from "@/store";
 import { getLogInfo, getLogData, setLogData } from "@/services/logService";
 import { LOG_ELEMENTS } from "@/modules/settings";
-import ActionsBar from "@/components/ActionsBar";
+import ActionsBar from "@/components/ActionsBar.vue";
 
 export default {
   name: "LogsView",
@@ -126,26 +127,29 @@ export default {
       deep: true,
       immediate: true,
     },
-    updated (v) {
+    updated(v) {
       if ((this.changedTab === "logs") !== v) {
         this.setChangedTab(v ? "logs" : null);
       }
-    }
+    },
   },
   computed: {
-    ...mapState({
-      logs: (state) => state.logs,
-      flash_info: (state) => state.static.flash_info,
-      changedTab: (state) => state.changedTab,
+    ...mapState(useAppStore, {
+      logs: "logs",
+      flash_info: (store) => store.static.flash_info,
+      changedTab: "changedTab",
     }),
     updated() {
-      return this.isValueChaged(this.rec_speed, "rec_speed") || this.isValueChaged(this.rec_elements, "rec_elements");
+      return (
+        this.isValueChaged(this.rec_speed, "rec_speed") ||
+        this.isValueChaged(this.rec_elements, "rec_elements")
+      );
     },
     flashUsage() {
       if (!this.flash_info || !this.flash_info.length) return null;
 
       let flashUsageString = this.flash_info.find((item) =>
-        item.includes("Flash usage:")
+        item.includes("Flash usage:"),
       );
       const usedSize = flashUsageString.match(/\d+/)[0];
       flashUsageString = flashUsageString.replace(usedSize, "");
@@ -176,7 +180,7 @@ export default {
     this.init();
   },
   methods: {
-    ...mapActions(["setChangedTab"]),
+    ...mapActions(useAppStore, ["setChangedTab"]),
     init() {
       getLogInfo();
       getLogData();

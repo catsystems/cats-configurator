@@ -1,9 +1,18 @@
 import { SerialPort, ReadlineParser } from "serialport";
-import { BrowserWindow, Notification, dialog } from "electron";
+import { Notification, dialog } from "electron";
 import fs from "fs";
 import path from "path";
 
-import { EVENT_SETTINGS } from "./settings.js";
+import { IPC_CHANNELS } from "../shared/ipc.js";
+import {
+  parseAllowedLength,
+  parseAllowedRange,
+  parseAllowedValues,
+  parseCommand,
+  parseConfigValue,
+  parseData,
+  parseEventData,
+} from "./serial-parser.js";
 
 const CONFIG = {
   baudRate: 115200,
@@ -18,22 +27,153 @@ let mainWindow,
   backupConfig = "",
   cliMode = false;
 
+const useFakeSerial = process.env.CATS_FAKE_SERIAL === "1";
+
+const fakeConfigurations = {
+  main_altitude: {
+    value: 200,
+    type: "NUMBER",
+    allowedRange: [10, 65535],
+  },
+  acc_threshold: {
+    value: 35,
+    type: "NUMBER",
+    allowedRange: [1, 100],
+  },
+  servo1_init_pos: {
+    value: 0,
+    type: "NUMBER",
+    allowedRange: [0, 1000],
+  },
+  servo2_init_pos: {
+    value: 0,
+    type: "NUMBER",
+    allowedRange: [0, 1000],
+  },
+  tele_enable: {
+    value: "ON",
+    type: "SELECT",
+    allowedValues: ["OFF", "ON"],
+  },
+  tele_link_phrase: {
+    value: "cats-test",
+    type: "STRING",
+    allowedRange: [1, 32],
+  },
+  tele_power_level: {
+    value: 20,
+    type: "NUMBER",
+    allowedRange: [-20, 22],
+  },
+  tele_adaptive_power: {
+    value: "OFF",
+    type: "SELECT",
+    allowedValues: ["OFF", "ON"],
+  },
+  test_mode: {
+    value: "OFF",
+    type: "SELECT",
+    allowedValues: ["OFF", "ON"],
+  },
+  tele_test_phrase: {
+    value: "cats-test",
+    type: "STRING",
+    allowedRange: [1, 32],
+  },
+};
+
+const fakeEventKeys = new Set([
+  "ev_liftoff",
+  "ev_burnout",
+  "ev_apogee",
+  "ev_main_deployment",
+  "ev_touchdown",
+  "ev_custom1",
+  "ev_custom2",
+]);
+
+function fakeConfigForKey(key) {
+  if (fakeConfigurations[key]) return { key, ...fakeConfigurations[key] };
+
+  if (fakeEventKeys.has(key)) {
+    const hasRecorderAction = key === "ev_liftoff";
+    return {
+      key,
+      value: hasRecorderAction ? "7,2" : "0,0",
+      type: "EVENT",
+      arrayLength: 8,
+      values: hasRecorderAction ? [7, 2] : [],
+      actions: hasRecorderAction
+        ? [
+            {
+              name: "Recorder",
+              args: [
+                { text: "OFF", value: 0 },
+                { text: "PRE", value: 1 },
+                { text: "LOG", value: 2 },
+              ],
+              type: "SELECT",
+              unit: null,
+              index: 7,
+              value: 2,
+            },
+          ]
+        : [],
+    };
+  }
+
+  const timerMatch = key.match(/^(timer[1-4])_(start|duration|trigger)$/);
+  if (!timerMatch) return null;
+  const [, timer, field] = timerMatch;
+  if (field === "duration") {
+    return {
+      key,
+      value: timer === "timer1" ? 1000 : 0,
+      type: "NUMBER",
+      allowedRange: [0, 60000],
+    };
+  }
+  return {
+    key,
+    value: "CALIBRATE",
+    type: "SELECT",
+    allowedValues: ["CALIBRATE", "READY", "LIFTOFF", "APOGEE"],
+  };
+}
+
+function setSerialWindow(window) {
+  mainWindow = window;
+}
+
 async function getList() {
+  if (useFakeSerial) {
+    return [{ path: "CATS-FAKE", manufacturer: "CATS Systems" }];
+  }
   return await SerialPort.list();
 }
 
 function connect(path) {
-  mainWindow = BrowserWindow.getFocusedWindow();
+  if (useFakeSerial) {
+    queueMicrotask(() => {
+      sendToRenderer(IPC_CHANNELS.SERIAL_CONNECTED);
+      sendToRenderer(IPC_CHANNELS.BOARD_STATIC_DATA, {
+        key: "version",
+        value: ["Board: CATS (test)", "Firmware: test"],
+      });
+      sendToRenderer(IPC_CHANNELS.BOARD_ACTIVE, true);
+    });
+    return;
+  }
 
   port = new SerialPort({ ...CONFIG, path }, function (err) {
-    if (err) return sendToRenderer("CONNECTION_ERROR", err);
+    if (err) return sendToRenderer(IPC_CHANNELS.SERIAL_ERROR, err.message);
   });
 
   parser = port.pipe(
     new ReadlineParser({
       delimiter: "\r\n",
       encoding: "utf8",
-    })
+    }),
   );
 
   parser.on("data", onData);
@@ -44,7 +184,7 @@ function connect(path) {
   port.on("open", function () {
     port.write("\n");
     command("version");
-    sendToRenderer("CONNECTED");
+    sendToRenderer(IPC_CHANNELS.SERIAL_CONNECTED);
   });
 
   port.on("close", function () {
@@ -52,12 +192,17 @@ function connect(path) {
       title: "Port is disconnected.",
     });
 
-    sendToRenderer("DISCONNECTED");
+    sendToRenderer(IPC_CHANNELS.SERIAL_DISCONNECTED);
   });
 }
 
 function disconnect() {
   currentCommand = null;
+
+  if (useFakeSerial) {
+    queueMicrotask(() => sendToRenderer(IPC_CHANNELS.SERIAL_DISCONNECTED));
+    return;
+  }
 
   if (port && port.isOpen) {
     port.close();
@@ -67,7 +212,7 @@ function disconnect() {
 
 function onData(data) {
   if (cliMode) {
-    return sendToRenderer("CLI_COMMAND", data);
+    return sendToRenderer(IPC_CHANNELS.SERIAL_DATA, data);
   }
 
   if (data.includes("CATS is now ready")) {
@@ -84,7 +229,7 @@ function onData(data) {
   // Handle actual data
   if (["version"].includes(currentCommand)) {
     const parsedData = parseData(currentCommand, data);
-    sendToRenderer("BOARD:STATIC_DATA", parsedData);
+    sendToRenderer(IPC_CHANNELS.BOARD_STATIC_DATA, parsedData);
 
     // Check if it's CATS board
     if (currentCommand === "version" && data.includes("Board: CATS")) {
@@ -93,7 +238,7 @@ function onData(data) {
         body: data,
       });
 
-      sendToRenderer("SET_ACTIVE", true);
+      sendToRenderer(IPC_CHANNELS.BOARD_ACTIVE, true);
     } else {
       disconnect();
     }
@@ -104,7 +249,7 @@ function onData(data) {
   // Handle actual data
   if (["status", "rec_info"].includes(currentCommand)) {
     const parsedData = parseData(currentCommand, data);
-    sendToRenderer("BOARD:STATIC_DATA", parsedData);
+    sendToRenderer(IPC_CHANNELS.BOARD_STATIC_DATA, parsedData);
 
     // Check if it's CATS board
     if (currentCommand === "version" && data.includes("Board: CATS")) {
@@ -113,7 +258,7 @@ function onData(data) {
         body: data,
       });
 
-      sendToRenderer("SET_ACTIVE", true);
+      sendToRenderer(IPC_CHANNELS.BOARD_ACTIVE, true);
     }
 
     return;
@@ -146,7 +291,7 @@ function onData(data) {
 
         const { values, actions } = parseEventData(
           config.value,
-          config.arrayLength
+          config.arrayLength,
         );
         config = {
           ...config,
@@ -154,7 +299,7 @@ function onData(data) {
           actions,
         };
       }
-      sendToRenderer("SET_CONFIG", config);
+      sendToRenderer(IPC_CHANNELS.BOARD_CONFIG_DATA, config);
       config = {};
     }
 
@@ -167,9 +312,11 @@ function onData(data) {
     else if (data === "#End of configuration dump") {
       try {
         saveDumpDataToFile(backupConfig.trim());
-        sendToRenderer("BOARD:DUMP");
+        sendToRenderer(IPC_CHANNELS.BOARD_DUMP_COMPLETE);
       } catch (error) {
-        return sendToRenderer("BOARD:DUMP", { error: error.message });
+        return sendToRenderer(IPC_CHANNELS.BOARD_DUMP_COMPLETE, {
+          error: error.message,
+        });
       }
       backupConfig = "";
     } else backupConfig += data + "\n";
@@ -179,7 +326,7 @@ function onData(data) {
 
   // Handle config success set requests
   if (data.includes("set to")) {
-    sendToRenderer("SET_CONFIG_RESPONSE", data);
+    sendToRenderer(IPC_CHANNELS.BOARD_CONFIG_SAVED, data);
 
     return;
   }
@@ -194,88 +341,40 @@ function onData(data) {
   }
 }
 
-// Parse command confirmation
-function parseCommand(data) {
-  let command;
-  data = data.split(">");
-  if (data.length >= 2) {
-    data.shift();
-
-    command = data
-      .join("")
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w \-_]/g, "")
-      .replace(/ +/g, "_");
-  }
-  return command;
-}
-
-// Parse data. ex: status
-function parseData(key, data) {
-  data = data.trim();
-  return {
-    key,
-    value: data.split("\n"),
-  };
-}
-
-// Parse config value ex: get boot_state
-function parseConfigValue(data) {
-  data = data.split(" = ");
-
-  return {
-    key: data[0],
-    value: data[1],
-  };
-}
-
-function parseAllowedValues(data) {
-  data = data.split(":");
-  data.shift();
-  data = data.join("").replace(/ +/g, "");
-  return data.split(",");
-}
-
-function parseAllowedRange(data) {
-  data = data.split(":");
-  data.shift();
-  return data
-    .join("")
-    .split("-")
-    .map((v) => Number(v));
-}
-
-function parseAllowedLength(data) {
-  data = data.split(":");
-  data.shift();
-  return Number(data[0]);
-}
-
-function parseEventData(value, maxLength) {
-  const valuesArr = value.split(",").map((v) => Number(v));
-
-  let values = [];
-  let actions = [];
-
-  for (var i = 0; i < valuesArr.length && i < maxLength; i += 2) {
-    if (valuesArr[i] === 0) continue;
-
-    const index = valuesArr[i];
-    const value = valuesArr[i + 1];
-    const config = EVENT_SETTINGS[index];
-
-    if (!config) continue;
-
-    actions.push({ ...config, index, value });
-    values.push(index, value);
-  }
-
-  return { values, actions };
-}
-
 async function command(cmd) {
   cliMode = false;
+
+  if (useFakeSerial) {
+    const getMatch = cmd.match(/^get ([a-z0-9_]+)$/);
+    const fakeConfig = getMatch ? fakeConfigForKey(getMatch[1]) : null;
+    if (fakeConfig) {
+      queueMicrotask(() =>
+        sendToRenderer(IPC_CHANNELS.BOARD_CONFIG_DATA, fakeConfig),
+      );
+    } else if (cmd === "status") {
+      queueMicrotask(() =>
+        sendToRenderer(IPC_CHANNELS.BOARD_STATIC_DATA, {
+          key: "status",
+          value: [
+            "CATS test device",
+            "Ready",
+            "Nominal",
+            "h: 0 m, v: 0 m/s, a: 0 m/s^2",
+          ],
+        }),
+      );
+    } else if (cmd === "save") {
+      queueMicrotask(() =>
+        sendToRenderer(IPC_CHANNELS.BOARD_CONFIG_SAVED, "saved"),
+      );
+    }
+    return;
+  }
+
+  if (!port?.isOpen) {
+    sendAlert("Serial port is not connected.");
+    return;
+  }
   port.write(`${cmd}\n`, function (err) {
     if (err) {
       return sendAlert(err.message);
@@ -285,6 +384,18 @@ async function command(cmd) {
 
 function cliCommand(cmd) {
   cliMode = true;
+
+  if (useFakeSerial) {
+    queueMicrotask(() =>
+      sendToRenderer(IPC_CHANNELS.SERIAL_DATA, `test> ${cmd}`),
+    );
+    return;
+  }
+
+  if (!port?.isOpen) {
+    sendAlert("Serial port is not connected.");
+    return;
+  }
   port.write(`${cmd}\n`, function (err) {
     if (err) {
       return sendAlert(err.message);
@@ -310,11 +421,13 @@ function notify(payload) {
 }
 
 function sendAlert(message) {
-  mainWindow.webContents.send("ALERT", message);
+  sendToRenderer(IPC_CHANNELS.APP_ALERT, message);
 }
 
 function sendToRenderer(channel, message) {
-  mainWindow.webContents.send(channel, message);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(channel, message);
+  }
 }
 
-export { getList, connect, disconnect, command, cliCommand };
+export { getList, connect, disconnect, command, cliCommand, setSerialWindow };

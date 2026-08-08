@@ -1,40 +1,35 @@
 <template>
   <v-snackbar
-      v-model="snackbarState.isVisible"
-      :color="snackbarState.color"
-      :timeout="snackbarState.timeout"
-      @input="handleSnackbarInput"
-      bottom
-    >
-      {{ snackbarState.message }}
+    v-model="snackbarState.isVisible"
+    :color="snackbarState.color"
+    :timeout="snackbarState.timeout"
+    @update:model-value="handleSnackbarInput"
+    location="bottom"
+  >
+    {{ snackbarState.message }}
 
-    <template v-slot:action="{ attrs }">
-      <v-btn
-        text
-        v-bind="attrs"
-        @click="hideSnackbar"
-      >
-        <v-icon>mdi-close</v-icon>
-      </v-btn>
+    <template #actions>
+      <v-btn icon="mdi-close" variant="text" @click="hideSnackbar" />
     </template>
   </v-snackbar>
 </template>
 
 <script>
-import { mapGetters, mapActions } from "vuex";
+import { mapActions, mapState } from "pinia";
+import { useAppStore } from "@/store";
 
 export default {
   name: "Snackbar",
   computed: {
-    ...mapGetters([ "snackbarState" ]),
+    ...mapState(useAppStore, ["snackbarState"]),
   },
   methods: {
-    ...mapActions([ "hideSnackbar" ]),
+    ...mapActions(useAppStore, ["hideSnackbar"]),
     handleSnackbarInput(value) {
       if (!value) {
-        this.hideSnackbar(); 
+        this.hideSnackbar();
       }
-    }
-  }
+    },
+  },
 };
 </script>

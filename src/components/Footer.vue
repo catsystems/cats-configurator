@@ -1,6 +1,6 @@
 <template>
-  <v-footer app dark>
-    <div class="d-flex caption" style="width: 100%">
+  <v-footer app height="32" color="grey-darken-4" theme="catsDark">
+    <div class="d-flex text-caption" style="width: 100%">
       <div class="mr-12">
         Status: {{ active ? "Connected" : "Disconnected" }}
       </div>
@@ -9,27 +9,26 @@
           {{ item }}
         </div>
       </template>
-      <div class="ml-auto">
-        App version: {{ appVersion }}
-      </div>
+      <div class="ml-auto">App version: {{ appVersion }}</div>
     </div>
   </v-footer>
 </template>
 
 <script>
-import { mapState } from "vuex";
+import { mapState } from "pinia";
+import { useAppStore } from "@/store";
 
 export default {
-  name: "Footer",
+  name: "AppFooter",
   data() {
     return {
-      appVersion: __APP_VERSION__
+      appVersion: __APP_VERSION__,
     };
   },
   computed: {
-    ...mapState({
-      version: (state) => state.static.version,
-      active: (state) => state.active,
+    ...mapState(useAppStore, {
+      version: (store) => store.static.version,
+      active: "active",
     }),
   },
 };

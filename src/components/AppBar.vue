@@ -1,30 +1,19 @@
 <template>
-  <v-app-bar app dark clipped-left>
-    <v-toolbar-title class="d-flex">
-      <v-img
-        height="48"
-        width="48"
-        contain
-        position="left"
-        src="@/assets/logos/logo_white_small.png"
-      />
-      <v-img
-        height="48"
-        width="100"
-        contain
-        position="left"
-        src="@/assets/logos/text_white.png"
-      />
-    </v-toolbar-title>
+  <v-app-bar color="grey-darken-4" theme="catsDark">
+    <div class="app-brand">
+      <img class="app-brand__mark" :src="logoImage" alt="" />
+      <img class="app-brand__text" :src="textLogoImage" alt="CATS" />
+    </div>
 
     <v-spacer></v-spacer>
-    <div class="d-flex align-center">
+    <div class="app-bar-controls d-flex align-center">
       <v-btn
         class="mr-2"
         :loading="isFetchingPorts"
         :disabled="active"
-        fab
-        small
+        icon
+        size="small"
+        variant="elevated"
         @click="getPorts"
       >
         <v-icon color="primary">mdi-reload</v-icon>
@@ -36,11 +25,11 @@
         ref="portSelector"
         label="ports"
         no-data-text="No ports available"
-        item-text="path"
+        item-title="path"
         item-value="path"
         style="width: 220px"
-        solo
-        dense
+        variant="solo-filled"
+        density="compact"
         hide-details
         return-object
       >
@@ -48,6 +37,7 @@
       <v-btn
         v-if="!active"
         color="primary"
+        variant="elevated"
         class="ml-2"
         style="width: 120px"
         :loading="connectBtnLoading"
@@ -59,6 +49,7 @@
       <v-btn
         v-else
         color="error"
+        variant="elevated"
         class="ml-2"
         style="width: 120px"
         :loading="connectBtnLoading"
@@ -71,7 +62,10 @@
 </template>
 
 <script>
-import { mapState, mapActions } from "vuex";
+import { mapActions, mapState } from "pinia";
+import { useAppStore } from "@/store";
+import logoImage from "@/assets/logos/logo_white_small.png";
+import textLogoImage from "@/assets/logos/text_white.png";
 
 export default {
   name: "AppBar",
@@ -79,54 +73,102 @@ export default {
     return {
       isFetchingPorts: false,
       connectBtnLoading: false,
-      connected: false,
       selectedPort: null,
+      subscriptions: [],
+      logoImage,
+      textLogoImage,
     };
   },
   computed: {
-    ...mapState({
-      serialPorts: (state) => state.serialPorts,
-      active: (state) => state.active,
-    }),
+    ...mapState(useAppStore, ["serialPorts", "active"]),
   },
   mounted() {
     this.getPorts();
-    window.renderer.on("FETCH_SERIAL_PORTS", (ports) => {
-      this.isFetchingPorts = false;
-      this.setSerialPorts(ports);
-    });
-    window.renderer.on("CONNECTED", () => {
-      this.connected = true;
-      this.connectBtnLoading = false;
-    });
-    window.renderer.on("CONNECTION_ERROR", (message) => {
-      window.alert(message);
-      this.connected = false;
-      this.connectBtnLoading = false;
-    });
-    window.renderer.on("DISCONNECTED", () => {
-      this.connectBtnLoading = false;
-      this.setActiveState(null);
-      this.$router.push("/");
-    });
+    this.subscriptions.push(
+      window.cats.serial.onConnected(() => {
+        this.connectBtnLoading = false;
+      }),
+      window.cats.serial.onError((message) => {
+        window.alert(message);
+        this.connectBtnLoading = false;
+      }),
+      window.cats.serial.onDisconnected(() => {
+        this.connectBtnLoading = false;
+        this.setActiveState(false);
+        this.$router.push("/");
+      }),
+    );
+  },
+  beforeUnmount() {
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
   },
   methods: {
-    ...mapActions(["setSerialPorts", "setActiveState"]),
-    getPorts() {
+    ...mapActions(useAppStore, ["setSerialPorts", "setActiveState"]),
+    async getPorts() {
       this.isFetchingPorts = true;
-      window.renderer.send("FETCH_SERIAL_PORTS");
+      try {
+        this.setSerialPorts(await window.cats.serial.list());
+      } catch (error) {
+        window.alert(error.message);
+      } finally {
+        this.isFetchingPorts = false;
+      }
     },
-    connect() {
+    async connect() {
       if (!this.selectedPort) return;
       this.connectBtnLoading = true;
-      window.renderer.send("CONNECT", this.selectedPort.path);
+      try {
+        await window.cats.serial.connect(this.selectedPort.path);
+      } catch (error) {
+        this.connectBtnLoading = false;
+        window.alert(error.message);
+      }
     },
-    disconnect() {
+    async disconnect() {
       this.connectBtnLoading = true;
-      window.renderer.send("DISCONNECT");
+      try {
+        await window.cats.serial.disconnect();
+      } catch (error) {
+        this.connectBtnLoading = false;
+        window.alert(error.message);
+      }
     },
   },
 };
 </script>
 
-<style></style>
+<style scoped>
+.app-brand {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  height: 48px;
+  margin-inline-start: 20px;
+}
+
+.app-brand__mark,
+.app-brand__text {
+  display: block;
+  height: 48px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.app-brand__mark {
+  width: 48px;
+}
+
+.app-brand__text {
+  width: 100px;
+}
+
+.app-bar-controls {
+  padding-inline-end: 20px;
+}
+
+.v-btn--disabled.bg-primary {
+  background-color: #424242 !important;
+  color: rgba(255, 255, 255, 0.3) !important;
+  opacity: 1;
+}
+</style>

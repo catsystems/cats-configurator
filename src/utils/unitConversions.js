@@ -10,22 +10,22 @@ const PSI_TO_KPA = 6.89476; // Pounds per square inch to Kilopascals
  * @returns {string} The unit label (e.g., 'm', 'ft', 'kPa', 'psi').
  */
 export function getUnitLabel(paramName, unitSystem) {
-  const isImperial = unitSystem === 'imperial';
+  const isImperial = unitSystem === "imperial";
 
   switch (paramName) {
-    case 'altitude':
-      return isImperial ? 'ft' : 'm';
-    case 'velocity':
-      return isImperial ? 'ft/s' : 'm/s';
-    case 'acceleration':
-      return isImperial ? 'ft/s²' : 'm/s²';
-    case 'pressure':
-      return isImperial ? 'psi' : 'kPa';
-    case 'temperature':
-      return isImperial ? '°F' : '°C';
+    case "altitude":
+      return isImperial ? "ft" : "m";
+    case "velocity":
+      return isImperial ? "ft/s" : "m/s";
+    case "acceleration":
+      return isImperial ? "ft/s²" : "m/s²";
+    case "pressure":
+      return isImperial ? "psi" : "kPa";
+    case "temperature":
+      return isImperial ? "°F" : "°C";
     default:
       console.warn(`Unknown parameter for unit label: ${paramName}`);
-      return '';
+      return "";
   }
 }
 
@@ -71,7 +71,7 @@ export function convertPressureToImperial(kpa) {
  * @returns {number} Converted value.
  */
 export function convertTemperatureToImperial(celsius) {
-  return (celsius * 9 / 5) + 32;
+  return (celsius * 9) / 5 + 32;
 }
 
 /**
@@ -116,7 +116,7 @@ export function convertPressureToMetric(psi) {
  * @returns {number} Converted value in Celsius.
  */
 export function convertTemperatureToMetric(fahrenheit) {
-  return (fahrenheit - 32) * 5 / 9;
+  return ((fahrenheit - 32) * 5) / 9;
 }
 
 /**
@@ -136,55 +136,58 @@ export function convertTemperatureToMetric(fahrenheit) {
 export function getDisplayValue(rawValue, paramName, options = {}) {
   // Handle null/undefined values
   if (rawValue === null || rawValue === undefined) {
-    return '-';
+    return "-";
   }
 
   // Ensure options have defaults
-  const { numeric = true, decimals = 2, targetUnitSystem = "imperial", excludeLabel = false } = options;
+  const {
+    numeric = true,
+    decimals = 2,
+    targetUnitSystem = "imperial",
+    excludeLabel = false,
+  } = options;
   let parsedValue = parseFloat(rawValue);
   let convertedValue;
 
   if (isNaN(parsedValue)) {
-    return '-';
+    return "-";
   }
 
-  let unitLabel = '';
-
-  if (targetUnitSystem === 'imperial') {
+  if (targetUnitSystem === "imperial") {
     switch (paramName) {
-      case 'altitude':
+      case "altitude":
         convertedValue = convertLengthToImperial(rawValue);
         break;
-      case 'velocity':
+      case "velocity":
         convertedValue = convertVelocityToImperial(rawValue);
         break;
-      case 'acceleration':
+      case "acceleration":
         convertedValue = convertAccelerationToImperial(rawValue);
         break;
-      case 'pressure':
+      case "pressure":
         convertedValue = convertPressureToImperial(rawValue);
         break;
-      case 'temperature':
+      case "temperature":
         convertedValue = convertTemperatureToImperial(rawValue);
         break;
       default:
         convertedValue = rawValue;
     }
-  } else if (targetUnitSystem === 'metric') {
+  } else if (targetUnitSystem === "metric") {
     switch (paramName) {
-      case 'altitude':
+      case "altitude":
         convertedValue = convertLengthToMetric(rawValue);
         break;
-      case 'velocity':
+      case "velocity":
         convertedValue = convertVelocityToMetric(rawValue);
         break;
-      case 'acceleration':
+      case "acceleration":
         convertedValue = convertAccelerationToMetric(rawValue);
         break;
-      case 'pressure':
+      case "pressure":
         convertedValue = convertPressureToMetric(rawValue);
         break;
-      case 'temperature':
+      case "temperature":
         convertedValue = convertTemperatureToMetric(rawValue);
         break;
       default:
@@ -192,12 +195,14 @@ export function getDisplayValue(rawValue, paramName, options = {}) {
     }
   } else {
     console.warn(`Unknown target unit system: ${targetUnitSystem}`);
-    return '-';
+    return "-";
   }
 
-  unitLabel = getUnitLabel(paramName, targetUnitSystem);
+  const unitLabel = getUnitLabel(paramName, targetUnitSystem);
 
   if (numeric) return convertedValue;
 
-  return excludeLabel ? `${convertedValue.toFixed(decimals)}` : `${convertedValue.toFixed(decimals)}${unitLabel}`
+  return excludeLabel
+    ? `${convertedValue.toFixed(decimals)}`
+    : `${convertedValue.toFixed(decimals)}${unitLabel}`;
 }

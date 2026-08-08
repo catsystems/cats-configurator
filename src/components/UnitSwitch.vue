@@ -2,44 +2,50 @@
   <v-container class="py-0">
     <v-row align="center" justify="start">
       <v-col cols="auto">
-        <v-switch v-model="useImperialUnitsState" label="Use imperial units" hide-details inset class="mt-0 pt-0"
-          color="primary"></v-switch>
+        <v-switch
+          v-model="useImperialUnitsState"
+          label="Use imperial units"
+          hide-details
+          inset
+          class="mt-0 pt-0"
+          color="primary"
+        ></v-switch>
       </v-col>
-      <v-tooltip top>
-        <template v-slot:activator="{ on, attrs }">
-        <v-icon
-              color="primary"
-              v-on="on"
-              v-bind="attrs"
-            >
-              mdi-information-variant-box-outline
-            </v-icon>
-            </template>
-        <span>Flight Computer natively uses metric units; Imperial values will be converted to the nearest metric integer.</span>
+      <v-tooltip location="top">
+        <template #activator="{ props }">
+          <v-icon color="primary" v-bind="props">
+            mdi-information-variant-box-outline
+          </v-icon>
+        </template>
+        <span
+          >Flight Computer natively uses metric units; Imperial values will be
+          converted to the nearest metric integer.</span
+        >
       </v-tooltip>
     </v-row>
   </v-container>
 </template>
 
 <script>
-import { mapGetters, mapActions } from 'vuex';
+import { mapActions, mapState } from "pinia";
+import { useAppStore } from "@/store";
 
 export default {
-  name: 'UnitSwitch',
+  name: "UnitSwitch",
   computed: {
-    ...mapGetters(['useImperialUnits']),
+    ...mapState(useAppStore, ["useImperialUnits"]),
     useImperialUnitsState: {
       get() {
         return this.useImperialUnits;
       },
-      set(newValue) {
+      set() {
         this.toggleUnitSystem();
-      }
-    }
+      },
+    },
   },
   methods: {
-    ...mapActions(['toggleUnitSystem']),
-  }
+    ...mapActions(useAppStore, ["toggleUnitSystem"]),
+  },
 };
 </script>
 

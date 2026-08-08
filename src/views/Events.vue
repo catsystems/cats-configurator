@@ -2,14 +2,14 @@
   <div>
     <v-container fluid>
       <v-slide-group show-arrows>
-        <v-slide-item v-for="key in Object.keys(events)" :key="key">
-          <v-card flat max-height="100%">
+        <v-slide-group-item v-for="key in Object.keys(events)" :key="key">
+          <v-card class="event-column-card" variant="flat" max-height="100%">
             <v-card-title class="py-2">
               <span class="text-capitalize" v-text="key.split('_')[1]" />
               <span></span>
             </v-card-title>
             <v-card-text>
-              <v-card outlined>
+              <v-card class="event-actions-card" variant="outlined">
                 <v-card-text v-if="events[key].actions.length" class="pa-2">
                   <div class="event-action">
                     <EventAction
@@ -25,6 +25,7 @@
                   <v-btn
                     block
                     color="primary"
+                    variant="elevated"
                     :disabled="isActionsFilled(events[key])"
                     @click="onAddActionClick(key)"
                   >
@@ -34,7 +35,7 @@
               </v-card>
             </v-card-text>
           </v-card>
-        </v-slide-item>
+        </v-slide-group-item>
       </v-slide-group>
     </v-container>
     <ActionsBar @refresh="init" @save="saveData" />
@@ -59,13 +60,14 @@
 </template>
 
 <script>
-import { mapState, mapGetters, mapActions } from "vuex";
+import { mapActions, mapState } from "pinia";
+import { useAppStore } from "@/store";
 import { getEvents, setEvents } from "@/services/eventService";
 
-import ActionsBar from "@/components/ActionsBar";
-import EventAction from "@/components/EventAction";
-import AddEventActionDialog from "@/components/AddEventActionDialog";
-import EditEventActionDialog from "@/components/EditEventActionDialog";
+import ActionsBar from "@/components/ActionsBar.vue";
+import EventAction from "@/components/EventAction.vue";
+import AddEventActionDialog from "@/components/AddEventActionDialog.vue";
+import EditEventActionDialog from "@/components/EditEventActionDialog.vue";
 
 export default {
   name: "EventsView",
@@ -85,11 +87,7 @@ export default {
     };
   },
   computed: {
-    ...mapState({
-      changedTab: (state) => state.changedTab,
-      events: (state) => state.events,
-    }),
-    ...mapGetters(["isEventsChanged"]),
+    ...mapState(useAppStore, ["changedTab", "events", "isEventsChanged"]),
     changed() {
       return this.changedTab === "events";
     },
@@ -111,7 +109,7 @@ export default {
     this.init();
   },
   methods: {
-    ...mapActions([
+    ...mapActions(useAppStore, [
       "setChangedTab",
       "editEventAction",
       "removeEventAction",
@@ -121,7 +119,6 @@ export default {
       getEvents();
     },
     saveData() {
-      
       setEvents(this.events);
       setTimeout(function () {
         getEvents();
@@ -160,5 +157,13 @@ export default {
 .event-action {
   max-height: calc(100vh - 290px);
   overflow: scroll;
+}
+
+.event-actions-card {
+  border-color: #e0e0e0;
+}
+
+.event-column-card > :deep(.v-card-title) {
+  min-height: 48px;
 }
 </style>

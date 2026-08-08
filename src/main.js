@@ -1,26 +1,32 @@
-import Vue from "vue";
+import "@mdi/font/css/materialdesignicons.css";
+import "vuetify/styles";
+import "@/assets/style/main.scss";
+import { createPinia } from "pinia";
+import { createApp } from "vue";
 import App from "./App.vue";
-import router from "./router";
-import store from "./store";
-import vuetify from "./plugins/vuetify";
+import vuetify from "./plugins/vuetify.js";
+import router from "./router/index.js";
 
-Vue.config.productionTip = false;
+const application = createApp(App);
 
-/* Add new vue directive that calls a function every time an element is resized */
-Vue.directive('resize', {
-  inserted: function(el, binding) {
-    const onResizeCallback = binding.value;
-    window.addEventListener('resize', () => {
-      const width = document.documentElement.clientWidth;
-      const height = document.documentElement.clientHeight;
-      onResizeCallback({ width, height });
-    })
-  }
+application.directive("resize", {
+  mounted(element, binding) {
+    const resizeHandler = () => {
+      binding.value({
+        width: document.documentElement.clientWidth,
+        height: document.documentElement.clientHeight,
+      });
+    };
+    element.__catsResizeHandler = resizeHandler;
+    window.addEventListener("resize", resizeHandler);
+  },
+  unmounted(element) {
+    window.removeEventListener("resize", element.__catsResizeHandler);
+    delete element.__catsResizeHandler;
+  },
 });
 
-new Vue({
-  router,
-  store,
-  vuetify,
-  render: (h) => h(App),
-}).$mount("#app");
+application.use(createPinia());
+application.use(router);
+application.use(vuetify);
+application.mount("#app");

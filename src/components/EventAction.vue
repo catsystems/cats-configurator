@@ -1,11 +1,14 @@
 <template>
-  <v-card outlined class="d-flex align-center justify-space-between pa-2 mb-2">
-    <div class="grey lighten-4 pa-1 my-n2 ml-n2">
-      <v-btn icon block small @click="editFunction">
-        <v-icon small color="primary">mdi-cog</v-icon>
+  <v-card
+    variant="outlined"
+    class="event-action-card d-flex align-center justify-space-between pa-2 mb-2"
+  >
+    <div class="bg-grey-lighten-4 pa-1 my-n2 ml-n2">
+      <v-btn icon block size="28" variant="text" @click="editFunction">
+        <v-icon size="small" color="primary">mdi-cog</v-icon>
       </v-btn>
-      <v-btn icon block small @click="removeFunction">
-        <v-icon small color="primary">mdi-close-circle</v-icon>
+      <v-btn icon block size="28" variant="text" @click="removeFunction">
+        <v-icon size="small" color="primary">mdi-close-circle</v-icon>
       </v-btn>
     </div>
     <div>
@@ -19,9 +22,9 @@
 export default {
   name: "EventAction",
   props: {
-    action: Object,
-    editFunction: Function,
-    removeFunction: Function,
+    action: { type: Object, required: true },
+    editFunction: { type: Function, required: true },
+    removeFunction: { type: Function, required: true },
   },
   computed: {
     value() {
@@ -34,4 +37,8 @@ export default {
 };
 </script>
 
-<style></style>
+<style scoped>
+.event-action-card {
+  border-color: #e0e0e0;
+}
+</style>

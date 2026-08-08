@@ -1,23 +1,46 @@
 <template>
-  <v-navigation-drawer app dark clipped permanent width="300" class="navigation-panel pb-4">
-    <v-alert v-if="!active" dense text type="info" class="mx-2 mt-2 caption">
+  <v-navigation-drawer
+    permanent
+    order="1"
+    width="300"
+    color="grey-darken-4"
+    theme="catsDark"
+    class="navigation-panel pb-4"
+  >
+    <v-alert
+      v-if="!active"
+      density="compact"
+      variant="tonal"
+      type="info"
+      class="mx-2 mt-2 text-caption"
+    >
       Plug in CATS board and connect to activate this area.
     </v-alert>
-    <v-alert v-if="changedTab" dense text type="warning" class="mx-2 mt-2 caption">
+    <v-alert
+      v-if="changedTab"
+      density="compact"
+      variant="tonal"
+      type="warning"
+      class="mx-2 mt-2 text-caption"
+    >
       <div class="d-flex justify-space-between align-center">
         <div>Unsaved changes.</div>
-        <v-btn small text @click="discard">discard</v-btn>
+        <v-btn size="small" variant="text" @click="discard">discard</v-btn>
       </div>
     </v-alert>
-    <v-card flat :disabled="!active || !!changedTab" color="transparent">
-      <v-list dense nav>
-        <v-list-item-group color="primary">
-          <v-list-item v-for="item in items" :key="item.title" :to="item.link">
-            <v-list-item-content>
-              <v-list-item-title v-text="item.title"></v-list-item-title>
-            </v-list-item-content>
-          </v-list-item>
-        </v-list-item-group>
+    <v-card
+      variant="flat"
+      :disabled="!active || !!changedTab"
+      color="transparent"
+    >
+      <v-list density="compact" nav>
+        <v-list-item
+          v-for="item in items"
+          :key="item.title"
+          :to="item.link"
+          :title="item.title"
+          color="primary"
+        />
       </v-list>
     </v-card>
     <UnitSwitch class="unit-switch mb-2" />
@@ -25,7 +48,8 @@
 </template>
 
 <script>
-import { mapState } from "vuex";
+import { mapState } from "pinia";
+import { useAppStore } from "@/store";
 import { getConfigs } from "@/services/configService";
 import { getEvents } from "@/services/eventService";
 import { getTimers } from "@/services/timerService";
@@ -44,10 +68,7 @@ export default {
     },
   },
   computed: {
-    ...mapState({
-      active: (state) => state.active,
-      changedTab: (state) => state.changedTab,
-    }),
+    ...mapState(useAppStore, ["active", "changedTab"]),
   },
   methods: {
     discard() {
@@ -71,9 +92,26 @@ export default {
 </script>
 
 <style scoped>
-.navigation-panel ::v-deep .v-navigation-drawer__content {
+.navigation-panel :deep(.v-navigation-drawer__content) {
   display: flex;
   flex-direction: column;
+}
+
+.navigation-panel :deep(.v-alert) {
+  flex: 0 0 auto;
+}
+
+.navigation-panel :deep(.v-alert__content) {
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.navigation-panel :deep(.v-list-item--active) {
+  background: rgba(255, 167, 38, 0.3);
+}
+
+.navigation-panel :deep(.v-list-item--active .v-list-item__overlay) {
+  opacity: 0;
 }
 
 .unit-switch {

@@ -1,120 +1,159 @@
-import { ipcMain, dialog } from "electron";
-import fs from "fs";
-import path from "path";
-import { parseFlightLog } from "./logparser.js"
-import { exportFlightLogToCSVs, exportFlightLogChartsToHTML } from "./flightlog.js"
-import { connect, disconnect, command, cliCommand, getList } from "./serial.js";
+import { dialog, ipcMain } from "electron";
+import fs from "node:fs/promises";
+import path from "node:path";
+import {
+  assertBoardKey,
+  assertBoardValue,
+  assertNonEmptyString,
+  assertRecord,
+  assertTrustedSender,
+  IPC_CHANNELS,
+} from "../shared/ipc.js";
 import { getFilename } from "../utils/file.js";
+import {
+  exportFlightLogChartsToHTML,
+  exportFlightLogToCSVs,
+} from "./flightlog.js";
+import { parseFlightLog } from "./logparser.js";
+import { cliCommand, command, connect, disconnect, getList } from "./serial.js";
 
-export let flightLogFilename = "";
+let trustedWindow;
+let registered = false;
+let flightLogFilename = "flight_log";
 
-export function subscribeListeners() {
-  ipcMain.on("BOARD:CONFIG", async (event, key) => {
-    command(`get ${key}`);
+export function setIpcWindow(window) {
+  trustedWindow = window;
+}
+
+function trusted(handler) {
+  return async (event, payload) => {
+    assertTrustedSender(event, trustedWindow);
+    return handler(payload);
+  };
+}
+
+function handle(channel, handler) {
+  ipcMain.handle(channel, trusted(handler));
+}
+
+async function loadFlightLog(filePath) {
+  assertNonEmptyString(filePath, "Flight-log path");
+  const resolvedPath = path.resolve(filePath);
+  if (path.extname(resolvedPath).toLowerCase() !== ".cfl") {
+    throw new Error("File does not end with .cfl");
+  }
+
+  const fileStat = await fs.stat(resolvedPath);
+  if (!fileStat.isFile()) throw new Error("Flight-log path is not a file.");
+  if (fileStat.size === 0) throw new Error("File is empty");
+
+  flightLogFilename = getFilename(resolvedPath.slice(0, -4));
+  const data = await fs.readFile(resolvedPath);
+  return parseFlightLog(data.toString("binary"));
+}
+
+async function restoreBoardConfiguration() {
+  const selection = await dialog.showOpenDialog(trustedWindow, {
+    properties: ["openFile"],
+    filters: [{ name: "CATS configuration", extensions: ["txt"] }],
+  });
+  if (selection.canceled || selection.filePaths.length === 0) {
+    return { canceled: true };
+  }
+
+  const data = await fs.readFile(selection.filePaths[0], "utf8");
+  for (const line of data.split(/\r?\n/)) {
+    const boardCommand = line.trim();
+    if (boardCommand) command(boardCommand);
+  }
+  return { canceled: false };
+}
+
+export function subscribeListeners(openExternal) {
+  if (registered) return;
+  registered = true;
+
+  handle(IPC_CHANNELS.APP_OPEN_EXTERNAL, async (url) => {
+    assertNonEmptyString(url, "External URL", 2048);
+    await openExternal(url);
+    return true;
   });
 
-  ipcMain.on("BOARD:SET_CONFIG", async (event, [key, value]) => {
-    if (!key) return;
-    command(`set ${key} = ${value}`);
+  handle(IPC_CHANNELS.SERIAL_LIST, () => getList());
+  handle(IPC_CHANNELS.SERIAL_CONNECT, (portPath) => {
+    assertNonEmptyString(portPath, "Serial port path", 512);
+    connect(portPath);
+    return true;
   });
-
-  ipcMain.on("BOARD:EVENTS", async (event, key) => {
-    command(`get ${key}`);
-  });
-
-  ipcMain.on("BOARD:TIMERS", async (event, key) => {
-    command(`get ${key}_start`);
-    command(`get ${key}_duration`);
-    command(`get ${key}_trigger`);
-  });
-
-  ipcMain.on("BOARD:INFO", () => {
-    command("status");
-  });
-
-  ipcMain.on("BOARD:LOG_INFO", () => {
-    command("rec_info");
-  });
-
-  ipcMain.on("BOARD:DUMP", () => {
-    command("dump");
-  });
-
-  ipcMain.on("BOARD:RESTORE", (event) => {
-    let paths = dialog.showOpenDialogSync({ properties: ["openFile"] });
-
-    if (paths) {
-      let data = fs.readFileSync(paths[0], { encoding: "utf8" });
-      if (data && data.length) {
-        data = data.split("\n");
-        data.forEach((cmd) => {
-          command(cmd);
-        });
-      }
-    }
-
-    event.sender.send("BOARD:RESTORE");
-  });
-
-  ipcMain.on("LOAD_FLIGHTLOG", (event, file) => {
-
-    if (!file.toLowerCase().endsWith(".cfl")) {
-      event.sender.send("LOAD_FLIGHTLOG", { error: "File does not end with .cfl" });
-      return
-    }
-
-    flightLogFilename = getFilename(file.slice(0, -4)); // Remove the .cfl extension
-
-    let data = fs.readFileSync(file, { encoding: "binary" });
-    if (!data || !data.length) {
-      event.sender.send("LOAD_FLIGHTLOG", { error: "File is empty" });
-      return
-    }
-
-    let flightLog = parseFlightLog(data);
-    event.sender.send("LOAD_FLIGHTLOG", flightLog);
-  });
-
-  ipcMain.on("EXPORT_FLIGHTLOG_CSVS", (event, flightLog) => {
-    try {
-      exportFlightLogToCSVs(flightLog)
-      event.sender.send("EXPORT_FLIGHTLOG_CSVS");
-    } catch (error) {
-      event.sender.send("EXPORT_FLIGHTLOG_CSVS", { error: error.message });
-    }
-  });
-
-  ipcMain.on("EXPORT_FLIGHTLOG_HTML", (event, args) => { 
-    try {
-      exportFlightLogChartsToHTML(args.flightLog, args.useImperialUnits);
-      event.sender.send("EXPORT_FLIGHTLOG_HTML");
-    } catch (error) {
-      event.sender.send("EXPORT_FLIGHTLOG_HTML", { error: error.message });
-    }
-  });
-
-  ipcMain.on("BOARD:RESET_CONFIG", () => {
-    command("defaults");
-  });
-
-  ipcMain.on("BOARD:SAVE", async () => {
-    command("save");
-  });
-
-  ipcMain.on("CLI_COMMAND", (event, cmd) => {
-    cliCommand(cmd);
-  });
-
-  ipcMain.on("CONNECT", (event, path) => {
-    connect(path);
-  });
-
-  ipcMain.on("DISCONNECT", () => {
+  handle(IPC_CHANNELS.SERIAL_DISCONNECT, () => {
     disconnect();
+    return true;
+  });
+  handle(IPC_CHANNELS.SERIAL_SEND, (value) => {
+    assertNonEmptyString(value, "CLI command", 1024);
+    if (/[\r\n]/.test(value))
+      throw new Error("CLI command must fit on one line.");
+    cliCommand(value);
+    return true;
   });
 
-  ipcMain.on("FETCH_SERIAL_PORTS", async (event) => {
-    const ports = await getList();
-    event.sender.send("FETCH_SERIAL_PORTS", ports);
+  handle(IPC_CHANNELS.BOARD_GET_CONFIG, (key) => {
+    command(`get ${assertBoardKey(key)}`);
+    return true;
+  });
+  handle(IPC_CHANNELS.BOARD_SET_CONFIG, (payload) => {
+    assertRecord(payload, "Board configuration update");
+    const key = assertBoardKey(payload.key);
+    const value = assertBoardValue(payload.value);
+    command(`set ${key} = ${value}`);
+    return true;
+  });
+  handle(IPC_CHANNELS.BOARD_GET_EVENTS, (key) => {
+    command(`get ${assertBoardKey(key)}`);
+    return true;
+  });
+  handle(IPC_CHANNELS.BOARD_GET_TIMERS, (key) => {
+    const timer = assertBoardKey(key);
+    command(`get ${timer}_start`);
+    command(`get ${timer}_duration`);
+    command(`get ${timer}_trigger`);
+    return true;
+  });
+  handle(IPC_CHANNELS.BOARD_GET_INFO, () => {
+    command("status");
+    return true;
+  });
+  handle(IPC_CHANNELS.BOARD_GET_LOG_INFO, () => {
+    command("rec_info");
+    return true;
+  });
+  handle(IPC_CHANNELS.BOARD_DUMP, () => {
+    command("dump");
+    return true;
+  });
+  handle(IPC_CHANNELS.BOARD_RESTORE, restoreBoardConfiguration);
+  handle(IPC_CHANNELS.BOARD_RESET, () => {
+    command("defaults");
+    return true;
+  });
+  handle(IPC_CHANNELS.BOARD_SAVE, () => {
+    command("save");
+    return true;
+  });
+
+  handle(IPC_CHANNELS.FLIGHT_LOG_LOAD, loadFlightLog);
+  handle(IPC_CHANNELS.FLIGHT_LOG_EXPORT_CSV, async (flightLog) => {
+    assertRecord(flightLog, "Flight log");
+    return exportFlightLogToCSVs(flightLog, flightLogFilename, trustedWindow);
+  });
+  handle(IPC_CHANNELS.FLIGHT_LOG_EXPORT_HTML, async (payload) => {
+    assertRecord(payload, "Flight-log HTML export");
+    assertRecord(payload.flightLog, "Flight log");
+    return exportFlightLogChartsToHTML(
+      payload.flightLog,
+      Boolean(payload.useImperialUnits),
+      flightLogFilename,
+      trustedWindow,
+    );
   });
 }
