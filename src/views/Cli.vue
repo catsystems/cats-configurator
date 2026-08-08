@@ -1,16 +1,10 @@
 <template>
-  <v-container
-    fluid
-    class="d-flex flex-column"
-    style="height: 100%; position: absolute"
-  >
+  <v-container fluid class="cli-view d-flex flex-column">
     <v-card
       id="cli_card"
-      dark
-      class="mb-2"
-      max-height="100%"
-      height="100%"
-      style="overflow: auto"
+      theme="catsDark"
+      color="grey-darken-4"
+      class="cli-output mb-2"
       ref="cli_card"
     >
       <v-card-text>
@@ -18,7 +12,7 @@
           <div v-if="response.includes('^._.^')" class="mb-1">
             <span v-text="response" />
           </div>
-          <div v-else class="white--text" style="white-space: pre-line">
+          <div v-else class="text-white" style="white-space: pre-line">
             <v-divider v-if="response === '\n'" class="mt-1" />
             <span v-text="response" />
           </div>
@@ -27,10 +21,11 @@
     </v-card>
     <v-text-field
       v-model="cmd"
+      class="cli-input"
       placeholder="Write your command here"
       append-icon="mdi-keyboard-return"
-      solo
-      dense
+      variant="solo"
+      density="compact"
       hide-details
       @keydown.enter="sendCommand"
     />
@@ -46,10 +41,11 @@ export default {
     return {
       cmd: null,
       responses: [],
+      unsubscribe: null,
     };
   },
   mounted() {
-    window.renderer.on("CLI_COMMAND", (res) => {
+    this.unsubscribe = window.cats.serial.onData((res) => {
       this.cmd = null;
       this.responses.push(res);
       this.$nextTick(function () {
@@ -58,8 +54,12 @@ export default {
       });
     });
   },
+  beforeUnmount() {
+    this.unsubscribe?.();
+  },
   methods: {
     sendCommand() {
+      if (!this.cmd?.trim()) return;
       if (this.responses.length) this.responses.push("\n");
       sendCliCommand(this.cmd);
     },
@@ -67,4 +67,18 @@ export default {
 };
 </script>
 
-<style></style>
+<style scoped>
+.cli-view {
+  height: calc(100vh - 96px);
+}
+
+.cli-output {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.cli-input {
+  flex: 0 0 auto;
+}
+</style>

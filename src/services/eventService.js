@@ -1,7 +1,7 @@
 import { EVENT_KEYS } from "@/modules/settings.js";
 
 export function getEvents() {
-  EVENT_KEYS.forEach((key) => window.renderer.send("BOARD:EVENTS", key));
+  EVENT_KEYS.forEach((key) => window.cats.board.getEvents(key));
 }
 
 export function setEvents(events) {
@@ -16,8 +16,8 @@ export function setEvents(events) {
 
     if (!values.length) values = [0, 0];
 
-    window.renderer.send("BOARD:SET_CONFIG", [key, values.join()]);
+    window.cats.board.setConfig(key, values.join());
   });
 
-  window.renderer.send("BOARD:SAVE");
+  window.cats.board.save();
 }

@@ -1,13 +1,37 @@
 # Changelog
+
 All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 08-08-2026
+
+- Move the desktop runtime to Node.js 24 and Electron 43.
+- Replace Vue CLI and the legacy Electron builder plugin with electron-vite,
+  Vite, and direct electron-builder packaging.
+- Upgrade the renderer to Vue 3, Vue Router 5, Pinia 4, and Vuetify 4.
+- Upgrade serialport and Plotly, make Plotly lazy-loaded, and make exported plot
+  HTML fully offline.
+- Replace generic renderer IPC access with a validated domain-specific bridge
+  and strengthen Electron navigation, sandbox, and content security policies.
+- Add non-mutating lint, unit/component tests, Electron smoke tests, security
+  gates, reproducible CI, and automated dependency updates.
+
+## [0.3.10] - 03-07-2025
+
+- Add interactive flight-log plots and export-folder selection.
+- Add metric/imperial display support across configuration and plots.
+- Add application notifications and clearer export feedback.
+- Display the application version and improve configuration safety checks.
+- Update CI actions and add a pinned local Node version.
+
 ## [0.3.3] - 24-07-2023
+
 - Save GNSS logs to CSV
 - Reorder and add titles to plots
 - Fix IMU acceleration scaling
 
 ## [0.3.2] - 10-06-2023
+
 - Removed altitude liftoff detection from general settings
 - Added new github action for automatic changelog

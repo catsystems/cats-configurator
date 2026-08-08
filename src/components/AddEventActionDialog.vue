@@ -1,9 +1,14 @@
 <template>
-  <v-card>
-    <v-card-title>
+  <v-card class="event-dialog-card">
+    <v-card-title class="event-dialog-title d-flex align-center">
       <span>Add Action</span>
       <v-spacer />
-      <v-btn icon :elevation="pinned ? '0' : '2'" @click="pinned = !pinned">
+      <v-btn
+        icon
+        size="small"
+        :elevation="pinned ? '0' : '2'"
+        @click="pinned = !pinned"
+      >
         <v-icon color="primary">
           {{ pinned ? "mdi-pin-off" : "mdi-pin" }}
         </v-icon>
@@ -14,16 +19,16 @@
         <v-row>
           <v-col cols="12">
             <v-select
-              :value="selectedAction"
+              :model-value="selectedAction"
               :items="eventConfigs"
-              item-text="name"
+              item-title="name"
               label="Action"
-              solo
-              dense
+              variant="solo"
+              density="compact"
               hide-details
               return-object
               autofocus
-              @change="onChange"
+              @update:model-value="onChange"
             ></v-select>
           </v-col>
           <v-col cols="12">
@@ -43,11 +48,11 @@
                 type="number"
                 hide-details="auto"
                 color="primary"
-                solo
-                dense
-                @keydown.enter="add"
+                variant="solo"
+                density="compact"
+                @keydown.enter.prevent="add"
               >
-                <template v-slot:append>
+                <template #append-inner>
                   {{ selectedAction.unit }}
                 </template>
               </v-text-field>
@@ -55,11 +60,13 @@
                 v-else-if="selectedAction.type === 'SELECT'"
                 v-model.number="action.value"
                 :items="selectedAction.args"
+                item-title="text"
+                item-value="value"
                 label="State"
-                solo
-                dense
+                variant="solo"
+                density="compact"
                 hide-details
-                @keydown.enter="add"
+                @keydown.enter.prevent="add"
               ></v-select>
             </template>
           </v-col>
@@ -84,9 +91,9 @@ import { EVENT_SETTINGS } from "@/modules/settings";
 export default {
   name: "AddEventActionDialog",
   props: {
-    event: Object,
-    saveFunction: Function,
-    closeFunction: Function,
+    event: { type: Object, required: true },
+    saveFunction: { type: Function, required: true },
+    closeFunction: { type: Function, required: true },
   },
   data() {
     return {
@@ -117,10 +124,11 @@ export default {
       this.action.index = index;
       this.action.value = null;
     },
-    add() {
+    async add() {
       if (!this.action || !this.selectedAction) return;
 
-      if (!this.$refs.form.validate()) return;
+      const { valid } = await this.$refs.form.validate();
+      if (!valid) return;
 
       const action = {
         ...this.action,
@@ -141,4 +149,12 @@ export default {
 };
 </script>
 
-<style></style>
+<style scoped>
+.event-dialog-title {
+  min-height: 58px;
+}
+
+.event-dialog-card :deep(.v-card-text) {
+  padding: 8px 16px;
+}
+</style>

@@ -1,0 +1,23 @@
+@font-face {
+  font-family: "Open Sans";
+  src:
+    local("Open Sans"),
+    url("/fonts/Open_Sans/OpenSans-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+
+:root {
+  font-family: "Open Sans", sans-serif;
+}
+
+.v-application {
+  font-family: "Open Sans", sans-serif;
+}
+
+.v-container--fluid {
+  padding: 12px;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}

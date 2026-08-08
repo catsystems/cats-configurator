@@ -1,51 +1,34 @@
-import Vue from "vue";
-import VueRouter from "vue-router";
-import HomeView from "../views/Home.vue";
-import ConfigView from "../views/Config.vue";
-import EventsView from "../views/Events.vue";
-import TimersView from "../views/Timers.vue";
-import LogsView from "../views/Logs.vue";
-import CliView from "../views/Cli.vue";
-
-Vue.use(VueRouter);
+import { createRouter, createWebHashHistory } from "vue-router";
 
 const routes = [
   {
     path: "/",
     name: "Home",
-    component: HomeView,
+    component: () => import("../views/Home.vue"),
   },
   {
     path: "/config",
     name: "Config",
-    component: ConfigView,
+    component: () => import("../views/Config.vue"),
   },
   {
     path: "/events",
     name: "Events",
-    component: EventsView,
+    component: () => import("../views/Events.vue"),
   },
   {
     path: "/timer",
     name: "Timers",
-    component: TimersView,
+    component: () => import("../views/Timers.vue"),
   },
-  /*{
-    path: "/log",
-    name: "Log",
-    component: LogsView,
-  },*/
   {
     path: "/cli",
     name: "Cli",
-    component: CliView,
+    component: () => import("../views/Cli.vue"),
   },
 ];
 
-const router = new VueRouter({
-  mode: "history",
-  base: process.env.BASE_URL,
+export default createRouter({
+  history: createWebHashHistory(),
   routes,
 });
-
-export default router;

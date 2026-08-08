@@ -1,3 +1,3 @@
 export function sendCommand(command) {
-  window.renderer.send("CLI_COMMAND", command);
+  return window.cats.serial.send(command);
 }

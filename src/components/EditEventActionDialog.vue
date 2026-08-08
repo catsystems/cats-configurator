@@ -1,6 +1,6 @@
 <template>
-  <v-card>
-    <v-card-title>
+  <v-card class="event-dialog-card">
+    <v-card-title class="event-dialog-title d-flex align-center">
       <span>Edit Action</span>
     </v-card-title>
     <v-card-text>
@@ -8,16 +8,16 @@
         <v-row>
           <v-col cols="12">
             <v-select
-              :value="selectedAction"
+              :model-value="selectedAction"
               :items="eventConfigs"
-              item-text="name"
+              item-title="name"
               label="Action"
-              solo
-              dense
+              variant="solo"
+              density="compact"
               hide-details
               return-object
               autofocus
-              @change="onChange"
+              @update:model-value="onChange"
             ></v-select>
           </v-col>
           <v-col cols="12">
@@ -37,11 +37,11 @@
                 type="number"
                 hide-details="auto"
                 color="primary"
-                solo
-                dense
-                @keydown.enter="save"
+                variant="solo"
+                density="compact"
+                @keydown.enter.prevent="save"
               >
-                <template v-slot:append>
+                <template #append-inner>
                   {{ selectedAction.unit }}
                 </template>
               </v-text-field>
@@ -49,11 +49,13 @@
                 v-else-if="selectedAction.type === 'SELECT'"
                 v-model.number="action.value"
                 :items="selectedAction.args"
+                item-title="text"
+                item-value="value"
                 label="State"
-                solo
-                dense
+                variant="solo"
+                density="compact"
                 hide-details
-                @keydown.enter="save"
+                @keydown.enter.prevent="save"
               ></v-select>
             </template>
           </v-col>
@@ -78,10 +80,10 @@ import { EVENT_SETTINGS } from "@/modules/settings";
 export default {
   name: "EditEventActionDialog",
   props: {
-    event: Object,
-    value: Object,
-    saveFunction: Function,
-    closeFunction: Function,
+    event: { type: Object, required: true },
+    value: { type: Object, required: true },
+    saveFunction: { type: Function, required: true },
+    closeFunction: { type: Function, required: true },
   },
   data() {
     return {
@@ -133,4 +135,12 @@ export default {
 };
 </script>
 
-<style></style>
+<style scoped>
+.event-dialog-title {
+  min-height: 58px;
+}
+
+.event-dialog-card :deep(.v-card-text) {
+  padding: 8px 16px;
+}
+</style>

@@ -1,90 +1,110 @@
-name: Build/release
+name: CI and release
 
-on: push
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
 
 jobs:
-  release:
-    runs-on: ${{ matrix.os }}
-    
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-    
-    steps: 
-      - name: Check out Git repository
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install Node.js, NPM and Yarn
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 24
+          cache: npm
 
-      - name: Install Packages
-        run: npm install
-      
-      - name: Build for Windows
-        if: matrix.os == 'windows-latest'
-        run: |
-          npm run build --windows nsis zip --x64  --publish never
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build for MacOS
-        if: matrix.os == 'macos-latest'
-        run: |
-          npm run build --macos dmg --x64  --publish never
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build for Linux
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          npm run build --linux AppImage --x64  --publish never
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload Artifacts for Windows Zip
-        if: matrix.os == 'windows-latest' 
-        uses: actions/upload-artifact@v4
-        with: 
-          name: ${{ github.event.repository.name }}-Zip Package
-          path: builds/*.zip
-       
-      - name: Upload Artifacts for Windows Installer
-        if: matrix.os == 'windows-latest' 
-        uses: actions/upload-artifact@v4
-        with: 
-          name: ${{ github.event.repository.name }}-Windows Installer
-          path: builds/*.exe
-      - name: Upload Artifacts for MacOS
-        if: matrix.os == 'macos-latest' 
-        uses: actions/upload-artifact@v4
-        with: 
-          name: ${{ github.event.repository.name }}-Dmg Package
-          path: builds/*.dmg
-      - name: Upload Artifacts for Linux
-        if: matrix.os == 'ubuntu-latest' 
-        uses: actions/upload-artifact@v4
-        with: 
-          name: ${{ github.event.repository.name }}-AppImage Package
-          path: builds/*.AppImage
-      
-      - name: Get changelog entry
-        uses: mindsers/changelog-reader-action@v2
-        if: startsWith(github.ref, 'refs/tags/' )
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Run unit and component tests
+        run: npm test
+
+      - name: Audit production dependencies
+        run: npm run audit:prod
+
+      - name: Reject critical development dependency findings
+        run: npm audit --audit-level=critical
+
+      - name: Run Electron smoke test
+        run: xvfb-run --auto-servernum npm run test:e2e
+
+  package:
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: cats-configurator-windows
+            command: npm run build -- --win nsis zip --x64 --publish never
+            files: |
+              builds/*.exe
+              builds/*.zip
+          - os: macos-latest
+            artifact: cats-configurator-macos
+            command: npm run build -- --mac dmg --x64 --publish never
+            files: builds/*.dmg
+          - os: ubuntu-latest
+            artifact: cats-configurator-linux
+            command: npm run build -- --linux AppImage --x64 --publish never
+            files: builds/*.AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          validation_level: warn
-          version: ${{ steps.tag_name.outputs.current_version }}
-          path: ./CHANGELOG.md
-          
-      - name: Release
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Package application
+        run: ${{ matrix.command }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cats-configurator-*
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/' )
-        with: 
-          name: "CATS Configurator ${{  github.ref_name }}"
-          body: ${{ steps.changelog_reader.outputs.changes }}
-          files: |
-            builds/*.zip
-            builds/*.exe
-            builds/*.dmg
-            builds/*.AppImage
-        env: 
-          GITHUB_TOKEN : ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: CATS Configurator ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release-artifacts/*

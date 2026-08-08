@@ -1,103 +1,131 @@
-"use strict";
+import { app, BrowserWindow, shell } from "electron";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { setIpcWindow, subscribeListeners } from "./modules/ipc.js";
+import { setSerialWindow } from "./modules/serial.js";
 
-import { app, protocol, BrowserWindow } from "electron";
-import { createProtocol } from "vue-cli-plugin-electron-builder/lib";
-import installExtension from "electron-devtools-installer";
-import { subscribeListeners } from "./modules/ipc.js";
-import path from "path";
-
-const isDevelopment = process.env.NODE_ENV !== "production";
-
+const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
+const isDevelopment = Boolean(process.env.ELECTRON_RENDERER_URL);
+const allowedExternalHost = "github.com";
+const rendererEntry = path.join(currentDirectory, "../renderer/index.html");
 let browserWindow;
 
-// Scheme must be registered before the app is ready
-protocol.registerSchemesAsPrivileged([
-  { scheme: "app", privileges: { secure: true, standard: true } },
-]);
+if (process.env.CATS_E2E_USER_DATA) {
+  app.setPath("userData", path.resolve(process.env.CATS_E2E_USER_DATA));
+  app.disableHardwareAcceleration();
+}
+
+export function isAllowedExternalUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return (
+      url.protocol === "https:" &&
+      url.hostname === allowedExternalHost &&
+      url.pathname.startsWith("/catsystems/")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export async function openAllowedExternalUrl(rawUrl) {
+  if (!isAllowedExternalUrl(rawUrl)) {
+    throw new Error("External URL is not allowlisted.");
+  }
+  await shell.openExternal(rawUrl);
+}
+
+function isApplicationUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    if (isDevelopment) {
+      return url.origin === new URL(process.env.ELECTRON_RENDERER_URL).origin;
+    }
+    return (
+      url.protocol === "file:" &&
+      path.normalize(fileURLToPath(url)) === path.normalize(rendererEntry)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function secureWebContents(window) {
+  window.webContents.on(
+    "did-fail-load",
+    (_event, errorCode, errorDescription, validatedUrl) => {
+      console.error("Renderer failed to load", {
+        errorCode,
+        errorDescription,
+        validatedUrl,
+      });
+    },
+  );
+  window.webContents.on("render-process-gone", (_event, details) => {
+    console.error("Renderer process exited", details);
+  });
+
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (isAllowedExternalUrl(url)) void openAllowedExternalUrl(url);
+    return { action: "deny" };
+  });
+
+  window.webContents.on("will-navigate", (event, url) => {
+    if (isApplicationUrl(url)) return;
+    event.preventDefault();
+    if (isAllowedExternalUrl(url)) void openAllowedExternalUrl(url);
+  });
+
+  window.webContents.session.setPermissionRequestHandler(
+    (_webContents, _permission, callback) => callback(false),
+  );
+}
 
 async function createWindow() {
-  // Create the browser window.
   browserWindow = new BrowserWindow({
     width: 1700,
     height: 1000,
     minWidth: 1200,
     minHeight: 800,
+    title: "CATS Configurator",
     webPreferences: {
-      // Use pluginOptions.nodeIntegration, leave this alone
-      // See nklayman.github.io/vue-cli-plugin-electron-builder/guide/security.html#node-integration for more info
-      // nodeIntegration: true,
-      // contextIsolation: false,
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(currentDirectory, "../preload/preload.js"),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
     },
   });
 
-  if (!isDevelopment) {
-    browserWindow.removeMenu();
-  }
+  setIpcWindow(browserWindow);
+  setSerialWindow(browserWindow);
+  secureWebContents(browserWindow);
 
-  browserWindow.webContents.on('did-finish-load',() => {
-    browserWindow.setTitle("CATS Configurator");
-  });
-
-  if (process.env.WEBPACK_DEV_SERVER_URL) {
-    // Load the url of the dev server if in development mode
-    await browserWindow.loadURL(process.env.WEBPACK_DEV_SERVER_URL);
-  } else {
-    createProtocol("app");
-    // Load the index.html when not in development
-    browserWindow.loadURL("app://./index.html");
-  }
-}
-
-// Quit when all windows are closed.
-app.on("window-all-closed", () => {
-  // On macOS it is common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
-
-app.on("activate", () => {
-  // On macOS it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
-});
-
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on("ready", async () => {
-  subscribeListeners();
+  if (!isDevelopment) browserWindow.removeMenu();
 
   if (isDevelopment) {
-    // Install Vue Devtools
-    try {
-      // Provide legacy Vue.js devtools ID
-      await installExtension('iaajmlceplecbljialhhkmedjlpdblhp');
-    } catch (e) {
-      console.error("Vue Devtools failed to install:", e.toString());
-    }
+    await browserWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
+    browserWindow.webContents.openDevTools({ mode: "detach" });
+  } else {
+    await browserWindow.loadFile(rendererEntry);
   }
 
+  browserWindow.on("closed", () => {
+    browserWindow = undefined;
+    setIpcWindow(undefined);
+    setSerialWindow(undefined);
+  });
+}
+
+app.whenReady().then(async () => {
+  subscribeListeners(openAllowedExternalUrl);
   await createWindow();
 
-  if (isDevelopment && browserWindow) {
-    browserWindow.webContents.openDevTools();
-  }
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) void createWindow();
+  });
 });
 
-// Exit cleanly on request from parent process in development mode.
-if (isDevelopment) {
-  if (process.platform === "win32") {
-    process.on("message", (data) => {
-      if (data === "graceful-exit") {
-        app.quit();
-      }
-    });
-  } else {
-    process.on("SIGTERM", () => {
-      app.quit();
-    });
-  }
-}
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
+});

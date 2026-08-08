@@ -44,13 +44,33 @@ export const EVENT_SETTINGS = [
 
 export const CONFIG_SETTINGS = {
   main_altitude: { section: "general", name: "Main Altitude", unit: "m" },
-  acc_threshold: { section: "general", name: "Liftoff Detection Acceleration", unit: "m/s²" },
-  servo1_init_pos: { section: "general", name: "Initial Position Servo 1", unit: "‰" },
-  servo2_init_pos: { section: "general", name: "Initial Position Servo 2", unit: "‰" },
+  acc_threshold: {
+    section: "general",
+    name: "Liftoff Detection Acceleration",
+    unit: "m/s²",
+  },
+  servo1_init_pos: {
+    section: "general",
+    name: "Initial Position Servo 1",
+    unit: "‰",
+  },
+  servo2_init_pos: {
+    section: "general",
+    name: "Initial Position Servo 2",
+    unit: "‰",
+  },
   tele_enable: { section: "telemetry", name: "Enable Telemetry", unit: null },
   tele_link_phrase: { section: "telemetry", name: "Link Phrase", unit: null },
-  tele_power_level: { section: "telemetry", name: "Telemetry Power Level", unit: "dBm" },
-  tele_adaptive_power: { section: "telemetry", name: "Adaptive Power Level", unit: null },
+  tele_power_level: {
+    section: "telemetry",
+    name: "Telemetry Power Level",
+    unit: "dBm",
+  },
+  tele_adaptive_power: {
+    section: "telemetry",
+    name: "Adaptive Power Level",
+    unit: null,
+  },
   test_mode: { section: "testing", name: "Enable Testing Mode", unit: null },
   tele_test_phrase: { section: "testing", name: "Testing Phrase", unit: null },
 };
@@ -95,5 +115,13 @@ export const LOG_ELEMENTS = [
 // ^._.^:/> save
 // Successfully written to flash
 export const TIMER_KEYS = ["timer1", "timer2", "timer3", "timer4"];
-export const EVENT_KEYS = ["ev_liftoff", "ev_burnout", "ev_apogee", "ev_main_deployment", "ev_touchdown", "ev_custom1", "ev_custom2"];
+export const EVENT_KEYS = [
+  "ev_liftoff",
+  "ev_burnout",
+  "ev_apogee",
+  "ev_main_deployment",
+  "ev_touchdown",
+  "ev_custom1",
+  "ev_custom2",
+];
 export const LOG_KEYS = ["rec_speed", "rec_elements"];

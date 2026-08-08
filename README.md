@@ -1,45 +1,56 @@
 # CATS Configurator
 
-<img src="https://github.com/catsystems/cats-docs/blob/main/logo/PNG/logo_with_smile.png" alt = "CATS Logo" width="300" height="300">
+<img src="https://github.com/catsystems/cats-docs/blob/main/logo/PNG/logo_with_smile.png" alt="CATS Logo" width="300" height="300">
 
-*Always land on your paws*
+_Always land on your paws._
 
-## Open Source
-All CATS code is open source and can be used free of charge without warranty.
+CATS Configurator is the cross-platform desktop utility for configuring CATS
+flight computers and inspecting `.cfl` flight logs.
 
-### Build Setup
+## Requirements
 
-``` bash
-# install dependencies
-npm install
+- Node.js 24 LTS
+- npm 11 or newer
+- A supported CATS device for hardware validation
 
-# serve with hot reload at localhost:9080
+## Development
+
+```bash
+# Reproduce the locked dependency graph
+npm ci
+
+# Start Electron with the Vite development server
 npm start
 
-# build electron application for production
+# Run non-mutating quality checks
+npm run lint
+npm run format:check
+npm test
+
+# Run the Electron bridge and navigation smoke test
+npm run test:e2e
+
+# Create the platform package(s)
 npm run build
 ```
 
-### How to debug
+`npm run lint` never rewrites source files. Use `npm run lint:fix` or
+`npm run format` only when an explicit rewrite is intended.
 
-Because webpack's `devtool` option is set to `source-map` a source map is emitted as a separate file which makes debugging possible.
+Electron DevTools open automatically in development. Renderer source maps are
+enabled, so breakpoints can be placed directly in the Vue source from the
+DevTools **Sources** panel.
 
-#### Visual Studio Code
+## Release formats
 
-Include the following under `.vscode/launch.json`:
+- Windows: NSIS installer and ZIP
+- macOS: DMG
+- Linux: AppImage
 
-```
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "type": "chrome",
-      "request": "launch",
-      "name": "vuejs: chrome",
-      "url": "http://localhost:8080"
-    }
-  ]
-}
-```
+CI installs exclusively from `package-lock.json`, runs lint, formatting, tests,
+and security gates, then packages each platform. Tags publish the three platform
+artifacts as one GitHub release.
 
-Set your breakpoints, start the app via `npm start`, select the `vuejs: chrome` configuration in debug view and press F5 or click the green play button.
+## Open source
+
+All CATS code is open source and can be used free of charge without warranty.

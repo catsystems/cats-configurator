@@ -3,8 +3,8 @@
     <v-container fluid>
       <v-form ref="form">
         <v-row v-if="data && Object.keys(data).length >= timerKeys.length * 3">
-          <v-col sm="12" md="6" xl="3" v-for="key in timerKeys" :key="key">
-            <v-card height="auto" width="100%">
+          <v-col sm="12" md="6" xxl="3" v-for="key in timerKeys" :key="key">
+            <v-card class="timer-card" height="auto" width="100%">
               <v-card-title>
                 <v-row>
                   <v-col>
@@ -16,10 +16,11 @@
                   >
                     <v-switch
                       v-model="data[`${key}_active`].value"
-                      class="mt-0"
-                      dense
+                      class="timer-switch mt-0"
+                      color="primary"
+                      density="compact"
                       hide-details
-                      @change="(v) => onSwitcherChange(key, v)"
+                      @update:model-value="(v) => onSwitcherChange(key, v)"
                     ></v-switch>
                   </v-col>
                 </v-row>
@@ -27,7 +28,7 @@
               <v-card-text
                 v-if="data[`${key}_active`] && data[`${key}_active`].value"
               >
-                <v-row dense>
+                <v-row density="compact">
                   <v-col cols="5">
                     <div class="text-capitalize py-2">Start</div>
                   </v-col>
@@ -35,13 +36,13 @@
                     <v-select
                       v-model="data[`${key}_start`].value"
                       :items="data[`${key}_start`].allowedValues"
-                      solo
-                      dense
+                      variant="solo"
+                      density="compact"
                       hide-details
                     ></v-select>
                   </v-col>
                 </v-row>
-                <v-row dense>
+                <v-row density="compact">
                   <v-col cols="5">
                     <div class="text-capitalize py-2">Duration</div>
                   </v-col>
@@ -61,15 +62,15 @@
                       ]"
                       type="number"
                       hide-details="auto"
-                      solo
-                      dense
-                      @change="(v) => onDurationChange(key, v)"
+                      variant="solo"
+                      density="compact"
+                      @update:model-value="(v) => onDurationChange(key, v)"
                     >
-                      <template #append> ms </template>
+                      <template #append-inner> ms </template>
                     </v-text-field>
                   </v-col>
                 </v-row>
-                <v-row dense>
+                <v-row density="compact">
                   <v-col cols="5">
                     <div class="text-capitalize py-2">Trigger</div>
                   </v-col>
@@ -77,8 +78,8 @@
                     <v-select
                       v-model="data[`${key}_trigger`].value"
                       :items="data[`${key}_trigger`].allowedValues"
-                      solo
-                      dense
+                      variant="solo"
+                      density="compact"
                       hide-details
                     ></v-select>
                   </v-col>
@@ -94,8 +95,9 @@
 </template>
 
 <script>
-import { mapState, mapActions } from "vuex";
-import ActionsBar from "@/components/ActionsBar";
+import { mapActions, mapState } from "pinia";
+import { useAppStore } from "@/store";
+import ActionsBar from "@/components/ActionsBar.vue";
 import { getTimers, setTimers } from "@/services/timerService";
 import { TIMER_KEYS } from "@/modules/settings";
 
@@ -130,16 +132,13 @@ export default {
     },
   },
   computed: {
-    ...mapState({
-      timers: (state) => state.timers,
-      changedTab: (state) => state.changedTab,
-    }),
+    ...mapState(useAppStore, ["timers", "changedTab"]),
   },
   mounted() {
     this.init();
   },
   methods: {
-    ...mapActions(["setChangedTab"]),
+    ...mapActions(useAppStore, ["setChangedTab"]),
     init() {
       getTimers();
     },
@@ -153,16 +152,12 @@ export default {
         this.data[`${key}_active`].value = false;
       }
     },
-    onSave() {
-      if (!this.$refs.form.validate()) return;
+    async onSave() {
+      const { valid } = await this.$refs.form.validate();
+      if (!valid) return;
       // TODO fix this later
-      const {
-        timer1_active,
-        timer2_active,
-        timer3_active,
-        timer4_active,
-        ...dataCopy
-      } = this.data;
+      const dataCopy = structuredClone(this.data);
+      for (const key of this.timerKeys) delete dataCopy[`${key}_active`];
       setTimers(dataCopy);
 
       setTimeout(function () {
@@ -178,4 +173,13 @@ export default {
 };
 </script>
 
-<style></style>
+<style scoped>
+.timer-card {
+  min-height: 64px;
+}
+
+.timer-switch.v-input--dirty :deep(.v-switch__track) {
+  background-color: rgb(var(--v-theme-primary)) !important;
+  opacity: 1;
+}
+</style>

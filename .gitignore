@@ -25,6 +25,9 @@ pnpm-debug.log*
 # Electron-builder output
 /dist_electron
 /builds
+/out
+/test-results
+/playwright-report
 
 # Exports
 flight-log-export

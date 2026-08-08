@@ -1,0 +1,198 @@
+import { _electron as electron, expect, test } from "@playwright/test";
+
+test("launches the production renderer and exercises the secure bridge", async ({}, testInfo) => {
+  test.setTimeout(90_000);
+  const executablePath = process.env.CATS_E2E_EXECUTABLE;
+  const application = await electron.launch({
+    ...(executablePath ? { executablePath } : {}),
+    args: executablePath ? ["--disable-gpu"] : [".", "--disable-gpu"],
+    env: {
+      ...process.env,
+      CATS_FAKE_SERIAL: "1",
+      CATS_E2E_USER_DATA: testInfo.outputPath("user-data"),
+    },
+  });
+  const pageErrors = [];
+  const consoleErrors = [];
+  const remoteRequests = [];
+
+  try {
+    application.context().on("request", (request) => {
+      if (/^https?:/.test(request.url())) remoteRequests.push(request.url());
+    });
+
+    const page = await application.firstWindow();
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
+
+    await expect
+      .poll(
+        () =>
+          application.evaluate(({ BrowserWindow }) => {
+            const window = BrowserWindow.getAllWindows()[0];
+            return {
+              crashed: window.webContents.isCrashed(),
+              loading: window.webContents.isLoading(),
+              title: window.getTitle(),
+              url: window.webContents.getURL(),
+            };
+          }),
+        { timeout: 30_000 },
+      )
+      .toMatchObject({
+        crashed: false,
+        loading: false,
+        title: "CATS Configurator",
+      });
+    await expect(page).toHaveTitle("CATS Configurator");
+    await expect(page.getByText("Status: Disconnected")).toBeVisible();
+    await expect(page.getByText("App version: 1.1.0")).toBeVisible();
+
+    const shellLayout = await page.evaluate(() => {
+      const bounds = (selector) => {
+        const { x, y, width, height, bottom } = document
+          .querySelector(selector)
+          .getBoundingClientRect();
+        return { x, y, width, height, bottom };
+      };
+      const mainStyles = getComputedStyle(document.querySelector(".v-main"));
+      const logo = document.querySelector(".app-brand__mark");
+
+      return {
+        viewportHeight: window.innerHeight,
+        appBar: bounds(".v-app-bar"),
+        drawer: bounds(".v-navigation-drawer"),
+        footer: bounds(".v-footer"),
+        alert: bounds(".v-alert"),
+        mainPadding: {
+          top: mainStyles.paddingTop,
+          right: mainStyles.paddingRight,
+          bottom: mainStyles.paddingBottom,
+          left: mainStyles.paddingLeft,
+        },
+        logoLoaded: logo.complete && logo.naturalWidth > 0,
+      };
+    });
+
+    expect(shellLayout.appBar.height).toBe(64);
+    expect(shellLayout.drawer).toMatchObject({
+      x: 0,
+      y: 64,
+      width: 300,
+    });
+    expect(shellLayout.drawer.bottom).toBeCloseTo(
+      shellLayout.viewportHeight - 32,
+      0,
+    );
+    expect(shellLayout.footer).toMatchObject({ height: 32 });
+    expect(shellLayout.footer.bottom).toBeCloseTo(
+      shellLayout.viewportHeight,
+      0,
+    );
+    expect(shellLayout.alert.height).toBeLessThan(100);
+    expect(shellLayout.mainPadding).toEqual({
+      top: "64px",
+      right: "0px",
+      bottom: "32px",
+      left: "300px",
+    });
+    expect(shellLayout.logoLoaded).toBe(true);
+
+    const bridge = await page.evaluate(() => ({
+      catsType: typeof window.cats,
+      rendererType: typeof window.renderer,
+      disposerType: typeof window.cats.app.onAlert(() => {}),
+    }));
+    expect(bridge).toEqual({
+      catsType: "object",
+      rendererType: "undefined",
+      disposerType: "function",
+    });
+
+    await expect
+      .poll(() => page.evaluate(() => window.cats.serial.list()))
+      .toEqual([{ path: "CATS-FAKE", manufacturer: "CATS Systems" }]);
+
+    await page.evaluate(() => window.cats.serial.connect("CATS-FAKE"));
+    await expect(page.getByText("Status: Connected")).toBeVisible();
+
+    const appBarActionGap = await page.evaluate(() => {
+      const action = document.querySelector(
+        ".app-bar-controls .v-btn:last-child",
+      );
+      return window.innerWidth - action.getBoundingClientRect().right;
+    });
+    expect(appBarActionGap).toBeGreaterThanOrEqual(16);
+
+    await expect(
+      page.getByText("Main Altitude", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("CATS test device")).toBeVisible();
+
+    const testingHeadingGap = await page.evaluate(() => {
+      const testingCard = document.querySelector(".testing-card");
+      const title = testingCard.querySelector(".v-card-title");
+      const firstField = testingCard.querySelector(".config-row .v-col div");
+      const textBounds = (element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return range.getBoundingClientRect();
+      };
+      return textBounds(firstField).top - textBounds(title).bottom;
+    });
+    expect(testingHeadingGap).toBeGreaterThanOrEqual(12);
+
+    await page.evaluate(() => {
+      window.location.hash = "#/events";
+    });
+    await expect(page.getByText(/^liftoff$/i)).toBeVisible();
+    await expect(page.getByText(/^recorder$/i)).toBeVisible();
+    await expect(page.getByText(/^log$/i)).toBeVisible();
+
+    await page.evaluate(() => {
+      window.location.hash = "#/timer";
+    });
+    await expect(page.getByText(/^timer 1$/i)).toBeVisible();
+    await expect(page.getByText("Start", { exact: true })).toBeVisible();
+    await expect(page.locator('input[type="number"]').first()).toHaveValue(
+      "1000",
+    );
+    const activeTimerSwitch = page.locator(".timer-switch").first();
+    await expect(activeTimerSwitch).toHaveClass(/v-input--dirty/);
+    await expect(activeTimerSwitch.locator(".v-switch__track")).toHaveCSS(
+      "background-color",
+      "rgb(255, 167, 38)",
+    );
+
+    for (const route of ["/cli", "/config", "/cli"]) {
+      await page.evaluate((path) => {
+        window.location.hash = `#${path}`;
+      }, route);
+      await expect(page).toHaveURL(
+        new RegExp(`#${route.replace("/", "\\/")}$`),
+      );
+    }
+
+    await page.evaluate(() => {
+      window.location.hash = "#/cli";
+    });
+    const commandInput = page.getByPlaceholder("Write your command here");
+    await commandInput.fill("status");
+    await commandInput.press("Enter");
+    await expect(page.getByText("test> status")).toBeVisible();
+    await expect(page.getByText("test> status")).toHaveCount(1);
+
+    expect(pageErrors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+    expect(remoteRequests).toEqual([]);
+  } finally {
+    const process = application.process();
+    await Promise.race([
+      application.close(),
+      new Promise((resolve) => setTimeout(resolve, 5_000)),
+    ]);
+    if (process.exitCode === null) process.kill();
+  }
+});
