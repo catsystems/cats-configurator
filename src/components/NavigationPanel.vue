@@ -28,11 +28,7 @@
         <v-btn size="small" variant="text" @click="discard">discard</v-btn>
       </div>
     </v-alert>
-    <v-card
-      variant="flat"
-      :disabled="!active || !!changedTab"
-      color="transparent"
-    >
+    <v-card variant="flat" color="transparent">
       <v-list density="compact" nav>
         <v-list-item
           v-for="item in items"
@@ -40,7 +36,19 @@
           :to="item.link"
           :title="item.title"
           color="primary"
+          :disabled="!active || !!changedTab"
         />
+        <v-list-item
+          class="flights-link"
+          href="https://flights.catsystems.io/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <template #title>
+            <span>Flights</span>
+            <span class="flights-link__arrow" aria-hidden="true">↗</span>
+          </template>
+        </v-list-item>
       </v-list>
     </v-card>
     <UnitSwitch class="unit-switch mb-2" />
@@ -112,6 +120,10 @@ export default {
 
 .navigation-panel :deep(.v-list-item--active .v-list-item__overlay) {
   opacity: 0;
+}
+
+.flights-link__arrow {
+  margin-inline-start: 3px;
 }
 
 .unit-switch {

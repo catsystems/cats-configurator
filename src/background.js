@@ -3,29 +3,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setIpcWindow, subscribeListeners } from "./modules/ipc.js";
 import { setSerialWindow } from "./modules/serial.js";
+import { isAllowedExternalUrl } from "./modules/external-links.js";
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const isDevelopment = Boolean(process.env.ELECTRON_RENDERER_URL);
-const allowedExternalHost = "github.com";
 const rendererEntry = path.join(currentDirectory, "../renderer/index.html");
 let browserWindow;
 
 if (process.env.CATS_E2E_USER_DATA) {
   app.setPath("userData", path.resolve(process.env.CATS_E2E_USER_DATA));
   app.disableHardwareAcceleration();
-}
-
-export function isAllowedExternalUrl(rawUrl) {
-  try {
-    const url = new URL(rawUrl);
-    return (
-      url.protocol === "https:" &&
-      url.hostname === allowedExternalHost &&
-      url.pathname.startsWith("/catsystems/")
-    );
-  } catch {
-    return false;
-  }
 }
 
 export async function openAllowedExternalUrl(rawUrl) {

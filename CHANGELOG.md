@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 09-08-2026
+
+- Align application typography and branding with the CATS websites using
+  locally bundled Inter and Space Grotesk variable fonts.
+- Add a direct Flights link to the navigation panel.
+- Refine connected-screen spacing and enabled timer styling.
+
 ## [1.1.0] - 08-08-2026
 
 - Move the desktop runtime to Node.js 24 and Electron 43.

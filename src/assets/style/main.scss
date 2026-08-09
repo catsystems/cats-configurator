@@ -1,17 +1,23 @@
-@font-face {
-  font-family: "Open Sans";
-  src:
-    local("Open Sans"),
-    url("/fonts/Open_Sans/OpenSans-Regular.ttf") format("truetype");
-  font-display: swap;
-}
-
 :root {
-  font-family: "Open Sans", sans-serif;
+  --cats-font-body: "Inter Variable", Inter, Arial, sans-serif;
+  --cats-font-display:
+    "Space Grotesk Variable", "Space Grotesk", Arial, sans-serif;
+
+  font-family: var(--cats-font-body);
 }
 
 .v-application {
-  font-family: "Open Sans", sans-serif;
+  font-family: var(--cats-font-body);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.v-card-title {
+  font-family: var(--cats-font-display);
 }
 
 .v-container--fluid {
