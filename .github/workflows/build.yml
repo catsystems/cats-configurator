@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -52,10 +52,8 @@ jobs:
         include:
           - os: windows-latest
             artifact: cats-configurator-windows
-            command: npm run build -- --win nsis zip --x64 --publish never
-            files: |
-              builds/*.exe
-              builds/*.zip
+            command: npm run build -- --win nsis --x64 --publish never
+            files: builds/*.exe
           - os: macos-latest
             artifact: cats-configurator-macos-x64
             command: npm run build -- --mac dmg --x64 --publish never
@@ -71,10 +69,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -88,7 +86,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.files }}
@@ -102,14 +100,14 @@ jobs:
       contents: write
     steps:
       - name: Download release packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: cats-configurator-*
           path: release-artifacts
           merge-multiple: true
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: CATS Configurator ${{ github.ref_name }}
           generate_release_notes: true
