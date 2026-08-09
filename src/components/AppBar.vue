@@ -1,9 +1,15 @@
 <template>
   <v-app-bar color="grey-darken-4" theme="catsDark">
-    <div class="app-brand">
+    <router-link class="app-brand" to="/" aria-label="CATS Configurator home">
       <img class="app-brand__mark" :src="logoImage" alt="" />
-      <img class="app-brand__text" :src="textLogoImage" alt="CATS" />
-    </div>
+      <span class="app-brand__copy">
+        <span class="app-brand__title">
+          <strong>CATS</strong>
+          <strong class="app-brand__product">Configurator</strong>
+        </span>
+        <span class="app-brand__tagline">Control &amp; Telemetry Systems</span>
+      </span>
+    </router-link>
 
     <v-spacer></v-spacer>
     <div class="app-bar-controls d-flex align-center">
@@ -65,7 +71,6 @@
 import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
 import logoImage from "@/assets/logos/logo_white_small.png";
-import textLogoImage from "@/assets/logos/text_white.png";
 
 export default {
   name: "AppBar",
@@ -76,7 +81,6 @@ export default {
       selectedPort: null,
       subscriptions: [],
       logoImage,
-      textLogoImage,
     };
   },
   computed: {
@@ -144,22 +148,50 @@ export default {
   align-items: center;
   height: 48px;
   margin-inline-start: 20px;
+  color: #f5f5f4;
+  text-decoration: none;
 }
 
-.app-brand__mark,
-.app-brand__text {
+.app-brand__mark {
   display: block;
   height: 48px;
   object-fit: contain;
   object-position: left center;
-}
-
-.app-brand__mark {
   width: 48px;
 }
 
-.app-brand__text {
-  width: 100px;
+.app-brand__copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-inline-start: 14px;
+  font-family: var(--cats-font-display);
+}
+
+.app-brand__title {
+  display: flex;
+  gap: 7px;
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 27px;
+  letter-spacing: -1.2px;
+}
+
+.app-brand__title strong {
+  font-weight: 700;
+}
+
+.app-brand__product {
+  color: rgb(var(--v-theme-primary));
+}
+
+.app-brand__tagline {
+  margin-top: 3px;
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 11px;
+  letter-spacing: -0.16px;
+  text-transform: uppercase;
 }
 
 .app-bar-controls {

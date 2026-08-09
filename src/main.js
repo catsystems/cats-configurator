@@ -1,4 +1,6 @@
 import "@mdi/font/css/materialdesignicons.css";
+import "@fontsource-variable/inter/wght.css";
+import "@fontsource-variable/space-grotesk/wght.css";
 import "vuetify/styles";
 import "@/assets/style/main.scss";
 import { createPinia } from "pinia";

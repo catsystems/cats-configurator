@@ -48,7 +48,75 @@ test("launches the production renderer and exercises the secure bridge", async (
       });
     await expect(page).toHaveTitle("CATS Configurator");
     await expect(page.getByText("Status: Disconnected")).toBeVisible();
-    await expect(page.getByText("App version: 1.1.0")).toBeVisible();
+    await expect(page.getByText("App version: 1.1.1")).toBeVisible();
+    await expect(page.getByText("CATS", { exact: true })).toBeVisible();
+    await expect(page.getByText("Configurator", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("Control & Telemetry Systems", { exact: true }),
+    ).toBeVisible();
+
+    const flightsLink = page.getByRole("link", {
+      name: "Flights",
+      exact: true,
+    });
+    await expect(flightsLink).toHaveAttribute(
+      "href",
+      "https://flights.catsystems.io/",
+    );
+    await expect(flightsLink).toHaveAttribute("target", "_blank");
+
+    const flightsMenuLayout = await page.evaluate(() => {
+      const items = [...document.querySelectorAll(".v-list-item")];
+      const cliItem = items.find((item) => item.textContent.trim() === "CLI");
+      const flightsItem = items.find((item) =>
+        item.textContent.trim().startsWith("Flights"),
+      );
+      const details = (item) => {
+        const title = item.querySelector(".v-list-item-title");
+        const bounds = item.getBoundingClientRect();
+        const titleBounds = title.getBoundingClientRect();
+        const style = getComputedStyle(title);
+        return {
+          height: bounds.height,
+          titleX: titleBounds.x,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+        };
+      };
+      return { cli: details(cliItem), flights: details(flightsItem) };
+    });
+    expect(flightsMenuLayout.flights).toEqual(flightsMenuLayout.cli);
+
+    const typography = await page.evaluate(() => {
+      const bodyStyle = getComputedStyle(document.body);
+      const titleStyle = getComputedStyle(
+        document.querySelector(".app-brand__title"),
+      );
+      const productStyle = getComputedStyle(
+        document.querySelector(".app-brand__product"),
+      );
+      const taglineStyle = getComputedStyle(
+        document.querySelector(".app-brand__tagline"),
+      );
+      return {
+        bodyFamily: bodyStyle.fontFamily,
+        titleFamily: titleStyle.fontFamily,
+        titleWeight: titleStyle.fontWeight,
+        productColor: productStyle.color,
+        taglineFamily: taglineStyle.fontFamily,
+        taglineWeight: taglineStyle.fontWeight,
+        taglineTransform: taglineStyle.textTransform,
+      };
+    });
+    expect(typography).toMatchObject({
+      titleWeight: "700",
+      productColor: "rgb(255, 167, 38)",
+      taglineWeight: "400",
+      taglineTransform: "uppercase",
+    });
+    expect(typography.bodyFamily).toContain("Inter Variable");
+    expect(typography.titleFamily).toContain("Space Grotesk Variable");
+    expect(typography.taglineFamily).toContain("Space Grotesk Variable");
 
     const shellLayout = await page.evaluate(() => {
       const bounds = (selector) => {
