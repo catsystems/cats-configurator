@@ -41,6 +41,9 @@ jobs:
       - name: Run Electron smoke test
         run: xvfb-run --auto-servernum npm run test:e2e
 
+      - name: Verify production Flights target isolation
+        run: npm run verify:production-target
+
   package:
     needs: quality
     strategy:

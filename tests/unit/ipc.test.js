@@ -3,6 +3,7 @@ import {
   assertBoardKey,
   assertBoardValue,
   assertNonEmptyString,
+  assertOpaqueId,
   assertRecord,
 } from "@/shared/ipc.js";
 
@@ -18,5 +19,12 @@ describe("IPC contract validation", () => {
     expect(() => assertBoardValue("value\nsave")).toThrow();
     expect(() => assertNonEmptyString("", "Value")).toThrow();
     expect(() => assertRecord([], "Payload")).toThrow();
+    expect(() => assertOpaqueId("../../flight.cfl")).toThrow();
+  });
+
+  it("accepts only opaque UUID identifiers", () => {
+    expect(assertOpaqueId("9e1be0e4-164a-4f0a-9a14-56be3d18fdf5")).toBe(
+      "9e1be0e4-164a-4f0a-9a14-56be3d18fdf5",
+    );
   });
 });

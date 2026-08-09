@@ -36,17 +36,17 @@
           :to="item.link"
           :title="item.title"
           color="primary"
-          :disabled="!active || !!changedTab"
+          :disabled="(item.requiresBoard && !active) || !!changedTab"
         />
         <v-list-item
           class="flights-link"
-          href="https://flights.catsystems.io/"
+          :href="flightsUrl"
           target="_blank"
           rel="noreferrer"
         >
           <template #title>
             <span>Flights</span>
-            <span class="flights-link__arrow" aria-hidden="true">↗</span>
+            <span class="flights-link__arrow" aria-hidden="true">&nearr;</span>
           </template>
         </v-list-item>
       </v-list>
@@ -62,6 +62,7 @@ import { getConfigs } from "@/services/configService";
 import { getEvents } from "@/services/eventService";
 import { getTimers } from "@/services/timerService";
 import { getLogData } from "@/services/logService";
+import { CATS_FLIGHTS_HOME_URL } from "@/shared/flights";
 import UnitSwitch from "./UnitSwitch.vue";
 
 export default {
@@ -74,6 +75,11 @@ export default {
       type: Array,
       default: () => [],
     },
+  },
+  data() {
+    return {
+      flightsUrl: CATS_FLIGHTS_HOME_URL,
+    };
   },
   computed: {
     ...mapState(useAppStore, ["active", "changedTab"]),

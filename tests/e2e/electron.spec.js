@@ -1,7 +1,28 @@
 import { _electron as electron, expect, test } from "@playwright/test";
+import fs from "node:fs/promises";
 
-test("launches the production renderer and exercises the secure bridge", async ({}, testInfo) => {
+function flightInfoFixture() {
+  const buffer = Buffer.alloc(22);
+  buffer.write("v", 0, "ascii");
+  buffer.writeUInt8(0, 1);
+  buffer.writeUInt32LE(1000, 2);
+  buffer.writeUInt32LE(1 << 6, 6);
+  buffer.writeFloatLE(123.5, 10);
+  buffer.writeFloatLE(45.25, 14);
+  buffer.writeFloatLE(9.81, 18);
+  return buffer;
+}
+
+test("launches the packaged renderer and exercises the secure bridge", async ({}, testInfo) => {
   test.setTimeout(90_000);
+  const fakeDrive = testInfo.outputPath("cats-drive");
+  const localLog = testInfo.outputPath("local-flight.cfl");
+  const secondLocalLog = testInfo.outputPath("second-flight.cfl");
+  await fs.mkdir(fakeDrive, { recursive: true });
+  await fs.writeFile(`${fakeDrive}\\readme.txt`, "Welcome to CATS!\n");
+  await fs.writeFile(`${fakeDrive}\\fl7.cfl`, flightInfoFixture());
+  await fs.writeFile(localLog, flightInfoFixture());
+  await fs.writeFile(secondLocalLog, flightInfoFixture());
   const executablePath = process.env.CATS_E2E_EXECUTABLE;
   const application = await electron.launch({
     ...(executablePath ? { executablePath } : {}),
@@ -9,6 +30,7 @@ test("launches the production renderer and exercises the secure bridge", async (
     env: {
       ...process.env,
       CATS_FAKE_SERIAL: "1",
+      CATS_FAKE_CATS_DRIVE: fakeDrive,
       CATS_E2E_USER_DATA: testInfo.outputPath("user-data"),
     },
   });
@@ -48,7 +70,7 @@ test("launches the production renderer and exercises the secure bridge", async (
       });
     await expect(page).toHaveTitle("CATS Configurator");
     await expect(page.getByText("Status: Disconnected")).toBeVisible();
-    await expect(page.getByText("App version: 1.1.1")).toBeVisible();
+    await expect(page.getByText("App version: 1.2.0")).toBeVisible();
     await expect(page.getByText("CATS", { exact: true })).toBeVisible();
     await expect(page.getByText("Configurator", { exact: true })).toBeVisible();
     await expect(
@@ -61,13 +83,37 @@ test("launches the production renderer and exercises the secure bridge", async (
     });
     await expect(flightsLink).toHaveAttribute(
       "href",
-      "https://flights.catsystems.io/",
+      process.env.CATS_FLIGHTS_TARGET === "staging"
+        ? "https://cats-flights-stage-7k2m9x4p.peppy-ridge-7142.chatgpt.site/"
+        : "https://flights.catsystems.io/",
     );
     await expect(flightsLink).toHaveAttribute("target", "_blank");
+
+    const configurationLink = page.getByRole("link", {
+      name: "Configuration",
+      exact: true,
+    });
+    const flightLogsLink = page.getByRole("link", {
+      name: "Flight Logs",
+      exact: true,
+    });
+    await expect(configurationLink).toHaveAttribute("aria-disabled", "true");
+    await expect(flightLogsLink).not.toHaveAttribute("aria-disabled", "true");
+    await flightLogsLink.click();
+    await expect(page).toHaveURL(/#\/flight-logs$/);
+    await expect(
+      page.getByText("Open a Vega flight log (.cfl)", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("Onboard logs", { exact: true })).toHaveCount(
+      0,
+    );
 
     const flightsMenuLayout = await page.evaluate(() => {
       const items = [...document.querySelectorAll(".v-list-item")];
       const cliItem = items.find((item) => item.textContent.trim() === "CLI");
+      const flightLogsItem = items.find(
+        (item) => item.textContent.trim() === "Flight Logs",
+      );
       const flightsItem = items.find((item) =>
         item.textContent.trim().startsWith("Flights"),
       );
@@ -83,9 +129,23 @@ test("launches the production renderer and exercises the secure bridge", async (
           fontWeight: style.fontWeight,
         };
       };
-      return { cli: details(cliItem), flights: details(flightsItem) };
+      return {
+        cli: details(cliItem),
+        flights: details(flightsItem),
+        order: {
+          cli: items.indexOf(cliItem),
+          flightLogs: items.indexOf(flightLogsItem),
+          flights: items.indexOf(flightsItem),
+        },
+      };
     });
     expect(flightsMenuLayout.flights).toEqual(flightsMenuLayout.cli);
+    expect(flightsMenuLayout.order.cli).toBeLessThan(
+      flightsMenuLayout.order.flightLogs,
+    );
+    expect(flightsMenuLayout.order.flightLogs).toBeLessThan(
+      flightsMenuLayout.order.flights,
+    );
 
     const typography = await page.evaluate(() => {
       const bodyStyle = getComputedStyle(document.body);
@@ -185,6 +245,7 @@ test("launches the production renderer and exercises the secure bridge", async (
 
     await page.evaluate(() => window.cats.serial.connect("CATS-FAKE"));
     await expect(page.getByText("Status: Connected")).toBeVisible();
+    await expect(page).toHaveURL(/#\/config$/);
 
     const appBarActionGap = await page.evaluate(() => {
       const action = document.querySelector(
@@ -198,6 +259,37 @@ test("launches the production renderer and exercises the secure bridge", async (
       page.getByText("Main Altitude", { exact: true }),
     ).toBeVisible();
     await expect(page.getByText("CATS test device")).toBeVisible();
+
+    await flightLogsLink.click();
+    await expect(page).toHaveURL(/#\/flight-logs$/);
+    await expect(page.getByText("Onboard logs", { exact: true })).toBeVisible();
+    await expect(page.getByText("fl7.cfl", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "View locally" }).click();
+    await expect(page.getByText("Current log", { exact: true })).toBeVisible();
+    await expect(page.getByText("fl7.cfl", { exact: true })).toHaveCount(2);
+
+    await page.locator('input[type="file"]').setInputFiles(localLog);
+    await expect(
+      page.getByText("local-flight.cfl", { exact: true }),
+    ).toHaveCount(2);
+    await expect(page.locator(".js-plotly-plot")).toHaveCount(8);
+
+    const unitSwitch = page.getByRole("checkbox", {
+      name: "Use imperial units",
+    });
+    await unitSwitch.check();
+    await expect(unitSwitch).toBeChecked();
+    await expect(page.locator(".js-plotly-plot")).toHaveCount(8);
+
+    await page.locator('input[type="file"]').setInputFiles(secondLocalLog);
+    await expect(
+      page.getByText("second-flight.cfl", { exact: true }),
+    ).toHaveCount(2);
+    await expect(page.locator(".flight-log-error")).toHaveCount(0);
+    await expect(page.locator(".js-plotly-plot")).toHaveCount(8);
+
+    await configurationLink.click();
+    await expect(page).toHaveURL(/#\/config$/);
 
     const testingHeadingGap = await page.evaluate(() => {
       const testingCard = document.querySelector(".testing-card");
@@ -228,8 +320,14 @@ test("launches the production renderer and exercises the secure bridge", async (
       "1000",
     );
     const activeTimerSwitch = page.locator(".timer-switch").first();
-    await expect(activeTimerSwitch).toHaveClass(/v-input--dirty/);
+    await expect(activeTimerSwitch).toHaveClass(/timer-switch--active/);
     await expect(activeTimerSwitch.locator(".v-switch__track")).toHaveCSS(
+      "background-color",
+      "rgb(255, 167, 38)",
+    );
+    const inactiveTimerSwitch = page.locator(".timer-switch").nth(1);
+    await expect(inactiveTimerSwitch).not.toHaveClass(/timer-switch--active/);
+    await expect(inactiveTimerSwitch.locator(".v-switch__track")).not.toHaveCSS(
       "background-color",
       "rgb(255, 167, 38)",
     );

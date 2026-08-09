@@ -1,6 +1,6 @@
 {
   "name": "cats-configurator",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Desktop configuration and flight-log analysis utility for CATS flight computers.",
   "author": "CATS Systems",
   "private": true,
@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "electron-vite build && playwright test",
+    "verify:production-target": "node tests/verify-production-target.mjs",
     "test:hardware": "node tests/hardware/vega-smoke.mjs",
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
