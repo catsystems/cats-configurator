@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { nextTick } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Config from "@/views/Config.vue";
+import AppBar from "@/components/AppBar.vue";
 import EditEventActionDialog from "@/components/EditEventActionDialog.vue";
 import Snackbar from "@/components/Snackbar.vue";
 import UnitSwitch from "@/components/UnitSwitch.vue";
@@ -41,6 +42,21 @@ describe("renderer state components", () => {
     wrapper.vm.handleSnackbarInput(false);
     expect(store.snackbar.isVisible).toBe(false);
     wrapper.unmount();
+  });
+
+  it("disposes Vega polling and serial subscriptions with the app bar", () => {
+    const unsubscribe = vi.fn();
+    const clearInterval = vi
+      .spyOn(window, "clearInterval")
+      .mockImplementation(() => {});
+
+    AppBar.beforeUnmount.call({
+      portScanTimer: 42,
+      subscriptions: [unsubscribe, unsubscribe],
+    });
+
+    expect(clearInterval).toHaveBeenCalledWith(42);
+    expect(unsubscribe).toHaveBeenCalledTimes(2);
   });
 
   it("renders reactive configuration data without cloning Pinia proxies", async () => {

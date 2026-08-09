@@ -17,6 +17,7 @@ import {
 const CONFIG = {
   baudRate: 115200,
 };
+const BOARD_IDENTIFICATION_TIMEOUT_MS = 5000;
 
 let mainWindow,
   port,
@@ -24,10 +25,20 @@ let mainWindow,
   config = {},
   currentCommand,
   currentNotification,
+  boardIdentificationTimer,
   backupConfig = "",
   cliMode = false;
 
 const useFakeSerial = process.env.CATS_FAKE_SERIAL === "1";
+const fakeSerialStartedAt = Date.now();
+const fakeSerialAppearAfterMs = Math.max(
+  0,
+  Number.parseInt(process.env.CATS_FAKE_SERIAL_APPEAR_AFTER_MS ?? "0", 10) || 0,
+);
+const fakeVegaCount = Math.max(
+  0,
+  Number.parseInt(process.env.CATS_FAKE_VEGA_COUNT ?? "0", 10) || 0,
+);
 
 const fakeConfigurations = {
   main_altitude: {
@@ -147,12 +158,43 @@ function setSerialWindow(window) {
 
 async function getList() {
   if (useFakeSerial) {
+    if (Date.now() - fakeSerialStartedAt < fakeSerialAppearAfterMs) return [];
+    if (fakeVegaCount > 0) {
+      return Array.from({ length: fakeVegaCount }, (_, index) => ({
+        path: fakeVegaCount === 1 ? "CATS-FAKE" : `CATS-FAKE-${index + 1}`,
+        manufacturer: "CATS Systems",
+        friendlyName: "CATS Vega",
+        vendorId: "CAFE",
+        productId: "4003",
+        serialNumber: `CATS-FAKE-${index + 1}`,
+        locationId: `fake-${index + 1}`,
+      }));
+    }
     return [{ path: "CATS-FAKE", manufacturer: "CATS Systems" }];
   }
   return await SerialPort.list();
 }
 
-function connect(path) {
+function clearBoardIdentificationTimer() {
+  if (boardIdentificationTimer) {
+    clearTimeout(boardIdentificationTimer);
+    boardIdentificationTimer = null;
+  }
+}
+
+function startBoardIdentificationTimer(candidatePort) {
+  clearBoardIdentificationTimer();
+  boardIdentificationTimer = setTimeout(() => {
+    if (port !== candidatePort) return;
+    sendToRenderer(
+      IPC_CHANNELS.SERIAL_ERROR,
+      "CATS Vega did not respond within five seconds.",
+    );
+    disconnect();
+  }, BOARD_IDENTIFICATION_TIMEOUT_MS);
+}
+
+function connect(serialPath) {
   if (useFakeSerial) {
     queueMicrotask(() => {
       sendToRenderer(IPC_CHANNELS.SERIAL_CONNECTED);
@@ -165,11 +207,27 @@ function connect(path) {
     return;
   }
 
-  port = new SerialPort({ ...CONFIG, path }, function (err) {
-    if (err) return sendToRenderer(IPC_CHANNELS.SERIAL_ERROR, err.message);
-  });
+  if (port?.isOpen || port?.opening) {
+    sendToRenderer(
+      IPC_CHANNELS.SERIAL_ERROR,
+      "A serial connection is already in progress.",
+    );
+    return;
+  }
 
-  parser = port.pipe(
+  currentCommand = null;
+  const candidatePort = new SerialPort(
+    { ...CONFIG, path: serialPath },
+    (err) => {
+      if (!err) return;
+      clearBoardIdentificationTimer();
+      if (port === candidatePort) port = null;
+      sendToRenderer(IPC_CHANNELS.SERIAL_ERROR, err.message);
+    },
+  );
+  port = candidatePort;
+
+  parser = candidatePort.pipe(
     new ReadlineParser({
       delimiter: "\r\n",
       encoding: "utf8",
@@ -178,16 +236,28 @@ function connect(path) {
 
   parser.on("data", onData);
 
-  port.on("error", function (err) {
-    sendAlert(err.message);
+  candidatePort.on("error", function (err) {
+    clearBoardIdentificationTimer();
+    sendToRenderer(IPC_CHANNELS.SERIAL_ERROR, err.message);
+    if (candidatePort.isOpen) candidatePort.close();
+    else if (!candidatePort.opening && port === candidatePort) {
+      port = null;
+      parser = null;
+      currentCommand = null;
+    }
   });
-  port.on("open", function () {
-    port.write("\n");
+  candidatePort.on("open", function () {
+    startBoardIdentificationTimer(candidatePort);
+    candidatePort.write("\n");
     command("version");
     sendToRenderer(IPC_CHANNELS.SERIAL_CONNECTED);
   });
 
-  port.on("close", function () {
+  candidatePort.on("close", function () {
+    clearBoardIdentificationTimer();
+    if (port === candidatePort) port = null;
+    parser = null;
+    currentCommand = null;
     notify({
       title: "Port is disconnected.",
     });
@@ -197,6 +267,7 @@ function connect(path) {
 }
 
 function disconnect() {
+  clearBoardIdentificationTimer();
   currentCommand = null;
 
   if (useFakeSerial) {
@@ -206,7 +277,6 @@ function disconnect() {
 
   if (port && port.isOpen) {
     port.close();
-    port = null;
   }
 }
 
@@ -230,9 +300,11 @@ function onData(data) {
   if (["version"].includes(currentCommand)) {
     const parsedData = parseData(currentCommand, data);
     sendToRenderer(IPC_CHANNELS.BOARD_STATIC_DATA, parsedData);
+    clearBoardIdentificationTimer();
+    currentCommand = null;
 
     // Check if it's CATS board
-    if (currentCommand === "version" && data.includes("Board: CATS")) {
+    if (data.includes("Board: CATS")) {
       notify({
         title: `Connected to: ${port.path}`,
         body: data,
@@ -240,6 +312,10 @@ function onData(data) {
 
       sendToRenderer(IPC_CHANNELS.BOARD_ACTIVE, true);
     } else {
+      sendToRenderer(
+        IPC_CHANNELS.SERIAL_ERROR,
+        "The selected serial device is not a CATS flight computer.",
+      );
       disconnect();
     }
 
