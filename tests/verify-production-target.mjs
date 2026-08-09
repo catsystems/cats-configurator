@@ -4,8 +4,6 @@ import path from "node:path";
 
 const outputRoot = path.resolve("out");
 const productionOrigin = "https://flights.catsystems.io";
-const stagingOrigin =
-  "https://cats-flights-stage-7k2m9x4p.peppy-ridge-7142.chatgpt.site";
 
 async function sourceFiles(directory) {
   const entries = await fs.readdir(directory, { withFileTypes: true });
@@ -24,14 +22,9 @@ const contents = await Promise.all(
   files.map((file) => fs.readFile(file, "utf8")),
 );
 assert.equal(
-  contents.some((content) => content.includes(stagingOrigin)),
-  false,
-  "Production output contains the CATS Flights staging origin.",
-);
-assert.equal(
   contents.some((content) => content.includes(productionOrigin)),
   true,
-  "Production output does not contain the CATS Flights production origin.",
+  "Built output does not contain the CATS Flights production origin.",
 );
 
-console.log("Production CATS Flights target isolation verified.");
+console.log("CATS Flights production origin verified.");

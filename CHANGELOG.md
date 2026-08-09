@@ -11,8 +11,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Discover and browse flight logs on the Vega's read-only mounted CATS drive.
 - Open local and onboard logs privately in CATS Flights through a single-use
   loopback handoff with a manual save fallback.
-- Add staging and production CATS Flights build targets, with validation builds
-  directed to CATS Flights Staging.
+- Point every Configurator build and development session exclusively at the
+  production CATS Flights website.
 
 ## [1.1.1] - 09-08-2026
 
