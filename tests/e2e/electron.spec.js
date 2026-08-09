@@ -84,9 +84,7 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     });
     await expect(flightsLink).toHaveAttribute(
       "href",
-      process.env.CATS_FLIGHTS_TARGET === "staging"
-        ? "https://cats-flights-stage-7k2m9x4p.peppy-ridge-7142.chatgpt.site/"
-        : "https://flights.catsystems.io/",
+      "https://flights.catsystems.io/",
     );
     await expect(flightsLink).toHaveAttribute("target", "_blank");
 
