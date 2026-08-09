@@ -12,7 +12,7 @@
 </template>
 
 <script>
-import { mapActions } from "pinia";
+import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
 import AppBar from "@/components/AppBar.vue";
 import NavPanel from "@/components/NavigationPanel.vue";
@@ -31,11 +31,11 @@ export default {
     return {
       subscriptions: [],
       navItems: [
-        { title: "Configuration", link: "/config" },
-        { title: "Events", link: "/events" },
-        { title: "Timers", link: "/timer" },
-        //{ title: "Log", link: "/log" },
-        { title: "CLI", link: "/cli" },
+        { title: "Configuration", link: "/config", requiresBoard: true },
+        { title: "Events", link: "/events", requiresBoard: true },
+        { title: "Timers", link: "/timer", requiresBoard: true },
+        { title: "CLI", link: "/cli", requiresBoard: true },
+        { title: "Flight Logs", link: "/flight-logs", requiresBoard: false },
       ],
     };
   },
@@ -46,9 +46,14 @@ export default {
       window.cats.app.onAlert((text) => window.alert(text)),
       window.cats.board.onStaticData((data) => this.setStaticData(data)),
       window.cats.board.onActive((value) => {
+        const wasActive = this.active;
         this.setActiveState(value);
-        if (value && this.$route.name !== "Config")
-          this.$router.push("/config");
+        if (value && !wasActive) {
+          if (this.$route.name !== "Config") this.$router.push("/config");
+        } else if (!value && wasActive) {
+          void window.cats.flightLog.clearOnboard();
+          if (this.$route.meta.requiresBoard) this.$router.push("/");
+        }
       }),
       window.cats.board.onConfig((config) => {
         if (config.type === "EVENT") this.setEvent(config);
@@ -63,6 +68,9 @@ export default {
   },
   beforeUnmount() {
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
+  },
+  computed: {
+    ...mapState(useAppStore, ["active"]),
   },
   methods: {
     ...mapActions(useAppStore, [

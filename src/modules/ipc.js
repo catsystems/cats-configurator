@@ -5,21 +5,24 @@ import {
   assertBoardKey,
   assertBoardValue,
   assertNonEmptyString,
+  assertOpaqueId,
   assertRecord,
   assertTrustedSender,
   IPC_CHANNELS,
 } from "../shared/ipc.js";
-import { getFilename } from "../utils/file.js";
 import {
   exportFlightLogChartsToHTML,
   exportFlightLogToCSVs,
 } from "./flightlog.js";
-import { parseFlightLog } from "./logparser.js";
 import { cliCommand, command, connect, disconnect, getList } from "./serial.js";
+import { FlightLogManager } from "./flight-log-manager.js";
+import { startFlightLogHandoff } from "./flight-log-handoff.js";
 
 let trustedWindow;
 let registered = false;
-let flightLogFilename = "flight_log";
+let openExternalUrl;
+let activeHandoff;
+const flightLogManager = new FlightLogManager();
 
 export function setIpcWindow(window) {
   trustedWindow = window;
@@ -36,20 +39,78 @@ function handle(channel, handler) {
   ipcMain.handle(channel, trusted(handler));
 }
 
+function sendFlightLogEvent(channel, payload) {
+  if (trustedWindow && !trustedWindow.isDestroyed()) {
+    trustedWindow.webContents.send(channel, payload);
+  }
+}
+
+function cancelActiveHandoff() {
+  activeHandoff?.cancel();
+  activeHandoff = undefined;
+}
+
 async function loadFlightLog(filePath) {
   assertNonEmptyString(filePath, "Flight-log path");
-  const resolvedPath = path.resolve(filePath);
-  if (path.extname(resolvedPath).toLowerCase() !== ".cfl") {
-    throw new Error("File does not end with .cfl");
+  cancelActiveHandoff();
+  return flightLogManager.loadPath(filePath, "local");
+}
+
+async function chooseOnboardDrive() {
+  const selection = await dialog.showOpenDialog(trustedWindow, {
+    title: "Choose the mounted CATS drive",
+    properties: ["openDirectory"],
+  });
+  if (selection.canceled || selection.filePaths.length === 0) {
+    return { status: "cancelled", logs: [] };
   }
+  const result = await flightLogManager.selectVolume(selection.filePaths[0]);
+  sendFlightLogEvent(IPC_CHANNELS.FLIGHT_LOG_ONBOARD_CHANGED, result);
+  return result;
+}
 
-  const fileStat = await fs.stat(resolvedPath);
-  if (!fileStat.isFile()) throw new Error("Flight-log path is not a file.");
-  if (fileStat.size === 0) throw new Error("File is empty");
+async function saveOriginalFlightLog(sessionId) {
+  const session = flightLogManager.getSession(
+    assertOpaqueId(sessionId, "Flight-log session ID"),
+  );
+  const selection = await dialog.showSaveDialog(trustedWindow, {
+    title: "Save flight log",
+    defaultPath: session.name,
+    filters: [{ name: "CATS flight log", extensions: ["cfl"] }],
+  });
+  if (selection.canceled || !selection.filePath) return null;
+  const destination = await flightLogManager.assertSaveDestination(
+    selection.filePath,
+  );
+  await fs.writeFile(destination, session.bytes);
+  return destination;
+}
 
-  flightLogFilename = getFilename(resolvedPath.slice(0, -4));
-  const data = await fs.readFile(resolvedPath);
-  return parseFlightLog(data.toString("binary"));
+async function openFlightLogInFlights(sessionId) {
+  if (!openExternalUrl)
+    throw new Error("External browser access is unavailable.");
+  const session = flightLogManager.getSession(
+    assertOpaqueId(sessionId, "Flight-log session ID"),
+  );
+  cancelActiveHandoff();
+  let reachedTerminalState = false;
+  const handoff = await startFlightLogHandoff({
+    bytes: session.bytes,
+    fileName: session.name,
+    openExternal: openExternalUrl,
+    onState(state) {
+      sendFlightLogEvent(IPC_CHANNELS.FLIGHT_LOG_HANDOFF_STATE, state);
+      if (
+        ["cancelled", "complete", "expired", "failed"].includes(state.status)
+      ) {
+        reachedTerminalState = true;
+        if (activeHandoff?.id === state.id) activeHandoff = undefined;
+      }
+    },
+  });
+  activeHandoff = handoff;
+  if (reachedTerminalState) activeHandoff = undefined;
+  return { id: handoff.id, status: "waiting" };
 }
 
 async function restoreBoardConfiguration() {
@@ -72,6 +133,7 @@ async function restoreBoardConfiguration() {
 export function subscribeListeners(openExternal) {
   if (registered) return;
   registered = true;
+  openExternalUrl = openExternal;
 
   handle(IPC_CHANNELS.APP_OPEN_EXTERNAL, async (url) => {
     assertNonEmptyString(url, "External URL", 2048);
@@ -142,18 +204,64 @@ export function subscribeListeners(openExternal) {
   });
 
   handle(IPC_CHANNELS.FLIGHT_LOG_LOAD, loadFlightLog);
-  handle(IPC_CHANNELS.FLIGHT_LOG_EXPORT_CSV, async (flightLog) => {
-    assertRecord(flightLog, "Flight log");
-    return exportFlightLogToCSVs(flightLog, flightLogFilename, trustedWindow);
+  handle(IPC_CHANNELS.FLIGHT_LOG_CURRENT, () =>
+    flightLogManager.publicSession(),
+  );
+  handle(IPC_CHANNELS.FLIGHT_LOG_DISCOVER_ONBOARD, async () => {
+    const result = await flightLogManager.discoverOnboard();
+    sendFlightLogEvent(IPC_CHANNELS.FLIGHT_LOG_ONBOARD_CHANGED, result);
+    return result;
   });
-  handle(IPC_CHANNELS.FLIGHT_LOG_EXPORT_HTML, async (payload) => {
-    assertRecord(payload, "Flight-log HTML export");
-    assertRecord(payload.flightLog, "Flight log");
-    return exportFlightLogChartsToHTML(
-      payload.flightLog,
-      Boolean(payload.useImperialUnits),
-      flightLogFilename,
+  handle(IPC_CHANNELS.FLIGHT_LOG_CHOOSE_ONBOARD, chooseOnboardDrive);
+  handle(IPC_CHANNELS.FLIGHT_LOG_REFRESH_ONBOARD, async () => {
+    const result = await flightLogManager.refreshOnboard();
+    sendFlightLogEvent(IPC_CHANNELS.FLIGHT_LOG_ONBOARD_CHANGED, result);
+    return result;
+  });
+  handle(IPC_CHANNELS.FLIGHT_LOG_CLEAR_ONBOARD, () => {
+    const result = flightLogManager.clearOnboard();
+    sendFlightLogEvent(IPC_CHANNELS.FLIGHT_LOG_ONBOARD_CHANGED, result);
+    return result;
+  });
+  handle(IPC_CHANNELS.FLIGHT_LOG_OPEN_ONBOARD, async (logId) => {
+    cancelActiveHandoff();
+    return flightLogManager.openOnboard(
+      assertOpaqueId(logId, "Onboard flight-log ID"),
+    );
+  });
+  handle(IPC_CHANNELS.FLIGHT_LOG_SAVE_ORIGINAL, saveOriginalFlightLog);
+  handle(IPC_CHANNELS.FLIGHT_LOG_OPEN_IN_FLIGHTS, openFlightLogInFlights);
+  handle(IPC_CHANNELS.FLIGHT_LOG_CANCEL_HANDOFF, () => {
+    cancelActiveHandoff();
+    return true;
+  });
+  handle(IPC_CHANNELS.FLIGHT_LOG_EXPORT_CSV, async (sessionId) => {
+    const session = flightLogManager.getSession(
+      assertOpaqueId(sessionId, "Flight-log session ID"),
+    );
+    return exportFlightLogToCSVs(
+      session.flightLog,
+      path.parse(session.name).name,
       trustedWindow,
     );
   });
+  handle(IPC_CHANNELS.FLIGHT_LOG_EXPORT_HTML, async (payload) => {
+    assertRecord(payload, "Flight-log HTML export");
+    if (typeof payload.useImperialUnits !== "boolean") {
+      throw new TypeError("Flight-log unit selection must be a boolean.");
+    }
+    const session = flightLogManager.getSession(
+      assertOpaqueId(payload.sessionId, "Flight-log session ID"),
+    );
+    return exportFlightLogChartsToHTML(
+      session.flightLog,
+      payload.useImperialUnits,
+      path.parse(session.name).name,
+      trustedWindow,
+    );
+  });
+}
+
+export function cleanupFlightLogResources() {
+  cancelActiveHandoff();
 }

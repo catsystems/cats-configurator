@@ -340,7 +340,7 @@ async function captureRelease(label, executablePath, useSource = false) {
       path: path.join(outputDirectory, "home-flight-log-plot.png"),
     });
 
-    if (label === "1.1.1" && runtimeErrors.length) {
+    if (label === "1.2.0" && runtimeErrors.length) {
       throw new Error(
         `${label} emitted runtime errors:\n${runtimeErrors.join("\n")}`,
       );
@@ -355,4 +355,4 @@ async function captureRelease(label, executablePath, useSource = false) {
 }
 
 await captureRelease("0.3.10", referenceExecutable);
-await captureRelease("1.1.1", candidateExecutable, candidateUsesSource);
+await captureRelease("1.2.0", candidateExecutable, candidateUsesSource);

@@ -12,6 +12,30 @@ function subscribe(channel, callback) {
 }
 
 /**
+ * @typedef {object} OnboardLogSummary
+ * @property {string} id Opaque identifier scoped to the selected CATS drive.
+ * @property {string} name Safe base filename ending in `.cfl`.
+ * @property {number} size Original byte length.
+ * @property {number|null} logNumber Numeric firmware log number when present.
+ */
+
+/**
+ * @typedef {object} FlightLogSessionSummary
+ * @property {string} id Opaque identifier for the active log.
+ * @property {"local"|"onboard"} source How the log entered Configurator.
+ * @property {string} name Original base filename.
+ * @property {number} size Original byte length.
+ * @property {object} flightLog Parsed flight-log data.
+ */
+
+/**
+ * @typedef {object} HandoffState
+ * @property {string} id Opaque browser-handoff identifier.
+ * @property {"waiting"|"transferring"|"complete"|"expired"|"cancelled"|"failed"} status
+ * @property {string} message Human-readable progress or failure message.
+ */
+
+/**
  * Narrow renderer API. No Electron primitives or arbitrary channel access are
  * exposed to application code.
  */
@@ -59,13 +83,34 @@ const cats = {
     pathForDroppedFile: (file) => webUtils.getPathForFile(file),
     load: (filePath) =>
       ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_LOAD, filePath),
-    exportCsv: (flightLog) =>
-      ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_EXPORT_CSV, flightLog),
-    exportHtml: (flightLog, useImperialUnits) =>
+    current: () => ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_CURRENT),
+    exportCsv: (sessionId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_EXPORT_CSV, sessionId),
+    exportHtml: (sessionId, useImperialUnits) =>
       ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_EXPORT_HTML, {
-        flightLog,
+        sessionId,
         useImperialUnits,
       }),
+    discoverOnboard: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_DISCOVER_ONBOARD),
+    chooseOnboardDrive: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_CHOOSE_ONBOARD),
+    refreshOnboard: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_REFRESH_ONBOARD),
+    clearOnboard: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_CLEAR_ONBOARD),
+    openOnboard: (logId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_OPEN_ONBOARD, logId),
+    saveOriginal: (sessionId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_SAVE_ORIGINAL, sessionId),
+    openInFlights: (sessionId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_OPEN_IN_FLIGHTS, sessionId),
+    cancelFlightsHandoff: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_CANCEL_HANDOFF),
+    onOnboardChanged: (callback) =>
+      subscribe(IPC_CHANNELS.FLIGHT_LOG_ONBOARD_CHANGED, callback),
+    onHandoffState: (callback) =>
+      subscribe(IPC_CHANNELS.FLIGHT_LOG_HANDOFF_STATE, callback),
   },
 };
 

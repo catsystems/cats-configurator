@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 09-08-2026
+
+- Add an always-available Flight Logs workspace for local `.cfl` files while
+  keeping Configuration as the default screen after connecting a board.
+- Discover and browse flight logs on the Vega's read-only mounted CATS drive.
+- Open local and onboard logs privately in CATS Flights through a single-use
+  loopback handoff with a manual save fallback.
+- Add staging and production CATS Flights build targets, with validation builds
+  directed to CATS Flights Staging.
+
 ## [1.1.1] - 09-08-2026
 
 - Align application typography and branding with the CATS websites using

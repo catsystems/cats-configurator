@@ -25,8 +25,19 @@ export const IPC_CHANNELS = Object.freeze({
   BOARD_RESET: "board:reset",
   BOARD_SAVE: "board:save",
   FLIGHT_LOG_LOAD: "flight-log:load",
+  FLIGHT_LOG_CURRENT: "flight-log:current",
   FLIGHT_LOG_EXPORT_CSV: "flight-log:export-csv",
   FLIGHT_LOG_EXPORT_HTML: "flight-log:export-html",
+  FLIGHT_LOG_DISCOVER_ONBOARD: "flight-log:discover-onboard",
+  FLIGHT_LOG_CHOOSE_ONBOARD: "flight-log:choose-onboard",
+  FLIGHT_LOG_REFRESH_ONBOARD: "flight-log:refresh-onboard",
+  FLIGHT_LOG_CLEAR_ONBOARD: "flight-log:clear-onboard",
+  FLIGHT_LOG_OPEN_ONBOARD: "flight-log:open-onboard",
+  FLIGHT_LOG_SAVE_ORIGINAL: "flight-log:save-original",
+  FLIGHT_LOG_OPEN_IN_FLIGHTS: "flight-log:open-in-flights",
+  FLIGHT_LOG_CANCEL_HANDOFF: "flight-log:cancel-handoff",
+  FLIGHT_LOG_ONBOARD_CHANGED: "flight-log:onboard-changed",
+  FLIGHT_LOG_HANDOFF_STATE: "flight-log:handoff-state",
 });
 
 export function assertNonEmptyString(value, label, maxLength = 4096) {
@@ -61,6 +72,18 @@ export function assertBoardValue(value) {
 export function assertRecord(value, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new TypeError(`${label} must be an object.`);
+  }
+  return value;
+}
+
+export function assertOpaqueId(value, label = "Identifier") {
+  assertNonEmptyString(value, label, 64);
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  ) {
+    throw new TypeError(`${label} is invalid.`);
   }
   return value;
 }

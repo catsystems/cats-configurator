@@ -42,9 +42,9 @@ function makePlot(
   eventInfo,
   useImperialUnits,
 ) {
-  let lines = [];
-  let x = [];
-  for (let o of traceNames) {
+  const lines = [];
+  const x = [];
+  for (const o of traceNames) {
     if (o != "ts") {
       lines.push({
         x: x,
@@ -54,24 +54,13 @@ function makePlot(
     }
   }
 
-  if (useImperialUnits) {
-    data = structuredClone(data);
-    for (const o of data) {
-      for (let key of traceNames.filter((value) =>
-        TRACES_TO_CONVERT.includes(value),
-      )) {
-        o[key] = getDisplayValue(
-          o[key],
-          adaptTraceNameForConverterFunction(key),
-        );
-      }
-    }
-  }
-
   for (const o of data) {
     let i = 0;
-    for (let key of traceNames) {
+    for (const key of traceNames) {
       let value = o[key];
+      if (useImperialUnits && TRACES_TO_CONVERT.includes(key)) {
+        value = getDisplayValue(value, adaptTraceNameForConverterFunction(key));
+      }
       lines[i].y.push(value);
       i++;
     }
@@ -80,7 +69,7 @@ function makePlot(
 
   // lines.push(...eventInfoTraces)
 
-  plotly.newPlot(elementId, lines, {
+  return plotly.newPlot(elementId, lines, {
     title: { text: title },
     margin: { t: 50 },
     xaxis: { title: "Timestamp [s]" },
@@ -244,7 +233,7 @@ export async function makePlots(flightlog, element, useImperialUnits) {
   let el = document.createElement("div");
   element.append(el);
   const altitudeYLabel = useImperialUnits ? "Altitude [ft]" : "Altitude [m]";
-  makePlot(
+  await makePlot(
     flightlog.flightInfo,
     el,
     "State Estimation - Altitude",
@@ -259,7 +248,7 @@ export async function makePlots(flightlog, element, useImperialUnits) {
   const velocityYLabel = useImperialUnits
     ? "Velocity [ft/s]"
     : "Velocity [m/s]";
-  makePlot(
+  await makePlot(
     flightlog.flightInfo,
     el,
     "State Estimation - Velocity",
@@ -274,7 +263,7 @@ export async function makePlots(flightlog, element, useImperialUnits) {
   const accelerationYLabel = useImperialUnits
     ? "Acceleration [ft/s²]"
     : "Acceleration [m/s²]";
-  makePlot(
+  await makePlot(
     flightlog.imu,
     el,
     "IMU - Acceleration",
@@ -286,7 +275,7 @@ export async function makePlots(flightlog, element, useImperialUnits) {
 
   el = document.createElement("div");
   element.append(el);
-  makePlot(
+  await makePlot(
     flightlog.imu,
     el,
     "IMU - Gyroscope",
@@ -300,7 +289,7 @@ export async function makePlots(flightlog, element, useImperialUnits) {
   const temperatureYLabel = useImperialUnits
     ? "Temperature [°F]"
     : "Temperature [°C]";
-  makePlot(
+  await makePlot(
     flightlog.baro,
     el,
     "Temperature",
@@ -313,7 +302,7 @@ export async function makePlots(flightlog, element, useImperialUnits) {
   el = document.createElement("div");
   element.append(el);
   const pressureYLabel = useImperialUnits ? "Pressure [psi]" : "Pressure [hPa]";
-  makePlot(
+  await makePlot(
     flightlog.baro,
     el,
     "Pressure",
@@ -328,7 +317,7 @@ export async function makePlots(flightlog, element, useImperialUnits) {
   const filteredAltitudeYLabel = useImperialUnits
     ? "Altitude [ft]"
     : "Altitude [m]";
-  makePlot(
+  await makePlot(
     flightlog.filteredDataInfo,
     el,
     "Filtered Barometer Altitude",
@@ -340,7 +329,7 @@ export async function makePlots(flightlog, element, useImperialUnits) {
 
   el = document.createElement("div");
   element.append(el);
-  makePlot(
+  await makePlot(
     flightlog.voltageInfo,
     el,
     "Battery Voltage",

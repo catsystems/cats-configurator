@@ -16,7 +16,13 @@
                   >
                     <v-switch
                       v-model="data[`${key}_active`].value"
-                      class="timer-switch mt-0"
+                      :class="[
+                        'timer-switch',
+                        'mt-0',
+                        {
+                          'timer-switch--active': data[`${key}_active`].value,
+                        },
+                      ]"
                       color="primary"
                       density="compact"
                       hide-details
@@ -178,7 +184,7 @@ export default {
   min-height: 64px;
 }
 
-.timer-switch.v-input--dirty :deep(.v-switch__track) {
+.timer-switch--active :deep(.v-switch__track) {
   background-color: rgb(var(--v-theme-primary)) !important;
   opacity: 1;
 }

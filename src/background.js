@@ -1,7 +1,11 @@
 import { app, BrowserWindow, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { setIpcWindow, subscribeListeners } from "./modules/ipc.js";
+import {
+  cleanupFlightLogResources,
+  setIpcWindow,
+  subscribeListeners,
+} from "./modules/ipc.js";
 import { setSerialWindow } from "./modules/serial.js";
 import { isAllowedExternalUrl } from "./modules/external-links.js";
 
@@ -116,3 +120,5 @@ app.whenReady().then(async () => {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
+
+app.on("before-quit", cleanupFlightLogResources);
