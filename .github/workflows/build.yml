@@ -57,8 +57,12 @@ jobs:
               builds/*.exe
               builds/*.zip
           - os: macos-latest
-            artifact: cats-configurator-macos
+            artifact: cats-configurator-macos-x64
             command: npm run build -- --mac dmg --x64 --publish never
+            files: builds/*.dmg
+          - os: macos-latest
+            artifact: cats-configurator-macos-arm64
+            command: npm run build -- --mac dmg --arm64 --publish never
             files: builds/*.dmg
           - os: ubuntu-latest
             artifact: cats-configurator-linux
