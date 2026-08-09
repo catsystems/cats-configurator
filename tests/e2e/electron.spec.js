@@ -1,5 +1,6 @@
 import { _electron as electron, expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
+import path from "node:path";
 
 function flightInfoFixture() {
   const buffer = Buffer.alloc(22);
@@ -19,8 +20,8 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
   const localLog = testInfo.outputPath("local-flight.cfl");
   const secondLocalLog = testInfo.outputPath("second-flight.cfl");
   await fs.mkdir(fakeDrive, { recursive: true });
-  await fs.writeFile(`${fakeDrive}\\readme.txt`, "Welcome to CATS!\n");
-  await fs.writeFile(`${fakeDrive}\\fl7.cfl`, flightInfoFixture());
+  await fs.writeFile(path.join(fakeDrive, "readme.txt"), "Welcome to CATS!\n");
+  await fs.writeFile(path.join(fakeDrive, "fl7.cfl"), flightInfoFixture());
   await fs.writeFile(localLog, flightInfoFixture());
   await fs.writeFile(secondLocalLog, flightInfoFixture());
   const executablePath = process.env.CATS_E2E_EXECUTABLE;
