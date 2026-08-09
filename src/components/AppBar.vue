@@ -16,7 +16,7 @@
       <v-btn
         class="mr-2"
         :loading="isFetchingPorts"
-        :disabled="active"
+        :disabled="active || connectionPending"
         icon
         size="small"
         variant="elevated"
@@ -27,11 +27,11 @@
       <v-select
         v-model="selectedPort"
         :items="serialPorts"
-        :disabled="active"
+        :disabled="active || connectionPending"
         ref="portSelector"
         label="ports"
         no-data-text="No ports available"
-        item-title="path"
+        :item-title="portTitle"
         item-value="path"
         style="width: 220px"
         variant="solo-filled"
@@ -71,14 +71,29 @@
 import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
 import logoImage from "@/assets/logos/logo_white_small.png";
+import {
+  SERIAL_PORT_POLL_INTERVAL_MS,
+  allowManualVegaConnection,
+  createVegaPresenceState,
+  getAutoConnectCandidate,
+  getSerialPortLabel,
+  isVegaSerialPort,
+  markVegaConnectionAttempt,
+  reconcileVegaCandidates,
+  suppressVegaAutoConnect,
+} from "@/modules/vega-autodetect.js";
 
 export default {
   name: "AppBar",
   data() {
     return {
       isFetchingPorts: false,
+      portScanInFlight: false,
+      portScanTimer: null,
+      connectionPending: false,
       connectBtnLoading: false,
       selectedPort: null,
+      vegaPresence: createVegaPresenceState(),
       subscriptions: [],
       logoImage,
     };
@@ -86,55 +101,110 @@ export default {
   computed: {
     ...mapState(useAppStore, ["serialPorts", "active"]),
   },
+  watch: {
+    active(value) {
+      if (value) {
+        this.connectionPending = false;
+        this.connectBtnLoading = false;
+      }
+    },
+  },
   mounted() {
-    this.getPorts();
     this.subscriptions.push(
-      window.cats.serial.onConnected(() => {
-        this.connectBtnLoading = false;
-      }),
       window.cats.serial.onError((message) => {
-        window.alert(message);
+        this.connectionPending = false;
         this.connectBtnLoading = false;
+        this.showErrorSnackbar(message);
       }),
       window.cats.serial.onDisconnected(() => {
+        this.connectionPending = false;
         this.connectBtnLoading = false;
         this.setActiveState(false);
         this.$router.push("/");
       }),
     );
+    void this.getPorts();
+    this.portScanTimer = window.setInterval(
+      () => void this.scanPorts(),
+      SERIAL_PORT_POLL_INTERVAL_MS,
+    );
   },
   beforeUnmount() {
+    if (this.portScanTimer !== null) window.clearInterval(this.portScanTimer);
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
   },
   methods: {
-    ...mapActions(useAppStore, ["setSerialPorts", "setActiveState"]),
+    ...mapActions(useAppStore, [
+      "setSerialPorts",
+      "setActiveState",
+      "showErrorSnackbar",
+    ]),
+    portTitle(port) {
+      return getSerialPortLabel(port);
+    },
     async getPorts() {
-      this.isFetchingPorts = true;
+      await this.refreshPorts(true);
+    },
+    async scanPorts() {
+      if (this.active || this.connectionPending) return;
+      await this.refreshPorts(false);
+    },
+    async refreshPorts(showLoading) {
+      if (this.portScanInFlight) return;
+      this.portScanInFlight = true;
+      if (showLoading) this.isFetchingPorts = true;
       try {
-        this.setSerialPorts(await window.cats.serial.list());
+        const ports = await window.cats.serial.list();
+        const selectedPath = this.selectedPort?.path;
+        this.setSerialPorts(ports);
+        this.selectedPort = selectedPath
+          ? (ports.find(({ path }) => path === selectedPath) ?? null)
+          : null;
+
+        const candidates = reconcileVegaCandidates(this.vegaPresence, ports);
+        const candidate = getAutoConnectCandidate(
+          this.vegaPresence,
+          candidates,
+        );
+        if (candidate && !this.active && !this.connectionPending) {
+          this.selectedPort = candidate.port;
+          await this.connect({ automatic: true });
+        }
       } catch (error) {
-        window.alert(error.message);
+        this.showErrorSnackbar(error.message);
       } finally {
-        this.isFetchingPorts = false;
+        if (showLoading) this.isFetchingPorts = false;
+        this.portScanInFlight = false;
       }
     },
-    async connect() {
+    async connect({ automatic = false } = {}) {
       if (!this.selectedPort) return;
+      if (isVegaSerialPort(this.selectedPort)) {
+        if (!automatic) {
+          allowManualVegaConnection(this.vegaPresence, this.selectedPort);
+        }
+        markVegaConnectionAttempt(this.vegaPresence, this.selectedPort);
+      }
+      this.connectionPending = true;
       this.connectBtnLoading = true;
       try {
         await window.cats.serial.connect(this.selectedPort.path);
       } catch (error) {
+        this.connectionPending = false;
         this.connectBtnLoading = false;
-        window.alert(error.message);
+        this.showErrorSnackbar(error.message);
       }
     },
     async disconnect() {
+      if (isVegaSerialPort(this.selectedPort)) {
+        suppressVegaAutoConnect(this.vegaPresence, this.selectedPort);
+      }
       this.connectBtnLoading = true;
       try {
         await window.cats.serial.disconnect();
       } catch (error) {
         this.connectBtnLoading = false;
-        window.alert(error.message);
+        this.showErrorSnackbar(error.message);
       }
     },
   },

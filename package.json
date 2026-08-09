@@ -1,6 +1,6 @@
 {
   "name": "cats-configurator",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Desktop configuration and flight-log analysis utility for CATS flight computers.",
   "author": "CATS Systems",
   "private": true,

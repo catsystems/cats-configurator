@@ -12,6 +12,17 @@ function subscribe(channel, callback) {
 }
 
 /**
+ * @typedef {object} SerialPortSummary
+ * @property {string} path Operating-system serial port path.
+ * @property {string=} vendorId USB vendor identifier when exposed by the OS.
+ * @property {string=} productId USB product identifier when exposed by the OS.
+ * @property {string=} serialNumber USB serial number when exposed by the OS.
+ * @property {string=} locationId Physical USB location when exposed by the OS.
+ * @property {string=} manufacturer USB manufacturer label when exposed by the OS.
+ * @property {string=} friendlyName Operating-system device label when available.
+ */
+
+/**
  * @typedef {object} OnboardLogSummary
  * @property {string} id Opaque identifier scoped to the selected CATS drive.
  * @property {string} name Safe base filename ending in `.cfl`.
@@ -46,6 +57,7 @@ const cats = {
     onAlert: (callback) => subscribe(IPC_CHANNELS.APP_ALERT, callback),
   },
   serial: {
+    /** @returns {Promise<SerialPortSummary[]>} */
     list: () => ipcRenderer.invoke(IPC_CHANNELS.SERIAL_LIST),
     connect: (portPath) =>
       ipcRenderer.invoke(IPC_CHANNELS.SERIAL_CONNECT, portPath),

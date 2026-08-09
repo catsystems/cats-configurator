@@ -71,7 +71,7 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       });
     await expect(page).toHaveTitle("CATS Configurator");
     await expect(page.getByText("Status: Disconnected")).toBeVisible();
-    await expect(page.getByText("App version: 1.2.0")).toBeVisible();
+    await expect(page.getByText("App version: 1.2.1")).toBeVisible();
     await expect(page.getByText("CATS", { exact: true })).toBeVisible();
     await expect(page.getByText("Configurator", { exact: true })).toBeVisible();
     await expect(
@@ -242,7 +242,9 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       .poll(() => page.evaluate(() => window.cats.serial.list()))
       .toEqual([{ path: "CATS-FAKE", manufacturer: "CATS Systems" }]);
 
-    await page.evaluate(() => window.cats.serial.connect("CATS-FAKE"));
+    await page.locator(".v-select .v-field").click();
+    await page.getByRole("option", { name: "CATS-FAKE", exact: true }).click();
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
     await expect(page.getByText("Status: Connected")).toBeVisible();
     await expect(page).toHaveURL(/#\/config$/);
 

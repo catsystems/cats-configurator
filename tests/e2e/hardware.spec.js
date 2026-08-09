@@ -24,15 +24,21 @@ test("connects to a real CATS Vega without modifying configuration", async ({}, 
 
     const ports = await page.evaluate(() => window.cats.serial.list());
     expect(ports.some(({ path }) => path === hardwarePort)).toBe(true);
-
-    await page.evaluate(
-      (portPath) => window.cats.serial.connect(portPath),
-      hardwarePort,
-    );
     await expect(page.getByText("Status: Connected")).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByText("Board: CATS Vega")).toBeVisible();
+    await expect(page).toHaveURL(/#\/config$/);
+
+    await page.getByRole("button", { name: "disconnect" }).click();
+    await expect(page.getByText("Status: Disconnected")).toBeVisible();
+    await page.waitForTimeout(2500);
+    await expect(page.getByText("Status: Disconnected")).toBeVisible();
+
+    await page.getByRole("button", { name: "Connect" }).click();
+    await expect(page.getByText("Status: Connected")).toBeVisible({
+      timeout: 15_000,
+    });
 
     await page.evaluate(() => {
       window.location.hash = "#/cli";
@@ -44,7 +50,7 @@ test("connects to a real CATS Vega without modifying configuration", async ({}, 
       timeout: 10_000,
     });
 
-    await page.evaluate(() => window.cats.serial.disconnect());
+    await page.getByRole("button", { name: "disconnect" }).click();
     await expect(page.getByText("Status: Disconnected")).toBeVisible();
   } finally {
     const process = application.process();
