@@ -135,6 +135,7 @@ export class FlightLogManager {
   constructor({ candidates = platformVolumeCandidates } = {}) {
     this.candidates = candidates;
     this.volumeRoot = null;
+    this.protectedVolumeRoots = new Set();
     this.onboard = new Map();
     this.session = null;
   }
@@ -156,19 +157,25 @@ export class FlightLogManager {
 
   async assertSaveDestination(filePath) {
     const destination = path.resolve(filePath);
-    if (!this.volumeRoot) return destination;
+    if (this.protectedVolumeRoots.size === 0) return destination;
+
     const parent = await fs.realpath(path.dirname(destination));
-    if (isContainedPath(this.volumeRoot, parent)) {
-      throw new Error(
-        "Flight logs cannot be written to the mounted CATS drive.",
-      );
-    }
-    try {
-      const existingDestination = await fs.realpath(destination);
-      if (isContainedPath(this.volumeRoot, existingDestination)) {
+    for (const root of this.protectedVolumeRoots) {
+      if (isContainedPath(root, parent)) {
         throw new Error(
           "Flight logs cannot be written to the mounted CATS drive.",
         );
+      }
+    }
+
+    try {
+      const existingDestination = await fs.realpath(destination);
+      for (const root of this.protectedVolumeRoots) {
+        if (isContainedPath(root, existingDestination)) {
+          throw new Error(
+            "Flight logs cannot be written to the mounted CATS drive.",
+          );
+        }
       }
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
@@ -177,6 +184,7 @@ export class FlightLogManager {
   }
 
   async loadPath(filePath, source = "local") {
+    this.session = null;
     const requestedPath = path.resolve(filePath);
     const requestedStat = await fs.lstat(requestedPath);
     if (requestedStat.isSymbolicLink()) {
@@ -211,6 +219,7 @@ export class FlightLogManager {
 
   async selectVolume(rootPath) {
     const resolvedRoot = await validateCatsVolume(rootPath);
+    this.protectedVolumeRoots.add(resolvedRoot);
     const logs = await listVolumeLogs(resolvedRoot);
     this.volumeRoot = resolvedRoot;
     this.onboard = new Map(logs.map((log) => [log.id, log]));
@@ -225,7 +234,9 @@ export class FlightLogManager {
     const matches = [];
     for (const candidate of candidates) {
       try {
-        matches.push(await validateCatsVolume(candidate));
+        const resolvedRoot = await validateCatsVolume(candidate);
+        matches.push(resolvedRoot);
+        this.protectedVolumeRoots.add(resolvedRoot);
       } catch {
         // Expected for ordinary drives and inaccessible mount points.
       }

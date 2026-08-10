@@ -16,15 +16,19 @@ function exportName(filename, suffix) {
   return `${filename}_${suffix}_${formatDateTime(new Date())}`;
 }
 
-export async function exportFlightLogToCSVs(flightLog, filename, ownerWindow) {
+export async function exportFlightLogToCSVs(
+  flightLog,
+  filename,
+  ownerWindow,
+  assertSaveDestination,
+) {
   const selection = await dialog.showOpenDialog(ownerWindow, {
     properties: ["openDirectory", "createDirectory"],
   });
   if (selection.canceled || selection.filePaths.length === 0) return null;
 
-  const exportFolder = path.join(
-    selection.filePaths[0],
-    exportName(filename, "export"),
+  const exportFolder = await assertSaveDestination(
+    path.join(selection.filePaths[0], exportName(filename, "export")),
   );
   await fs.mkdir(exportFolder);
 
@@ -46,15 +50,15 @@ export async function exportFlightLogChartsToHTML(
   useImperialUnits,
   filename,
   ownerWindow,
+  assertSaveDestination,
 ) {
   const selection = await dialog.showOpenDialog(ownerWindow, {
     properties: ["openDirectory", "createDirectory"],
   });
   if (selection.canceled || selection.filePaths.length === 0) return null;
 
-  const outputPath = path.join(
-    selection.filePaths[0],
-    `${exportName(filename, "plots")}.html`,
+  const outputPath = await assertSaveDestination(
+    path.join(selection.filePaths[0], `${exportName(filename, "plots")}.html`),
   );
   const plotlySource = await fs.readFile(
     requireFromMain.resolve("plotly.js-dist-min"),

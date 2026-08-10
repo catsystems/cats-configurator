@@ -43,12 +43,12 @@ DevTools **Sources** panel.
 
 ## Release formats
 
-- Windows: NSIS installer and ZIP
-- macOS: DMG
-- Linux: AppImage
+- Windows x64: NSIS installer
+- macOS: Intel and Apple Silicon DMGs
+- Linux x64: AppImage
 
 CI installs exclusively from `package-lock.json`, runs lint, formatting, tests,
-and security gates, then packages each platform. Tags publish the three platform
+and security gates, then packages each platform. Tags publish the four native
 artifacts as one GitHub release.
 
 ## Open source

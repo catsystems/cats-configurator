@@ -51,6 +51,12 @@ jobs:
       - name: Verify release artifact contract
         run: npm run verify:release-contract
 
+      - name: Verify release tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: npm run verify:release-tag -- "$RELEASE_TAG"
+
   package:
     needs: quality
     strategy:

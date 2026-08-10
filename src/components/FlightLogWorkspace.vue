@@ -221,13 +221,16 @@ export default {
       const file = Array.isArray(fileValue) ? fileValue[0] : fileValue;
       if (!file) return;
       this.fileLoading = true;
+      this.errorString = "";
+      this.session = null;
+      this.flightLog = null;
+      this.$refs.flightLogPlotContainer?.replaceChildren();
       try {
         const filePath = window.cats.flightLog.pathForDroppedFile(file);
         if (!filePath) throw new Error("Could not resolve the selected file.");
         await this.setSession(await window.cats.flightLog.load(filePath));
       } catch (error) {
         this.errorString = error.message;
-        this.$refs.flightLogPlotContainer?.replaceChildren();
       } finally {
         this.fileLoading = false;
       }

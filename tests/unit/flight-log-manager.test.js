@@ -55,6 +55,13 @@ describe("mounted CATS drive flight logs", () => {
     await expect(
       manager.assertSaveDestination(path.join(root, "saved-copy.cfl")),
     ).rejects.toThrow(/cannot be written/i);
+
+    manager.clearOnboard();
+    await expect(
+      manager.assertSaveDestination(
+        path.join(root, "saved-after-disconnect.cfl"),
+      ),
+    ).rejects.toThrow(/cannot be written/i);
   });
 
   it("requires manual selection when multiple signed volumes are present", async () => {
@@ -68,6 +75,12 @@ describe("mounted CATS drive flight logs", () => {
       status: "multiple",
       logs: [],
     });
+    await expect(
+      manager.assertSaveDestination(path.join(first, "first-export.html")),
+    ).rejects.toThrow(/cannot be written/i);
+    await expect(
+      manager.assertSaveDestination(path.join(second, "second-export.html")),
+    ).rejects.toThrow(/cannot be written/i);
   });
 
   it("loads onboard bytes into one replaceable session and detects removal", async () => {
@@ -96,12 +109,19 @@ describe("mounted CATS drive flight logs", () => {
     await expect(validateCatsVolume(unsigned)).rejects.toThrow(/CATS drive/);
 
     const root = await createCatsDrive([]);
+    const valid = path.join(root, "valid.cfl");
     const empty = path.join(root, "empty.cfl");
     const text = path.join(root, "notes.txt");
+    await fs.writeFile(valid, flightInfoFixture());
     await fs.writeFile(empty, "");
     await fs.writeFile(text, "not a log");
     const manager = new FlightLogManager();
+    await expect(manager.loadPath(valid)).resolves.toMatchObject({
+      name: "valid.cfl",
+    });
+    expect(manager.publicSession()).not.toBeNull();
     await expect(manager.loadPath(empty)).rejects.toThrow(/empty/i);
+    expect(manager.publicSession()).toBeNull();
     await expect(manager.loadPath(text)).rejects.toThrow(/\.cfl/);
     expect(isContainedPath(root, path.resolve(root, "..", "escape.cfl"))).toBe(
       false,

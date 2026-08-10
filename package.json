@@ -21,6 +21,7 @@
     "test:e2e": "electron-vite build && playwright test",
     "verify:production-target": "node tests/verify-production-target.mjs",
     "verify:release-contract": "node tests/verify-release-contract.mjs",
+    "verify:release-tag": "node tests/verify-release-tag.mjs",
     "verify:packaged-artifact": "node tests/verify-packaged-artifact.mjs",
     "test:hardware": "node tests/hardware/vega-smoke.mjs",
     "audit:prod": "npm audit --omit=dev --audit-level=high"
