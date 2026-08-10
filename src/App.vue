@@ -3,6 +3,7 @@
     <AppBar />
     <NavPanel :items="navItems" />
     <Snackbar />
+    <UpdateDialog />
     <AppFooter />
 
     <v-main>
@@ -17,6 +18,7 @@ import { useAppStore } from "@/store";
 import AppBar from "@/components/AppBar.vue";
 import NavPanel from "@/components/NavigationPanel.vue";
 import Snackbar from "@/components/Snackbar.vue";
+import UpdateDialog from "@/components/UpdateDialog.vue";
 import AppFooter from "@/components/Footer.vue";
 
 export default {
@@ -25,6 +27,7 @@ export default {
     AppBar,
     NavPanel,
     Snackbar,
+    UpdateDialog,
     AppFooter,
   },
   data() {
@@ -43,6 +46,7 @@ export default {
     if (this.$route.path !== "/") this.$router.push("/");
 
     this.subscriptions.push(
+      window.cats.updates.onState((state) => this.handleUpdateState(state)),
       window.cats.app.onAlert((text) => window.alert(text)),
       window.cats.board.onStaticData((data) => this.setStaticData(data)),
       window.cats.board.onActive((value) => {
@@ -65,6 +69,10 @@ export default {
         this.showSuccessSnackbar("Values saved successfully!");
       }),
     );
+    void window.cats.updates
+      .current()
+      .then((state) => this.setUpdateState(state))
+      .catch((error) => this.showErrorSnackbar(error.message));
   },
   beforeUnmount() {
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
@@ -81,7 +89,18 @@ export default {
       "setTimer",
       "setLog",
       "showSuccessSnackbar",
+      "showErrorSnackbar",
+      "setUpdateState",
     ]),
+    handleUpdateState(state) {
+      this.setUpdateState(state);
+      if (!state.manual) return;
+      if (state.status === "up-to-date") {
+        this.showSuccessSnackbar("CATS Configurator is up to date.");
+      } else if (state.status === "error") {
+        this.showErrorSnackbar(state.message || "The update check failed.");
+      }
+    },
   },
 };
 </script>

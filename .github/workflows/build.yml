@@ -44,6 +44,9 @@ jobs:
       - name: Verify CATS Flights production origin
         run: npm run verify:production-target
 
+      - name: Verify release artifact contract
+        run: npm run verify:release-contract
+
   package:
     needs: quality
     strategy:
@@ -52,18 +55,26 @@ jobs:
         include:
           - os: windows-latest
             artifact: cats-configurator-windows
+            platform: win32
+            arch: x64
             command: npm run build -- --win nsis --x64 --publish never
             files: builds/*.exe
           - os: macos-latest
             artifact: cats-configurator-macos-x64
+            platform: darwin
+            arch: x64
             command: npm run build -- --mac dmg --x64 --publish never
             files: builds/*.dmg
           - os: macos-latest
             artifact: cats-configurator-macos-arm64
+            platform: darwin
+            arch: arm64
             command: npm run build -- --mac dmg --arm64 --publish never
             files: builds/*.dmg
           - os: ubuntu-latest
             artifact: cats-configurator-linux
+            platform: linux
+            arch: x64
             command: npm run build -- --linux AppImage --x64 --publish never
             files: builds/*.AppImage
     runs-on: ${{ matrix.os }}
@@ -84,6 +95,9 @@ jobs:
         run: ${{ matrix.command }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify update asset name
+        run: npm run verify:packaged-artifact -- ${{ matrix.platform }} ${{ matrix.arch }}
 
       - name: Upload package
         uses: actions/upload-artifact@v7

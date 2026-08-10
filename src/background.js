@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, net, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -8,6 +8,12 @@ import {
 } from "./modules/ipc.js";
 import { setSerialWindow } from "./modules/serial.js";
 import { isAllowedExternalUrl } from "./modules/external-links.js";
+import {
+  cleanupUpdates,
+  createE2EUpdateFetch,
+  initializeUpdates,
+  setUpdateWindow,
+} from "./modules/updates.js";
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const isDevelopment = Boolean(process.env.ELECTRON_RENDERER_URL);
@@ -90,6 +96,7 @@ async function createWindow() {
 
   setIpcWindow(browserWindow);
   setSerialWindow(browserWindow);
+  setUpdateWindow(browserWindow);
   secureWebContents(browserWindow);
 
   if (!isDevelopment) browserWindow.removeMenu();
@@ -105,11 +112,39 @@ async function createWindow() {
     browserWindow = undefined;
     setIpcWindow(undefined);
     setSerialWindow(undefined);
+    setUpdateWindow(undefined);
+  });
+}
+
+async function startUpdates() {
+  const fixturePath =
+    !app.isPackaged && process.env.CATS_E2E_USER_DATA
+      ? process.env.CATS_E2E_UPDATE_FIXTURE
+      : null;
+  const updateFetch = fixturePath
+    ? await createE2EUpdateFetch(fixturePath, {
+        platform: process.platform,
+        arch: process.arch,
+        currentVersion: app.getVersion(),
+      })
+    : (url, options) => net.fetch(url, options);
+
+  initializeUpdates({
+    currentVersion: app.getVersion(),
+    cacheRoot: path.join(app.getPath("userData"), "updates"),
+    fetch: updateFetch,
+    revealFile: fixturePath
+      ? () => {}
+      : (filePath) => shell.showItemInFolder(filePath),
+    openExternal: openAllowedExternalUrl,
+    enabled: app.isPackaged || Boolean(fixturePath),
+    initialDelayMs: fixturePath ? 10 : undefined,
   });
 }
 
 app.whenReady().then(async () => {
   subscribeListeners(openAllowedExternalUrl);
+  await startUpdates();
   await createWindow();
 
   app.on("activate", () => {
@@ -121,4 +156,7 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", cleanupFlightLogResources);
+app.on("before-quit", () => {
+  cleanupFlightLogResources();
+  cleanupUpdates();
+});
