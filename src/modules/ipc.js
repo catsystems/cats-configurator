@@ -17,6 +17,12 @@ import {
 import { cliCommand, command, connect, disconnect, getList } from "./serial.js";
 import { FlightLogManager } from "./flight-log-manager.js";
 import { startFlightLogHandoff } from "./flight-log-handoff.js";
+import {
+  checkForUpdates,
+  currentUpdateState,
+  openUpdateRelease,
+  revealDownloadedUpdate,
+} from "./updates.js";
 
 let trustedWindow;
 let registered = false;
@@ -140,6 +146,11 @@ export function subscribeListeners(openExternal) {
     await openExternal(url);
     return true;
   });
+
+  handle(IPC_CHANNELS.UPDATES_CURRENT, currentUpdateState);
+  handle(IPC_CHANNELS.UPDATES_CHECK, checkForUpdates);
+  handle(IPC_CHANNELS.UPDATES_REVEAL, revealDownloadedUpdate);
+  handle(IPC_CHANNELS.UPDATES_OPEN_RELEASE, openUpdateRelease);
 
   handle(IPC_CHANNELS.SERIAL_LIST, () => getList());
   handle(IPC_CHANNELS.SERIAL_CONNECT, (portPath) => {

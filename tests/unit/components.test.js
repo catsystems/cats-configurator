@@ -2,11 +2,14 @@ import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { nextTick } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import App from "@/App.vue";
 import Config from "@/views/Config.vue";
 import AppBar from "@/components/AppBar.vue";
 import EditEventActionDialog from "@/components/EditEventActionDialog.vue";
+import AppFooter from "@/components/Footer.vue";
 import Snackbar from "@/components/Snackbar.vue";
 import UnitSwitch from "@/components/UnitSwitch.vue";
+import UpdateDialog from "@/components/UpdateDialog.vue";
 import vuetify from "@/plugins/vuetify.js";
 import { useAppStore } from "@/store/index.js";
 
@@ -16,6 +19,14 @@ describe("renderer state components", () => {
   beforeEach(() => {
     pinia = createPinia();
     setActivePinia(pinia);
+    globalThis.__APP_VERSION__ = "1.3.0";
+    window.cats = {
+      updates: {
+        check: vi.fn(),
+        reveal: vi.fn(),
+        openRelease: vi.fn(),
+      },
+    };
   });
 
   it("toggles the shared unit system through UnitSwitch", async () => {
@@ -42,6 +53,124 @@ describe("renderer state components", () => {
     wrapper.vm.handleSnackbarInput(false);
     expect(store.snackbar.isVisible).toBe(false);
     wrapper.unmount();
+  });
+
+  it("shows update progress in the footer and supports a manual check", async () => {
+    const wrapper = mount(AppFooter, {
+      global: {
+        plugins: [pinia, vuetify],
+        stubs: {
+          VFooter: { template: "<footer><slot /></footer>" },
+        },
+      },
+    });
+    const store = useAppStore();
+
+    store.setUpdateState({ status: "downloading", progress: 42 });
+    await nextTick();
+    expect(wrapper.text()).toContain("Downloading update 42%");
+
+    store.setUpdateState({ status: "ready", progress: 100 });
+    await nextTick();
+    expect(wrapper.text()).toContain("Update ready");
+    await wrapper.get("button").trigger("click");
+    expect(window.cats.updates.check).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+
+  it("reveals verified updates and opens validated release pages", async () => {
+    const wrapper = mount(UpdateDialog, {
+      attachTo: document.body,
+      global: {
+        plugins: [pinia, vuetify],
+        stubs: {
+          VDialog: {
+            props: ["modelValue"],
+            template: '<div v-if="modelValue"><slot /></div>',
+          },
+        },
+      },
+    });
+    const store = useAppStore();
+    store.setUpdateState({
+      status: "ready",
+      availableVersion: "1.4.0",
+      assetName: "cats-configurator Setup 1.4.0.exe",
+      message: "Ready",
+    });
+    await nextTick();
+    await nextTick();
+
+    expect(document.body.textContent).toContain("Configurator update");
+    expect(document.body.textContent).toContain("downloaded and verified");
+    await wrapper.vm.openRelease();
+    expect(window.cats.updates.openRelease).toHaveBeenCalledOnce();
+    await wrapper.vm.reveal();
+    expect(window.cats.updates.reveal).toHaveBeenCalledOnce();
+    expect(store.snackbar.message).toContain("verified update file");
+    wrapper.unmount();
+  });
+
+  it("falls back to the release page for unsupported downloads", async () => {
+    const wrapper = mount(UpdateDialog, {
+      attachTo: document.body,
+      global: {
+        plugins: [pinia, vuetify],
+        stubs: {
+          VDialog: {
+            props: ["modelValue"],
+            template: '<div v-if="modelValue"><slot /></div>',
+          },
+        },
+      },
+    });
+    const store = useAppStore();
+    store.setUpdateState({
+      status: "unsupported",
+      availableVersion: "1.4.0",
+      message: "No automatic download is available for this platform.",
+    });
+    await nextTick();
+    await nextTick();
+
+    expect(document.body.textContent).toContain(
+      "could not prepare a verified download",
+    );
+    expect(document.body.textContent).toContain("Open release page");
+    wrapper.unmount();
+  });
+
+  it("keeps automatic update failures quiet and reports manual results", () => {
+    const context = {
+      setUpdateState: vi.fn(),
+      showSuccessSnackbar: vi.fn(),
+      showErrorSnackbar: vi.fn(),
+    };
+
+    App.methods.handleUpdateState.call(context, {
+      status: "error",
+      message: "Network unavailable",
+      manual: false,
+    });
+    expect(context.setUpdateState).toHaveBeenCalledOnce();
+    expect(context.showErrorSnackbar).not.toHaveBeenCalled();
+
+    App.methods.handleUpdateState.call(context, {
+      status: "up-to-date",
+      manual: true,
+    });
+    expect(context.showSuccessSnackbar).toHaveBeenCalledWith(
+      "CATS Configurator is up to date.",
+    );
+
+    App.methods.handleUpdateState.call(context, {
+      status: "error",
+      message: "Network unavailable",
+      manual: true,
+    });
+    expect(context.showErrorSnackbar).toHaveBeenCalledWith(
+      "Network unavailable",
+    );
   });
 
   it("disposes Vega polling and serial subscriptions with the app bar", () => {

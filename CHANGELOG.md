@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 10-08-2026
+
+- Check GitHub automatically for newer stable CATS Configurator releases and
+  expose manual checks from the application footer.
+- Download the correct Windows, macOS, or Linux release asset in the background,
+  verify its GitHub SHA-256 digest, and reveal the cached file for manual
+  installation.
+- Keep installers isolated from the renderer and reject malformed releases,
+  unsafe redirects, oversized files, incomplete downloads, and digest failures.
+
 ## [1.2.1] - 09-08-2026
 
 - Detect a uniquely connected CATS Vega by its USB identity and connect to it

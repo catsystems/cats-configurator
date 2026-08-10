@@ -47,6 +47,17 @@ function subscribe(channel, callback) {
  */
 
 /**
+ * @typedef {object} UpdateState
+ * @property {"idle"|"checking"|"up-to-date"|"downloading"|"ready"|"unsupported"|"error"} status
+ * @property {string} currentVersion Running Configurator version.
+ * @property {string|null} availableVersion Newer stable release when available.
+ * @property {string|null} assetName Validated platform installer filename.
+ * @property {number|null} progress Integer download percentage from 0 to 100.
+ * @property {string|null} message Human-readable status or failure message.
+ * @property {boolean} manual Whether a user explicitly initiated the check.
+ */
+
+/**
  * Narrow renderer API. No Electron primitives or arbitrary channel access are
  * exposed to application code.
  */
@@ -55,6 +66,15 @@ const cats = {
     openExternal: (url) =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_EXTERNAL, url),
     onAlert: (callback) => subscribe(IPC_CHANNELS.APP_ALERT, callback),
+  },
+  updates: {
+    /** @returns {Promise<UpdateState>} */
+    current: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATES_CURRENT),
+    /** @returns {Promise<UpdateState>} */
+    check: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATES_CHECK),
+    reveal: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATES_REVEAL),
+    openRelease: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATES_OPEN_RELEASE),
+    onState: (callback) => subscribe(IPC_CHANNELS.UPDATES_STATE, callback),
   },
   serial: {
     /** @returns {Promise<SerialPortSummary[]>} */

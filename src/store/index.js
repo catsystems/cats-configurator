@@ -20,6 +20,15 @@ export const useAppStore = defineStore("app", {
       color: "success",
       timeout: 3000,
     },
+    updates: {
+      status: "idle",
+      currentVersion: null,
+      availableVersion: null,
+      assetName: null,
+      progress: null,
+      message: null,
+      manual: false,
+    },
     useImperialUnits: false,
   }),
   getters: {
@@ -100,6 +109,10 @@ export const useAppStore = defineStore("app", {
     hideSnackbar() {
       this.snackbar.isVisible = false;
       this.snackbar.message = "";
+    },
+    setUpdateState(state) {
+      if (!state || typeof state !== "object") return;
+      this.updates = { ...this.updates, ...state };
     },
     toggleUnitSystem() {
       this.useImperialUnits = !this.useImperialUnits;

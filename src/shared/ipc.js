@@ -1,6 +1,11 @@
 export const IPC_CHANNELS = Object.freeze({
   APP_ALERT: "app:alert",
   APP_OPEN_EXTERNAL: "app:open-external",
+  UPDATES_CURRENT: "updates:current",
+  UPDATES_CHECK: "updates:check",
+  UPDATES_REVEAL: "updates:reveal",
+  UPDATES_OPEN_RELEASE: "updates:open-release",
+  UPDATES_STATE: "updates:state",
   SERIAL_LIST: "serial:list",
   SERIAL_CONNECT: "serial:connect",
   SERIAL_DISCONNECT: "serial:disconnect",
