@@ -2,6 +2,10 @@ name: CI and release
 
 on:
   push:
+    branches:
+      - main
+    tags:
+      - "*"
   pull_request:
 
 permissions:
