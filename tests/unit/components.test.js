@@ -7,6 +7,7 @@ import Config from "@/views/Config.vue";
 import AppBar from "@/components/AppBar.vue";
 import EditEventActionDialog from "@/components/EditEventActionDialog.vue";
 import AppFooter from "@/components/Footer.vue";
+import FlightLogWorkspace from "@/components/FlightLogWorkspace.vue";
 import Snackbar from "@/components/Snackbar.vue";
 import UnitSwitch from "@/components/UnitSwitch.vue";
 import UpdateDialog from "@/components/UpdateDialog.vue";
@@ -239,5 +240,30 @@ describe("renderer state components", () => {
     expect(wrapper.text()).toContain("LOG");
     expect(wrapper.text()).not.toContain("[object Object]");
     wrapper.unmount();
+  });
+
+  it("clears the previous flight-log session when a new file fails", async () => {
+    const replaceChildren = vi.fn();
+    window.cats = {
+      flightLog: {
+        pathForDroppedFile: vi.fn(() => "C:/logs/broken.cfl"),
+        load: vi.fn().mockRejectedValue(new Error("File is empty")),
+      },
+    };
+    const context = {
+      session: { id: "previous" },
+      flightLog: { flightInfo: [] },
+      fileLoading: false,
+      errorString: "",
+      $refs: { flightLogPlotContainer: { replaceChildren } },
+    };
+
+    await FlightLogWorkspace.methods.loadFlightLog.call(context, {});
+
+    expect(context.session).toBeNull();
+    expect(context.flightLog).toBeNull();
+    expect(context.errorString).toBe("File is empty");
+    expect(replaceChildren).toHaveBeenCalledOnce();
+    expect(context.fileLoading).toBe(false);
   });
 });

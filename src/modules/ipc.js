@@ -254,6 +254,7 @@ export function subscribeListeners(openExternal) {
       session.flightLog,
       path.parse(session.name).name,
       trustedWindow,
+      (destination) => flightLogManager.assertSaveDestination(destination),
     );
   });
   handle(IPC_CHANNELS.FLIGHT_LOG_EXPORT_HTML, async (payload) => {
@@ -269,6 +270,7 @@ export function subscribeListeners(openExternal) {
       payload.useImperialUnits,
       path.parse(session.name).name,
       trustedWindow,
+      (destination) => flightLogManager.assertSaveDestination(destination),
     );
   });
 }

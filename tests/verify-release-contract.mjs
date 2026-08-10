@@ -43,4 +43,9 @@ for (const expected of [
   );
 }
 
+assert.ok(
+  workflow.includes("npm run verify:release-tag"),
+  "release workflow does not validate the tag against the package version",
+);
+
 console.log("Release artifact naming and architecture contract verified.");
