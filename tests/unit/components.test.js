@@ -96,7 +96,7 @@ describe("renderer state components", () => {
     store.setUpdateState({
       status: "ready",
       availableVersion: "1.4.0",
-      assetName: "cats-configurator Setup 1.4.0.exe",
+      assetName: "cats-configurator-Setup-1.4.0.exe",
       message: "Ready",
     });
     await nextTick();

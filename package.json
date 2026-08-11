@@ -72,7 +72,7 @@
     "npmRebuild": false,
     "win": {
       "icon": "build/icon.ico",
-      "artifactName": "${name} Setup ${version}.${ext}",
+      "artifactName": "${name}-Setup-${version}.${ext}",
       "target": [
         "nsis"
       ]

@@ -17,7 +17,7 @@ assert.equal(
 );
 assert.equal(
   packageJson.build.win.artifactName,
-  "${name} Setup ${version}.${ext}",
+  "${name}-Setup-${version}.${ext}",
   "Windows release name no longer matches the updater contract",
 );
 assert.equal(
