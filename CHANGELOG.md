@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 11-08-2026
+
+- Use a GitHub-safe Windows installer filename so the automatic updater can
+  discover and verify the release asset.
+
 ## [1.3.1] - 11-08-2026
 
 - Separate formatted telemetry values from their unit labels for clearer status
