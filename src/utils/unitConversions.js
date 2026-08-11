@@ -204,5 +204,5 @@ export function getDisplayValue(rawValue, paramName, options = {}) {
 
   return excludeLabel
     ? `${convertedValue.toFixed(decimals)}`
-    : `${convertedValue.toFixed(decimals)}${unitLabel}`;
+    : `${convertedValue.toFixed(decimals)} ${unitLabel}`;
 }

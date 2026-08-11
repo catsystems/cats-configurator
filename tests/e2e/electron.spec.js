@@ -71,7 +71,7 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       });
     await expect(page).toHaveTitle("CATS Configurator");
     await expect(page.getByText("Status: Disconnected")).toBeVisible();
-    await expect(page.getByText("App version: 1.3.0")).toBeVisible();
+    await expect(page.getByText("App version: 1.3.1")).toBeVisible();
     await expect(page.getByText("CATS", { exact: true })).toBeVisible();
     await expect(page.getByText("Configurator", { exact: true })).toBeVisible();
     await expect(

@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 11-08-2026
+
+- Separate formatted telemetry values from their unit labels for clearer status
+  readouts and exported plots.
+
 ## [1.3.0] - 10-08-2026
 
 - Check GitHub automatically for newer stable CATS Configurator releases and
