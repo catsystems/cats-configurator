@@ -1,8 +1,10 @@
-# CATS Configurator
+<h1 align="center">CATS Configurator</h1>
 
-<img src="https://github.com/catsystems/cats-docs/blob/main/logo/PNG/logo_with_smile.png" alt="CATS Logo" width="300" height="300">
+<p align="center">
+  <img src="https://github.com/catsystems/cats-docs/blob/main/logo/PNG/logo_with_smile.png" alt="CATS logo" width="200" height="200">
+</p>
 
-_Always land on your paws._
+<p align="center">🐈 <em>Always land on your paws!</em> 🐈‍⬛</p>
 
 CATS Configurator is the cross-platform desktop utility for configuring CATS
 flight computers and inspecting `.cfl` flight logs.
