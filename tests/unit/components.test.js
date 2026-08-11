@@ -20,7 +20,7 @@ describe("renderer state components", () => {
   beforeEach(() => {
     pinia = createPinia();
     setActivePinia(pinia);
-    globalThis.__APP_VERSION__ = "1.3.0";
+    globalThis.__APP_VERSION__ = "1.3.1";
     window.cats = {
       updates: {
         check: vi.fn(),

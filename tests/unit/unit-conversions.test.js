@@ -20,7 +20,19 @@ describe("unit conversions", () => {
   it("formats converted values with their unit", () => {
     expect(
       getDisplayValue(100, "altitude", { numeric: false, decimals: 1 }),
-    ).toBe("328.1ft");
+    ).toBe("328.1 ft");
+    expect(
+      getDisplayValue(9.81, "acceleration", {
+        numeric: false,
+        decimals: 1,
+      }),
+    ).toBe("32.2 ft/s²");
+    expect(
+      getDisplayValue(20, "temperature", {
+        numeric: false,
+        decimals: 0,
+      }),
+    ).toBe("68 °F");
     expect(getDisplayValue(undefined, "altitude")).toBe("-");
   });
 });
