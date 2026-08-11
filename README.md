@@ -53,6 +53,11 @@ CI installs exclusively from `package-lock.json`, runs lint, formatting, tests,
 and security gates, then packages each platform. Tags publish the four native
 artifacts as one GitHub release.
 
+See the [Code signing policy](CODE_SIGNING_POLICY.md) for release provenance,
+maintainer roles, privacy information, and uninstall instructions.
+
 ## Open source
 
-All CATS code is open source and can be used free of charge without warranty.
+CATS Configurator is licensed under the
+[GNU General Public License v3](LICENSE) and can be used free of charge without
+warranty.
