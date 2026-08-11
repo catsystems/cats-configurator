@@ -5,7 +5,7 @@ import packageJson from "../package.json" with { type: "json" };
 
 function expectedUpdateAssetName(platform, arch, version) {
   if (platform === "win32" && arch === "x64") {
-    return `cats-configurator Setup ${version}.exe`;
+    return `cats-configurator-Setup-${version}.exe`;
   }
   if (platform === "darwin" && ["x64", "arm64"].includes(arch)) {
     return `cats-configurator-${version}-${arch}.dmg`;

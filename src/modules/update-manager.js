@@ -42,7 +42,8 @@ function normalizeStableVersion(tagName) {
 
 export function expectedUpdateAssetName(platform, arch, version) {
   if (platform === "win32" && arch === "x64") {
-    return `cats-configurator Setup ${version}.exe`;
+    // GitHub normalizes spaces in uploaded asset filenames, so keep this URL-safe.
+    return `cats-configurator-Setup-${version}.exe`;
   }
   if (platform === "darwin" && ["x64", "arm64"].includes(arch)) {
     return `cats-configurator-${version}-${arch}.dmg`;

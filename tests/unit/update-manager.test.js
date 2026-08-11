@@ -114,7 +114,7 @@ afterEach(async () => {
 describe("update release validation", () => {
   it("locks the supported platform asset names", () => {
     expect(expectedUpdateAssetName("win32", "x64", "1.4.0")).toBe(
-      "cats-configurator Setup 1.4.0.exe",
+      "cats-configurator-Setup-1.4.0.exe",
     );
     expect(expectedUpdateAssetName("darwin", "x64", "1.4.0")).toBe(
       "cats-configurator-1.4.0-x64.dmg",
