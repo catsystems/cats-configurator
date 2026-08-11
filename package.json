@@ -57,7 +57,7 @@
     "vuetify": "^4.1.8"
   },
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=24.15 <25"
   },
   "build": {
     "appId": "com.cats.cats-configurator",

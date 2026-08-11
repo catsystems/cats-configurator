@@ -9,7 +9,7 @@ flight computers and inspecting `.cfl` flight logs.
 
 ## Requirements
 
-- Node.js 24 LTS
+- Node.js 24.15 or newer (within Node.js 24 LTS)
 - npm 11 or newer
 - A supported CATS device for hardware validation
 
