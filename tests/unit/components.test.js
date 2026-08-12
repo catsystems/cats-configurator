@@ -8,6 +8,7 @@ import AppBar from "@/components/AppBar.vue";
 import EditEventActionDialog from "@/components/EditEventActionDialog.vue";
 import AppFooter from "@/components/Footer.vue";
 import FlightLogWorkspace from "@/components/FlightLogWorkspace.vue";
+import Profiles from "@/views/Profiles.vue";
 import Snackbar from "@/components/Snackbar.vue";
 import UnitSwitch from "@/components/UnitSwitch.vue";
 import UpdateDialog from "@/components/UpdateDialog.vue";
@@ -239,6 +240,63 @@ describe("renderer state components", () => {
     expect(selects[1].props("itemValue")).toBe("value");
     expect(wrapper.text()).toContain("LOG");
     expect(wrapper.text()).not.toContain("[object Object]");
+    wrapper.unmount();
+  });
+
+  it("renders profile differences and reports per-field apply results", async () => {
+    const profile = {
+      source: { boardModel: "CATS Vega", firmwareVersion: "3.0.2" },
+      schemaVersion: 1,
+      createdAt: "2026-08-12T08:00:00.000Z",
+    };
+    const changedRow = {
+      key: "main_altitude",
+      section: "Configuration",
+      label: "Main Altitude",
+      boardValue: 200,
+      profileValue: 300,
+      status: "changed",
+    };
+    window.cats = {
+      profiles: {
+        open: vi.fn().mockResolvedValue({
+          canceled: false,
+          profile,
+          rows: [changedRow],
+          compatibility: {
+            warnings: [],
+            canApply: true,
+            changedCount: 1,
+          },
+        }),
+        apply: vi.fn().mockResolvedValue({
+          ok: true,
+          rows: [{ ...changedRow, boardValue: 300, status: "same" }],
+          compatibility: {
+            warnings: [],
+            canApply: true,
+            changedCount: 0,
+          },
+          results: [{ key: "main_altitude", status: "verified" }],
+        }),
+      },
+    };
+    const wrapper = mount(Profiles, {
+      global: { plugins: [pinia, vuetify] },
+    });
+
+    await wrapper.vm.openProfile();
+    await nextTick();
+    expect(wrapper.text()).toContain("Main Altitude");
+    expect(wrapper.text()).toContain("1 field will change");
+
+    await wrapper.vm.applyProfile();
+    await nextTick();
+    expect(window.cats.profiles.apply).toHaveBeenCalledWith(profile);
+    expect(wrapper.text()).toContain("verified");
+    expect(useAppStore().snackbar.message).toBe(
+      "Profile applied and verified.",
+    );
     wrapper.unmount();
   });
 

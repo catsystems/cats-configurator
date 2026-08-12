@@ -25,6 +25,12 @@ const routes = [
     component: () => import("../views/Timers.vue"),
   },
   {
+    path: "/profiles",
+    name: "Profiles",
+    meta: { requiresBoard: true },
+    component: () => import("../views/Profiles.vue"),
+  },
+  {
     path: "/flight-logs",
     name: "FlightLogs",
     component: () => import("../views/FlightLogs.vue"),

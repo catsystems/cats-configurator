@@ -101,3 +101,15 @@ export const EVENT_KEYS = [
   "ev_custom2",
 ];
 export const LOG_KEYS = ["rec_speed", "rec_elements"];
+
+export const CONFIG_KEYS = Object.keys(CONFIG_SETTINGS);
+export const TIMER_FIELDS = ["start", "duration", "trigger"];
+export const TIMER_CONFIG_KEYS = TIMER_KEYS.flatMap((timer) =>
+  TIMER_FIELDS.map((field) => `${timer}_${field}`),
+);
+export const PROFILE_BOARD_KEYS = [
+  ...CONFIG_KEYS,
+  ...EVENT_KEYS,
+  ...TIMER_CONFIG_KEYS,
+  ...LOG_KEYS,
+];
