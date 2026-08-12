@@ -393,6 +393,35 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await expect(page.getByText("test> status")).toBeVisible();
     await expect(page.getByText("test> status")).toHaveCount(1);
 
+    await commandInput.fill("get timer4_duration");
+    await commandInput.press("Enter");
+    await expect(page.getByText("test> get timer4_duration")).toBeVisible();
+    await commandInput.press("ArrowUp");
+    await expect(commandInput).toHaveValue("get timer4_duration");
+    await commandInput.press("ArrowUp");
+    await expect(commandInput).toHaveValue("status");
+    await commandInput.press("ArrowDown");
+    await expect(commandInput).toHaveValue("get timer4_duration");
+    await commandInput.press("ArrowDown");
+    await expect(commandInput).toHaveValue("");
+
+    await commandInput.fill("stat");
+    await commandInput.press("Control+r");
+    await expect(commandInput).toHaveValue("status");
+
+    await page.evaluate(() => {
+      window.location.hash = "#/config";
+    });
+    await expect(page).toHaveURL(/#\/config$/);
+    await page.evaluate(() => {
+      window.location.hash = "#/cli";
+    });
+    const restoredCommandInput = page.getByPlaceholder(
+      "Write your command here",
+    );
+    await restoredCommandInput.press("ArrowUp");
+    await expect(restoredCommandInput).toHaveValue("get timer4_duration");
+
     expect(pageErrors).toEqual([]);
     expect(consoleErrors).toEqual([]);
     expect(remoteRequests).toEqual([]);
