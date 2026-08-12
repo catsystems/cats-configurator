@@ -22,12 +22,12 @@ assert.equal(
 );
 assert.equal(
   packageJson.author,
-  "CATS Systems",
+  "Control and Telemetry Systems GmbH",
   "company name no longer matches the signing metadata contract",
 );
 assert.equal(
   packageJson.build.copyright,
-  "Copyright © 2026 CATS Systems",
+  "Copyright © 2026 Control and Telemetry Systems GmbH",
   "copyright no longer matches the signing metadata contract",
 );
 assert.equal(

@@ -22,11 +22,17 @@ build configuration in this repository under the
 ## Team roles
 
 - Authors and committers:
-  [Nemanja Stojoski (@stojadin2701)](https://github.com/stojadin2701)
+  [Nemanja Stojoski (@stojadin2701)](https://github.com/stojadin2701),
+  [Luca Jost (@l-jost)](https://github.com/l-jost), and
+  [Jonas Binz (@jbinz)](https://github.com/jbinz)
 - Reviewers:
-  [Nemanja Stojoski (@stojadin2701)](https://github.com/stojadin2701)
+  [Nemanja Stojoski (@stojadin2701)](https://github.com/stojadin2701),
+  [Luca Jost (@l-jost)](https://github.com/l-jost), and
+  [Jonas Binz (@jbinz)](https://github.com/jbinz)
 - Signing approvers:
-  [Nemanja Stojoski (@stojadin2701)](https://github.com/stojadin2701)
+  [Nemanja Stojoski (@stojadin2701)](https://github.com/stojadin2701),
+  [Luca Jost (@l-jost)](https://github.com/l-jost), and
+  [Jonas Binz (@jbinz)](https://github.com/jbinz)
 - Contributions from people who do not have commit access are reviewed before
   they are merged.
 - Additional people will be listed here before they receive a signing role.
