@@ -37,6 +37,7 @@ export default {
         { title: "Configuration", link: "/config", requiresBoard: true },
         { title: "Events", link: "/events", requiresBoard: true },
         { title: "Timers", link: "/timer", requiresBoard: true },
+        { title: "Profiles", link: "/profiles", requiresBoard: true },
         { title: "CLI", link: "/cli", requiresBoard: true },
         { title: "Flight Logs", link: "/flight-logs", requiresBoard: false },
       ],

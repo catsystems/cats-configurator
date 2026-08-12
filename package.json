@@ -26,6 +26,7 @@
     "verify:packaged-artifact": "node tests/verify-packaged-artifact.mjs",
     "test:hardware": "node tests/hardware/vega-smoke.mjs",
     "test:hardware:transaction": "node tests/hardware/vega-transaction.mjs",
+    "test:hardware:profile": "node tests/hardware/vega-profile.mjs",
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
