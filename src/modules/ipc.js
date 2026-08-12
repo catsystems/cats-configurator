@@ -1,4 +1,4 @@
-import { dialog, ipcMain } from "electron";
+import { app, dialog, ipcMain } from "electron";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
@@ -17,13 +17,20 @@ import {
 } from "./flightlog.js";
 import {
   applyConfiguration,
+  applyConfigurationProfile,
   cliCommand,
   command,
   connect,
   disconnect,
   getList,
+  readBoardSnapshot,
   restoreBoardConfiguration,
 } from "./serial.js";
+import {
+  compareConfigurationProfile,
+  createConfigurationProfile,
+  validateConfigurationProfile,
+} from "../shared/configuration-profile.js";
 import { FlightLogManager } from "./flight-log-manager.js";
 import { startFlightLogHandoff } from "./flight-log-handoff.js";
 import {
@@ -38,6 +45,7 @@ let registered = false;
 let openExternalUrl;
 let activeHandoff;
 const flightLogManager = new FlightLogManager();
+const MAX_PROFILE_BYTES = 1024 * 1024;
 
 export function setIpcWindow(window) {
   trustedWindow = window;
@@ -128,6 +136,54 @@ async function openFlightLogInFlights(sessionId) {
   return { id: handoff.id, status: "waiting" };
 }
 
+async function exportConfigurationProfile() {
+  const date = new Date().toISOString().slice(0, 10);
+  const selection = await dialog.showSaveDialog(trustedWindow, {
+    title: "Export CATS configuration profile",
+    defaultPath: `cats-vega-profile-${date}.json`,
+    filters: [{ name: "CATS configuration profile", extensions: ["json"] }],
+  });
+  if (selection.canceled || !selection.filePath) return { canceled: true };
+  const profile = createConfigurationProfile(await readBoardSnapshot(), {
+    appVersion: app.getVersion(),
+  });
+  await fs.writeFile(
+    selection.filePath,
+    `${JSON.stringify(profile, null, 2)}\n`,
+  );
+  return { canceled: false, profile };
+}
+
+async function openConfigurationProfile() {
+  const selection = await dialog.showOpenDialog(trustedWindow, {
+    title: "Open CATS configuration profile",
+    properties: ["openFile"],
+    filters: [{ name: "CATS configuration profile", extensions: ["json"] }],
+  });
+  if (selection.canceled || selection.filePaths.length === 0) {
+    return { canceled: true };
+  }
+  const filePath = selection.filePaths[0];
+  const stats = await fs.stat(filePath);
+  if (stats.size > MAX_PROFILE_BYTES) {
+    throw new Error("Configuration profile is larger than 1 MB.");
+  }
+  let profile;
+  try {
+    profile = JSON.parse(await fs.readFile(filePath, "utf8"));
+  } catch (error) {
+    throw new Error("Configuration profile is not valid JSON.", {
+      cause: error,
+    });
+  }
+  validateConfigurationProfile(profile);
+  const comparison = compareConfigurationProfile(
+    profile,
+    await readBoardSnapshot(),
+  );
+  return { canceled: false, profile, ...comparison };
+}
+
 export function subscribeListeners(openExternal) {
   if (registered) return;
   registered = true;
@@ -192,6 +248,12 @@ export function subscribeListeners(openExternal) {
   handle(IPC_CHANNELS.BOARD_RESTORE, () => restoreBoardConfiguration());
   handle(IPC_CHANNELS.BOARD_RESET, () => command("defaults"));
   handle(IPC_CHANNELS.BOARD_SAVE, () => command("save"));
+  handle(IPC_CHANNELS.PROFILE_EXPORT, exportConfigurationProfile);
+  handle(IPC_CHANNELS.PROFILE_OPEN, openConfigurationProfile);
+  handle(IPC_CHANNELS.PROFILE_APPLY, (profile) => {
+    validateConfigurationProfile(profile);
+    return applyConfigurationProfile(profile);
+  });
 
   handle(IPC_CHANNELS.FLIGHT_LOG_LOAD, loadFlightLog);
   handle(IPC_CHANNELS.FLIGHT_LOG_CURRENT, () =>

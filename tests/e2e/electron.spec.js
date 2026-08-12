@@ -333,6 +333,19 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       "rgb(255, 167, 38)",
     );
 
+    await page.evaluate(() => {
+      window.location.hash = "#/profiles";
+    });
+    await expect(
+      page.getByText("Configuration Profiles", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Export Board Profile" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Open Profile" }),
+    ).toBeVisible();
+
     for (const route of ["/cli", "/config", "/cli"]) {
       await page.evaluate((path) => {
         window.location.hash = `#${path}`;

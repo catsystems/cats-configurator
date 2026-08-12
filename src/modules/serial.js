@@ -13,6 +13,12 @@ import {
   parseData,
   parsePromptCommand,
 } from "./serial-parser.js";
+import { PROFILE_BOARD_KEYS } from "./settings.js";
+import {
+  changedProfileEntries,
+  compareConfigurationProfile,
+  parseBoardIdentity,
+} from "../shared/configuration-profile.js";
 import { IPC_CHANNELS } from "../shared/ipc.js";
 
 const CONFIG = { baudRate: 115200 };
@@ -507,6 +513,81 @@ async function applyConfiguration(entries) {
   return result;
 }
 
+async function readBoardSnapshot() {
+  return requireCommandEngine().transaction(async (execute) => {
+    const version = await execute("version");
+    const values = {};
+    const unsupportedKeys = [];
+
+    for (const key of PROFILE_BOARD_KEYS) {
+      try {
+        const response = await execute(`get ${key}`);
+        values[key] = parseConfigResponse(response.output).value;
+      } catch (error) {
+        if (
+          error instanceof BoardCommandError &&
+          /invalid name/i.test(error.message)
+        ) {
+          unsupportedKeys.push(key);
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    return {
+      board: parseBoardIdentity(version.output),
+      values,
+      unsupportedKeys,
+    };
+  });
+}
+
+async function applyConfigurationProfile(profile) {
+  const before = await readBoardSnapshot();
+  const comparison = compareConfigurationProfile(profile, before);
+  if (comparison.compatibility.blocked) {
+    throw new Error(
+      comparison.compatibility.warnings
+        .filter(({ severity }) => severity === "error")
+        .map(({ message }) => message)
+        .join(" "),
+    );
+  }
+
+  const entries = changedProfileEntries(comparison);
+  const transaction = entries.length
+    ? await applyConfiguration(entries)
+    : { ok: true, saved: false, results: [] };
+  const transactionResults = new Map(
+    transaction.results.map((result) => [result.key, result]),
+  );
+  const results = comparison.rows.map((row) => {
+    if (row.status === "same") return { key: row.key, status: "unchanged" };
+    if (row.status !== "changed") return { key: row.key, status: row.status };
+    return (
+      transactionResults.get(row.key) ?? {
+        key: row.key,
+        status: "pending",
+      }
+    );
+  });
+
+  let refreshedComparison = comparison;
+  if (transaction.ok && entries.length) {
+    refreshedComparison = compareConfigurationProfile(
+      profile,
+      await readBoardSnapshot(),
+    );
+  }
+  return {
+    ok: transaction.ok,
+    saved: transaction.saved,
+    results,
+    ...refreshedComparison,
+  };
+}
+
 async function restoreBoardConfiguration() {
   const selection = await dialog.showOpenDialog(mainWindow, {
     properties: ["openFile"],
@@ -548,11 +629,13 @@ function sendToRenderer(channel, message) {
 
 export {
   applyConfiguration,
+  applyConfigurationProfile,
   cliCommand,
   command,
   connect,
   disconnect,
   getList,
+  readBoardSnapshot,
   restoreBoardConfiguration,
   setSerialWindow,
 };
