@@ -31,6 +31,7 @@ import {
   createConfigurationProfile,
   validateConfigurationProfile,
 } from "../shared/configuration-profile.js";
+import { buildPreflightReport } from "../shared/preflight.js";
 import { FlightLogManager } from "./flight-log-manager.js";
 import { startFlightLogHandoff } from "./flight-log-handoff.js";
 import {
@@ -254,6 +255,9 @@ export function subscribeListeners(openExternal) {
     validateConfigurationProfile(profile);
     return applyConfigurationProfile(profile);
   });
+  handle(IPC_CHANNELS.PREFLIGHT_RUN, async () =>
+    buildPreflightReport(await readBoardSnapshot()),
+  );
 
   handle(IPC_CHANNELS.FLIGHT_LOG_LOAD, loadFlightLog);
   handle(IPC_CHANNELS.FLIGHT_LOG_CURRENT, () =>
