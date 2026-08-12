@@ -96,7 +96,12 @@
         </v-row>
       </v-form>
     </v-container>
-    <ActionsBar :saving="saveLoading" @refresh="init" @save="onSave" />
+    <ActionsBar
+      :saving="saveLoading"
+      :changed="changedTab === 'timers'"
+      @refresh="init"
+      @save="onSave"
+    />
   </div>
 </template>
 
@@ -162,11 +167,11 @@ export default {
     async onSave() {
       const { valid } = await this.$refs.form.validate();
       if (!valid) return;
-      const dataCopy = structuredClone(this.data);
-      for (const key of this.timerKeys) delete dataCopy[`${key}_active`];
       this.saveLoading = true;
       try {
-        await setTimers(dataCopy);
+        const dataCopy = JSON.parse(JSON.stringify(this.data));
+        for (const key of this.timerKeys) delete dataCopy[`${key}_active`];
+        await setTimers(dataCopy, this.timers);
         await getTimers();
       } catch (error) {
         this.showErrorSnackbar(error.message);

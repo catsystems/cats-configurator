@@ -7,9 +7,10 @@ export function getConfigs() {
   );
 }
 
-export function setConfigs(data) {
+export function setConfigs(data, original = {}) {
   const entries = Object.keys(CONFIG_SETTINGS)
     .filter((key) => key in data)
+    .filter((key) => data[key].value !== original[key]?.value)
     .map((key) => ({ key, value: data[key].value }));
   return applyBoardValues(entries);
 }

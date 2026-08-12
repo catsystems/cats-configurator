@@ -1,4 +1,5 @@
 export async function applyBoardValues(entries) {
+  if (entries.length === 0) return { ok: true, saved: false, results: [] };
   const result = await window.cats.board.applyConfig(entries);
   if (result?.ok) return result;
 

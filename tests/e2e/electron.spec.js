@@ -333,6 +333,16 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       "rgb(255, 167, 38)",
     );
 
+    const timerDuration = page.locator('input[type="number"]').first();
+    await timerDuration.fill("1200");
+    await expect(configurationLink).toHaveAttribute("aria-disabled", "true");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(timerDuration).toHaveValue("1200");
+    await expect(configurationLink).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
     await page.evaluate(() => {
       window.location.hash = "#/profiles";
     });
@@ -360,6 +370,10 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     });
     await expect(page.getByText("Recording", { exact: true })).toBeVisible();
     await expect(page.getByText("Elements", { exact: true })).toBeVisible();
+    await expect(configurationLink).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
 
     for (const route of ["/cli", "/config", "/cli"]) {
       await page.evaluate((path) => {

@@ -73,8 +73,15 @@ export function assertBoardValue(value) {
   if (!["string", "number", "boolean"].includes(typeof value)) {
     throw new TypeError("Board value must be a string, number, or boolean.");
   }
-  if (typeof value === "string" && /[\r\n]/.test(value)) {
-    throw new TypeError("Board value must fit on one line.");
+  if (typeof value === "number" && !Number.isFinite(value)) {
+    throw new TypeError("Board number must be finite.");
+  }
+  if (typeof value === "string") {
+    if (!value.length || value.length > 512 || /[\r\n#]/.test(value)) {
+      throw new TypeError(
+        "Board value must be a non-empty single line without # characters.",
+      );
+    }
   }
   return value;
 }

@@ -59,10 +59,11 @@
 
           <div class="d-flex align-center mb-3">
             <div class="text-body-2">
-              {{ compatibility.changedCount }} field{{
+              {{ compatibility.changedCount }} profile value{{
                 compatibility.changedCount === 1 ? "" : "s"
               }}
-              will change.
+              {{ compatibility.changedCount === 1 ? "differs" : "differ" }}
+              from the board.
             </div>
             <v-spacer />
             <v-btn
@@ -73,7 +74,7 @@
               :loading="applyLoading"
               @click="applyProfile"
             >
-              Apply Changed Fields
+              Apply Profile to Board
             </v-btn>
           </div>
 
@@ -97,9 +98,11 @@
                     {{ row.key }}
                   </div>
                 </td>
-                <td class="profile-value">{{ formatValue(row.boardValue) }}</td>
                 <td class="profile-value">
-                  {{ formatValue(row.profileValue) }}
+                  {{ formatValue(row.key, row.boardValue) }}
+                </td>
+                <td class="profile-value">
+                  {{ formatValue(row.key, row.profileValue) }}
                 </td>
                 <td>
                   <v-chip :color="statusColor(row.status)" size="small">
@@ -129,6 +132,7 @@
 <script>
 import { mapActions } from "pinia";
 import { useAppStore } from "@/store";
+import { formatProfileValue } from "@/shared/configuration-profile.js";
 
 export default {
   name: "ProfilesView",
@@ -180,7 +184,8 @@ export default {
     async applyProfile() {
       this.applyLoading = true;
       try {
-        const result = await window.cats.profiles.apply(this.profile);
+        const profile = JSON.parse(JSON.stringify(this.profile));
+        const result = await window.cats.profiles.apply(profile);
         this.rows = result.rows;
         this.compatibility = result.compatibility;
         this.applyResults = Object.fromEntries(
@@ -189,7 +194,14 @@ export default {
         if (result.ok) {
           this.showSuccessSnackbar("Profile applied and verified.");
         } else {
-          this.showErrorSnackbar("Profile was not fully applied.");
+          const failed = result.results.find(({ status }) =>
+            ["failed", "mismatch"].includes(status),
+          );
+          const row = this.rows.find(({ key }) => key === failed?.key);
+          const detail = failed
+            ? `${row?.label || failed.key}: ${failed.message || failed.status}`
+            : "The board did not verify every value.";
+          this.showErrorSnackbar(`Profile was not fully applied. ${detail}`);
         }
       } catch (error) {
         this.showErrorSnackbar(error.message);
@@ -201,9 +213,8 @@ export default {
       const date = new Date(value);
       return Number.isNaN(date.valueOf()) ? value : date.toLocaleString();
     },
-    formatValue(value) {
-      if (value === null || value === undefined) return "—";
-      return String(value);
+    formatValue(key, value) {
+      return formatProfileValue(key, value);
     },
     statusLabel(status) {
       return String(status).replaceAll("_", " ");

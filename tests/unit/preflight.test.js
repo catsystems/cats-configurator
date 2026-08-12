@@ -112,6 +112,14 @@ describe("guided preflight and event simulation", () => {
     ).toMatchObject({ status: "warning" });
   });
 
+  it("does not treat reserved logging bits as recorded flight data", () => {
+    const report = buildPreflightReport(safeSnapshot({ rec_elements: 98304 }));
+    expect(report.checks.find(({ id }) => id === "recording")).toMatchObject({
+      status: "blocked",
+      title: "Flight recording is not armed",
+    });
+  });
+
   it("decodes event actions and places active timers in the timeline", () => {
     expect(parseConfiguredActions("1,500,7,2")).toMatchObject([
       { name: "Delay", value: 500 },
