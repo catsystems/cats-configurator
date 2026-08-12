@@ -134,6 +134,8 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           name: CATS Configurator ${{ github.ref_name }}
+          body: |
+            [Code signing policy](https://github.com/catsystems/cats-configurator/blob/main/CODE_SIGNING_POLICY.md)
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: release-artifacts/*

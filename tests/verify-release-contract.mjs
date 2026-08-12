@@ -16,6 +16,26 @@ assert.equal(
   "root lockfile metadata must match the package version",
 );
 assert.equal(
+  packageJson.productName,
+  "CATS Configurator",
+  "product name no longer matches the signing metadata contract",
+);
+assert.equal(
+  packageJson.author,
+  "Control and Telemetry Systems GmbH",
+  "company name no longer matches the signing metadata contract",
+);
+assert.equal(
+  packageJson.build.copyright,
+  "Copyright © 2026 Control and Telemetry Systems GmbH",
+  "copyright no longer matches the signing metadata contract",
+);
+assert.equal(
+  packageJson.build.win.executableName,
+  "CATS Configurator",
+  "Windows executable name no longer matches the signing metadata contract",
+);
+assert.equal(
   packageJson.build.win.artifactName,
   "${name}-Setup-${version}.${ext}",
   "Windows release name no longer matches the updater contract",
@@ -46,6 +66,10 @@ for (const expected of [
 assert.ok(
   workflow.includes("npm run verify:release-tag"),
   "release workflow does not validate the tag against the package version",
+);
+assert.ok(
+  workflow.includes("CODE_SIGNING_POLICY.md"),
+  "generated release notes do not link to the code signing policy",
 );
 
 console.log("Release artifact naming and architecture contract verified.");

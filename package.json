@@ -1,8 +1,9 @@
 {
   "name": "cats-configurator",
+  "productName": "CATS Configurator",
   "version": "1.3.2",
   "description": "Desktop configuration and flight-log analysis utility for CATS flight computers.",
-  "author": "CATS Systems",
+  "author": "Control and Telemetry Systems GmbH",
   "private": true,
   "main": "out/main/background.js",
   "scripts": {
@@ -61,6 +62,7 @@
   },
   "build": {
     "appId": "com.cats.cats-configurator",
+    "copyright": "Copyright © 2026 Control and Telemetry Systems GmbH",
     "directories": {
       "buildResources": "build",
       "output": "builds"
@@ -72,6 +74,7 @@
     "npmRebuild": false,
     "win": {
       "icon": "build/icon.ico",
+      "executableName": "CATS Configurator",
       "artifactName": "${name}-Setup-${version}.${ext}",
       "target": [
         "nsis"
