@@ -79,6 +79,20 @@ describe("serial board identification", () => {
     });
   });
 
+  function respond(command, output) {
+    serialState.parser.emit("data", `^._.^:/> ${command}`);
+    output.forEach((line) => serialState.parser.emit("data", line));
+    serialState.parser.emit("data", "^._.^:/>");
+  }
+
+  async function identify(port) {
+    port.openSuccessfully();
+    respond("version", ["Board: CATS Vega", "Firmware: test"]);
+    await vi.waitFor(() =>
+      expect(sent).toContainEqual([IPC_CHANNELS.BOARD_ACTIVE, true]),
+    );
+  }
+
   it("times out and closes a silent serial device", async () => {
     serial.connect("COM4");
     const port = serialState.instances[0];
@@ -97,9 +111,7 @@ describe("serial board identification", () => {
   it("accepts a CATS version response and cancels the timeout", async () => {
     serial.connect("COM4");
     const port = serialState.instances[0];
-    port.openSuccessfully();
-    serialState.parser.emit("data", "version");
-    serialState.parser.emit("data", "Board: CATS Vega\nFirmware: test");
+    await identify(port);
 
     await vi.advanceTimersByTimeAsync(5000);
 
@@ -115,18 +127,19 @@ describe("serial board identification", () => {
     serial.disconnect();
   });
 
-  it("rejects and closes a responsive non-CATS device", () => {
+  it("rejects and closes a responsive non-CATS device", async () => {
     serial.connect("COM4");
     const port = serialState.instances[0];
     port.openSuccessfully();
-    serialState.parser.emit("data", "version");
-    serialState.parser.emit("data", "Board: Other");
+    respond("version", ["Board: Other"]);
 
-    expect(sent).toContainEqual([
-      IPC_CHANNELS.SERIAL_ERROR,
-      "The selected serial device is not a CATS flight computer.",
-    ]);
-    expect(port.isOpen).toBe(false);
+    await vi.waitFor(() => {
+      expect(sent).toContainEqual([
+        IPC_CHANNELS.SERIAL_ERROR,
+        "The selected serial device is not a CATS flight computer.",
+      ]);
+      expect(port.isOpen).toBe(false);
+    });
   });
 
   it("closes an errored connection and cancels identification", async () => {
@@ -149,5 +162,54 @@ describe("serial board identification", () => {
           message.includes("did not respond"),
       ),
     ).toBe(false);
+  });
+
+  it("writes, saves, and verifies timer 4 as one transaction", async () => {
+    serial.connect("COM4");
+    const port = serialState.instances[0];
+    await identify(port);
+
+    const transaction = serial.applyConfiguration([
+      { key: "timer4_start", value: "LIFTOFF" },
+      { key: "timer4_duration", value: 1000 },
+      { key: "timer4_trigger", value: "APOGEE" },
+    ]);
+
+    for (const [command, output] of [
+      ["set timer4_start = LIFTOFF", ["timer4_start set to LIFTOFF"]],
+      ["set timer4_duration = 1000", ["timer4_duration set to 1000"]],
+      ["set timer4_trigger = APOGEE", ["timer4_trigger set to APOGEE"]],
+      ["save", ["Successfully written to flash"]],
+      [
+        "get timer4_start",
+        ["timer4_start = LIFTOFF", "Allowed values: READY, LIFTOFF, APOGEE"],
+      ],
+      [
+        "get timer4_duration",
+        ["timer4_duration = 1000", "Allowed range: 0 - 60000"],
+      ],
+      [
+        "get timer4_trigger",
+        ["timer4_trigger = APOGEE", "Allowed values: READY, LIFTOFF, APOGEE"],
+      ],
+    ]) {
+      await vi.waitFor(() =>
+        expect(port.write).toHaveBeenCalledWith(
+          `${command}\n`,
+          expect.any(Function),
+        ),
+      );
+      respond(command, output);
+    }
+
+    await expect(transaction).resolves.toMatchObject({
+      ok: true,
+      saved: true,
+      results: [
+        { key: "timer4_start", status: "verified" },
+        { key: "timer4_duration", status: "verified" },
+        { key: "timer4_trigger", status: "verified" },
+      ],
+    });
   });
 });

@@ -4,15 +4,21 @@ import {
   parseAllowedRange,
   parseAllowedValues,
   parseCommand,
+  parseConfigResponse,
   parseConfigValue,
   parseData,
   parseEventData,
+  parsePromptCommand,
 } from "@/modules/serial-parser.js";
 
 describe("serial response parsing", () => {
   it("normalizes command confirmations", () => {
     expect(parseCommand("^._.^ > GET main_altitude")).toBe("get_main_altitude");
     expect(parseCommand("not a prompt")).toBeUndefined();
+    expect(parsePromptCommand("^._.^:/> set timer4_duration = 1000")).toBe(
+      "set timer4_duration = 1000",
+    );
+    expect(parsePromptCommand("^._.^:/> ")).toBe("");
   });
 
   it("parses configuration metadata, including negative ranges", () => {
@@ -36,6 +42,27 @@ describe("serial response parsing", () => {
     expect(parseData("status", "Ready\nNominal\n")).toEqual({
       key: "status",
       value: ["Ready", "Nominal"],
+    });
+  });
+
+  it("parses a complete configuration response", () => {
+    expect(
+      parseConfigResponse([
+        "timer4_duration = 1000",
+        "Allowed range: 0 - 60000",
+      ]),
+    ).toEqual({
+      key: "timer4_duration",
+      value: 1000,
+      type: "NUMBER",
+      allowedRange: [0, 60000],
+    });
+    expect(
+      parseConfigResponse(["ev_apogee = 2,1,7,2", "Array length: 8"]),
+    ).toMatchObject({
+      key: "ev_apogee",
+      type: "EVENT",
+      values: [2, 1, 7, 2],
     });
   });
 });

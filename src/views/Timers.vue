@@ -96,7 +96,7 @@
         </v-row>
       </v-form>
     </v-container>
-    <ActionsBar @refresh="init" @save="onSave" />
+    <ActionsBar :saving="saveLoading" @refresh="init" @save="onSave" />
   </div>
 </template>
 
@@ -116,6 +116,7 @@ export default {
     return {
       timerKeys: TIMER_KEYS,
       data: {},
+      saveLoading: false,
     };
   },
   watch: {
@@ -144,7 +145,7 @@ export default {
     this.init();
   },
   methods: {
-    ...mapActions(useAppStore, ["setChangedTab"]),
+    ...mapActions(useAppStore, ["setChangedTab", "showErrorSnackbar"]),
     init() {
       getTimers();
     },
@@ -161,14 +162,17 @@ export default {
     async onSave() {
       const { valid } = await this.$refs.form.validate();
       if (!valid) return;
-      // TODO fix this later
       const dataCopy = structuredClone(this.data);
       for (const key of this.timerKeys) delete dataCopy[`${key}_active`];
-      setTimers(dataCopy);
-
-      setTimeout(function () {
-        getTimers();
-      }, 100);
+      this.saveLoading = true;
+      try {
+        await setTimers(dataCopy);
+        await getTimers();
+      } catch (error) {
+        this.showErrorSnackbar(error.message);
+      } finally {
+        this.saveLoading = false;
+      }
     },
     getEventName(key) {
       let name = key.split("");

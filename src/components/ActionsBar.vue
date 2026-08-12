@@ -2,8 +2,12 @@
   <v-sheet class="actions-bar d-flex align-center px-4" elevation="4">
     <v-spacer></v-spacer>
     <div>
-      <v-btn class="mr-2" @click="$emit('refresh')"> Refresh </v-btn>
-      <v-btn color="primary" @click="$emit('save')"> Save </v-btn>
+      <v-btn class="mr-2" :disabled="saving" @click="$emit('refresh')">
+        Refresh
+      </v-btn>
+      <v-btn color="primary" :loading="saving" @click="$emit('save')">
+        Save
+      </v-btn>
     </div>
   </v-sheet>
 </template>
@@ -11,6 +15,9 @@
 <script>
 export default {
   name: "ActionsBar",
+  props: {
+    saving: Boolean,
+  },
   emits: ["refresh", "save"],
 };
 </script>

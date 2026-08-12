@@ -83,7 +83,7 @@
         </v-col>
       </v-row>
     </v-container>
-    <ActionsBar @refresh="init" @save="onSave" />
+    <ActionsBar :saving="saveLoading" @refresh="init" @save="onSave" />
   </div>
 </template>
 
@@ -106,6 +106,7 @@ export default {
       recElements: [],
       elementsSize: 0,
       logElements: LOG_ELEMENTS,
+      saveLoading: false,
     };
   },
   watch: {
@@ -180,7 +181,7 @@ export default {
     this.init();
   },
   methods: {
-    ...mapActions(useAppStore, ["setChangedTab"]),
+    ...mapActions(useAppStore, ["setChangedTab", "showErrorSnackbar"]),
     init() {
       getLogInfo();
       getLogData();
@@ -197,14 +198,21 @@ export default {
       const sizes = this.recElements.map((element) => element.size);
       this.elementsSize = sizes.reduce((pv, cv) => pv + cv, 0);
     },
-    onSave() {
+    async onSave() {
       const data = {
         speed: this.rec_speed,
         elements: this.rec_elements,
       };
 
-      setLogData(data);
-      getLogData();
+      this.saveLoading = true;
+      try {
+        await setLogData(data);
+        await getLogData();
+      } catch (error) {
+        this.showErrorSnackbar(error.message);
+      } finally {
+        this.saveLoading = false;
+      }
     },
     isValueChaged(value, key) {
       return value !== this.logs[key].value;

@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   assertBoardKey,
+  assertBoardEntries,
   assertBoardValue,
   assertNonEmptyString,
   assertOpaqueId,
@@ -14,7 +15,15 @@ import {
   exportFlightLogChartsToHTML,
   exportFlightLogToCSVs,
 } from "./flightlog.js";
-import { cliCommand, command, connect, disconnect, getList } from "./serial.js";
+import {
+  applyConfiguration,
+  cliCommand,
+  command,
+  connect,
+  disconnect,
+  getList,
+  restoreBoardConfiguration,
+} from "./serial.js";
 import { FlightLogManager } from "./flight-log-manager.js";
 import { startFlightLogHandoff } from "./flight-log-handoff.js";
 import {
@@ -119,23 +128,6 @@ async function openFlightLogInFlights(sessionId) {
   return { id: handoff.id, status: "waiting" };
 }
 
-async function restoreBoardConfiguration() {
-  const selection = await dialog.showOpenDialog(trustedWindow, {
-    properties: ["openFile"],
-    filters: [{ name: "CATS configuration", extensions: ["txt"] }],
-  });
-  if (selection.canceled || selection.filePaths.length === 0) {
-    return { canceled: true };
-  }
-
-  const data = await fs.readFile(selection.filePaths[0], "utf8");
-  for (const line of data.split(/\r?\n/)) {
-    const boardCommand = line.trim();
-    if (boardCommand) command(boardCommand);
-  }
-  return { canceled: false };
-}
-
 export function subscribeListeners(openExternal) {
   if (registered) return;
   registered = true;
@@ -162,57 +154,44 @@ export function subscribeListeners(openExternal) {
     disconnect();
     return true;
   });
-  handle(IPC_CHANNELS.SERIAL_SEND, (value) => {
+  handle(IPC_CHANNELS.SERIAL_SEND, async (value) => {
     assertNonEmptyString(value, "CLI command", 1024);
     if (/[\r\n]/.test(value))
       throw new Error("CLI command must fit on one line.");
-    cliCommand(value);
+    await cliCommand(value);
     return true;
   });
 
-  handle(IPC_CHANNELS.BOARD_GET_CONFIG, (key) => {
-    command(`get ${assertBoardKey(key)}`);
-    return true;
-  });
-  handle(IPC_CHANNELS.BOARD_SET_CONFIG, (payload) => {
+  handle(IPC_CHANNELS.BOARD_GET_CONFIG, (key) =>
+    command(`get ${assertBoardKey(key)}`),
+  );
+  handle(IPC_CHANNELS.BOARD_SET_CONFIG, async (payload) => {
     assertRecord(payload, "Board configuration update");
     const key = assertBoardKey(payload.key);
     const value = assertBoardValue(payload.value);
-    command(`set ${key} = ${value}`);
+    await command(`set ${key} = ${value}`);
     return true;
   });
-  handle(IPC_CHANNELS.BOARD_GET_EVENTS, (key) => {
-    command(`get ${assertBoardKey(key)}`);
-    return true;
-  });
+  handle(IPC_CHANNELS.BOARD_APPLY_CONFIG, (entries) =>
+    applyConfiguration(assertBoardEntries(entries)),
+  );
+  handle(IPC_CHANNELS.BOARD_GET_EVENTS, (key) =>
+    command(`get ${assertBoardKey(key)}`),
+  );
   handle(IPC_CHANNELS.BOARD_GET_TIMERS, (key) => {
     const timer = assertBoardKey(key);
-    command(`get ${timer}_start`);
-    command(`get ${timer}_duration`);
-    command(`get ${timer}_trigger`);
-    return true;
+    return Promise.all([
+      command(`get ${timer}_start`),
+      command(`get ${timer}_duration`),
+      command(`get ${timer}_trigger`),
+    ]);
   });
-  handle(IPC_CHANNELS.BOARD_GET_INFO, () => {
-    command("status");
-    return true;
-  });
-  handle(IPC_CHANNELS.BOARD_GET_LOG_INFO, () => {
-    command("rec_info");
-    return true;
-  });
-  handle(IPC_CHANNELS.BOARD_DUMP, () => {
-    command("dump");
-    return true;
-  });
-  handle(IPC_CHANNELS.BOARD_RESTORE, restoreBoardConfiguration);
-  handle(IPC_CHANNELS.BOARD_RESET, () => {
-    command("defaults");
-    return true;
-  });
-  handle(IPC_CHANNELS.BOARD_SAVE, () => {
-    command("save");
-    return true;
-  });
+  handle(IPC_CHANNELS.BOARD_GET_INFO, () => command("status", { poll: true }));
+  handle(IPC_CHANNELS.BOARD_GET_LOG_INFO, () => command("rec_info"));
+  handle(IPC_CHANNELS.BOARD_DUMP, () => command("dump"));
+  handle(IPC_CHANNELS.BOARD_RESTORE, () => restoreBoardConfiguration());
+  handle(IPC_CHANNELS.BOARD_RESET, () => command("defaults"));
+  handle(IPC_CHANNELS.BOARD_SAVE, () => command("save"));
 
   handle(IPC_CHANNELS.FLIGHT_LOG_LOAD, loadFlightLog);
   handle(IPC_CHANNELS.FLIGHT_LOG_CURRENT, () =>

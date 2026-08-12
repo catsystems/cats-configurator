@@ -338,7 +338,7 @@
         </v-col>
       </v-row>
     </v-container>
-    <ActionsBar @refresh="init" @save="onSave" />
+    <ActionsBar :saving="saveLoading" @refresh="init" @save="onSave" />
   </div>
 </template>
 
@@ -419,6 +419,7 @@ export default {
       timer: null,
       backupLoading: false,
       restoreLoading: false,
+      saveLoading: false,
       data: null,
       imperialData: null,
       lastSavedData: null,
@@ -533,13 +534,19 @@ export default {
       );
       if (validation.some(({ valid }) => !valid)) return;
 
-      if (this.useImperialUnits) {
-        setConfigs(convertImperialDataToMetric(this.displayData));
-      } else {
-        setConfigs(this.displayData);
+      this.saveLoading = true;
+      try {
+        if (this.useImperialUnits) {
+          await setConfigs(convertImperialDataToMetric(this.displayData));
+        } else {
+          await setConfigs(this.displayData);
+        }
+        await getConfigs();
+      } catch (error) {
+        this.showErrorSnackbar(error.message);
+      } finally {
+        this.saveLoading = false;
       }
-
-      getConfigs();
     },
     async backupConfig() {
       this.backupLoading = true;
