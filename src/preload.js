@@ -94,6 +94,8 @@ const cats = {
     getConfig: (key) => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_CONFIG, key),
     setConfig: (key, value) =>
       ipcRenderer.invoke(IPC_CHANNELS.BOARD_SET_CONFIG, { key, value }),
+    applyConfig: (entries) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOARD_APPLY_CONFIG, entries),
     getEvents: (key) => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_EVENTS, key),
     getTimers: (key) => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_TIMERS, key),
     getInfo: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_INFO),

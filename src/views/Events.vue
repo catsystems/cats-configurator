@@ -38,7 +38,7 @@
         </v-slide-group-item>
       </v-slide-group>
     </v-container>
-    <ActionsBar @refresh="init" @save="saveData" />
+    <ActionsBar :saving="saveLoading" @refresh="init" @save="saveData" />
     <v-dialog v-model="addActionDialog" width="500">
       <AddEventActionDialog
         v-if="addActionDialog"
@@ -84,6 +84,7 @@ export default {
       currentKey: null,
       currentAction: null,
       currentActionIndex: null,
+      saveLoading: false,
     };
   },
   computed: {
@@ -114,15 +115,21 @@ export default {
       "editEventAction",
       "removeEventAction",
       "addEventAction",
+      "showErrorSnackbar",
     ]),
     init() {
       getEvents();
     },
-    saveData() {
-      setEvents(this.events);
-      setTimeout(function () {
-        getEvents();
-      }, 200);
+    async saveData() {
+      this.saveLoading = true;
+      try {
+        await setEvents(this.events);
+        await getEvents();
+      } catch (error) {
+        this.showErrorSnackbar(error.message);
+      } finally {
+        this.saveLoading = false;
+      }
     },
     isActionsFilled(event) {
       return event.actions.length >= Math.floor(event.arrayLength / 2);
