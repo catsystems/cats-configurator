@@ -181,9 +181,9 @@ async function captureRelease(label, executablePath, useSource = false) {
         }, route.path);
       }
       try {
-        if (route.readyText === "Write your command here") {
+        if (route.name === "cli") {
           await page
-            .getByPlaceholder(route.readyText)
+            .getByPlaceholder(/Write your command here/)
             .waitFor({ state: "visible", timeout: 10_000 });
         } else {
           await page
@@ -306,7 +306,7 @@ async function captureRelease(label, executablePath, useSource = false) {
       }
 
       if (route.name === "cli") {
-        const commandInput = page.getByPlaceholder("Write your command here");
+        const commandInput = page.getByPlaceholder(/Write your command here/);
         await commandInput.fill("status");
         await commandInput.press("Enter");
         await page.waitForTimeout(750);

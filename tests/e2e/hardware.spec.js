@@ -43,7 +43,7 @@ test("connects to a real CATS Vega without modifying configuration", async ({}, 
     await page.evaluate(() => {
       window.location.hash = "#/cli";
     });
-    const commandInput = page.getByPlaceholder("Write your command here");
+    const commandInput = page.getByPlaceholder(/Write your command here/);
     await commandInput.fill("status");
     await commandInput.press("Enter");
     await expect(page.getByText(/State:\s+READY/)).toBeVisible({
