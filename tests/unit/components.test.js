@@ -9,6 +9,7 @@ import EditEventActionDialog from "@/components/EditEventActionDialog.vue";
 import AppFooter from "@/components/Footer.vue";
 import FlightLogWorkspace from "@/components/FlightLogWorkspace.vue";
 import Profiles from "@/views/Profiles.vue";
+import Preflight from "@/views/Preflight.vue";
 import Snackbar from "@/components/Snackbar.vue";
 import UnitSwitch from "@/components/UnitSwitch.vue";
 import UpdateDialog from "@/components/UpdateDialog.vue";
@@ -297,6 +298,50 @@ describe("renderer state components", () => {
     expect(useAppStore().snackbar.message).toBe(
       "Profile applied and verified.",
     );
+    wrapper.unmount();
+  });
+
+  it("renders a guided preflight report and simulated timeline", async () => {
+    window.cats = {
+      preflight: {
+        run: vi.fn().mockResolvedValue({
+          status: "BLOCKED",
+          generatedAt: "2026-08-12T08:00:00.000Z",
+          board: { model: "CATS Vega", firmwareVersion: "3.0.2" },
+          summary: { blockedCount: 1, warningCount: 0, readyCount: 1 },
+          checks: [
+            {
+              id: "testing-mode",
+              category: "Board mode",
+              status: "blocked",
+              title: "Testing mode is enabled",
+              detail: "Disable testing mode before flight.",
+            },
+          ],
+          timeline: [
+            {
+              id: "ev_liftoff",
+              kind: "event",
+              title: "Liftoff",
+              detail: "Flight event: LIFTOFF",
+              actions: ["Recorder: LOG"],
+            },
+          ],
+        }),
+      },
+    };
+    const wrapper = mount(Preflight, {
+      global: { plugins: [pinia, vuetify] },
+    });
+
+    await vi.waitFor(() =>
+      expect(window.cats.preflight.run).toHaveBeenCalled(),
+    );
+    await nextTick();
+    expect(wrapper.text()).toContain("BLOCKED");
+    expect(wrapper.text()).toContain("Testing mode is enabled");
+    expect(wrapper.text()).toContain("Event & Timer Simulator");
+    expect(wrapper.text()).toContain("Recorder: LOG");
     wrapper.unmount();
   });
 

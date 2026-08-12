@@ -4,7 +4,7 @@
       <v-row>
         <v-col>
           <v-card height="100%">
-            <v-card-title>Logs</v-card-title>
+            <v-card-title>Recording</v-card-title>
             <v-card-text>
               <v-form ref="form">
                 <v-row density="compact">
@@ -23,22 +23,6 @@
                 </v-row>
               </v-form>
             </v-card-text>
-            <v-card-actions>
-              <v-row density="compact">
-                <v-col cols="6">
-                  <v-btn color="primary" block>
-                    <v-icon start>mdi-arrow-down</v-icon>
-                    Download
-                  </v-btn>
-                </v-col>
-                <v-col cols="6">
-                  <v-btn color="error" block>
-                    <v-icon start>mdi-delete</v-icon>
-                    Erase
-                  </v-btn>
-                </v-col>
-              </v-row>
-            </v-card-actions>
           </v-card>
         </v-col>
         <v-col>

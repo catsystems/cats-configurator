@@ -25,10 +25,22 @@ const routes = [
     component: () => import("../views/Timers.vue"),
   },
   {
+    path: "/logging",
+    name: "Logging",
+    meta: { requiresBoard: true },
+    component: () => import("../views/Logs.vue"),
+  },
+  {
     path: "/profiles",
     name: "Profiles",
     meta: { requiresBoard: true },
     component: () => import("../views/Profiles.vue"),
+  },
+  {
+    path: "/preflight",
+    name: "Preflight",
+    meta: { requiresBoard: true },
+    component: () => import("../views/Preflight.vue"),
   },
   {
     path: "/flight-logs",

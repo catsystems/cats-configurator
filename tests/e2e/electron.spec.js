@@ -346,6 +346,21 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       page.getByRole("button", { name: "Open Profile" }),
     ).toBeVisible();
 
+    await page.evaluate(() => {
+      window.location.hash = "#/preflight";
+    });
+    await expect(
+      page.getByText("Flight Preflight", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("Event & Timer Simulator")).toBeVisible();
+    await expect(page.getByText("BLOCKED", { exact: true })).toBeVisible();
+
+    await page.evaluate(() => {
+      window.location.hash = "#/logging";
+    });
+    await expect(page.getByText("Recording", { exact: true })).toBeVisible();
+    await expect(page.getByText("Elements", { exact: true })).toBeVisible();
+
     for (const route of ["/cli", "/config", "/cli"]) {
       await page.evaluate((path) => {
         window.location.hash = `#${path}`;

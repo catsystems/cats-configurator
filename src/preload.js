@@ -118,6 +118,9 @@ const cats = {
     open: () => ipcRenderer.invoke(IPC_CHANNELS.PROFILE_OPEN),
     apply: (profile) => ipcRenderer.invoke(IPC_CHANNELS.PROFILE_APPLY, profile),
   },
+  preflight: {
+    run: () => ipcRenderer.invoke(IPC_CHANNELS.PREFLIGHT_RUN),
+  },
   flightLog: {
     pathForDroppedFile: (file) => webUtils.getPathForFile(file),
     load: (filePath) =>
