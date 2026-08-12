@@ -21,6 +21,7 @@ export const IPC_CHANNELS = Object.freeze({
   BOARD_DUMP_COMPLETE: "board:dump-complete",
   BOARD_GET_CONFIG: "board:get-config",
   BOARD_SET_CONFIG: "board:set-config",
+  BOARD_APPLY_CONFIG: "board:apply-config",
   BOARD_GET_EVENTS: "board:get-events",
   BOARD_GET_TIMERS: "board:get-timers",
   BOARD_GET_INFO: "board:get-info",
@@ -72,6 +73,19 @@ export function assertBoardValue(value) {
     throw new TypeError("Board value must fit on one line.");
   }
   return value;
+}
+
+export function assertBoardEntries(value) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 128) {
+    throw new TypeError("Board transaction must contain 1 to 128 values.");
+  }
+  return value.map((entry) => {
+    assertRecord(entry, "Board transaction value");
+    return {
+      key: assertBoardKey(entry.key),
+      value: assertBoardValue(entry.value),
+    };
+  });
 }
 
 export function assertRecord(value, label) {

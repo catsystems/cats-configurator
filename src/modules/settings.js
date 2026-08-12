@@ -90,30 +90,6 @@ export const LOG_ELEMENTS = [
   { name: "Error Info", dec: 65536, hex: 0x10000, size: 0, bit: 16 },
 ];
 
-// KEYS:
-// TODO: setting timer 4 doesn't work because something interrupts the setting:
-// ^._.^:/> set timer1_start = MOVING
-// timer1_start set to MOVING
-// ^._.^:/> set timer1_duration = 0
-// timer1_duration set to 0
-// ^._.^:/> set timer1_trigger = MOVING
-// timer1_trigger set to MOVING
-// ^._.^:/> set timer2_start = MOVING
-// timer2_start set to MOVING
-// ^._.^:/> set timer2_duration = 0
-// timer2_duration set to 0
-// ^._.^:/> set timer2_trigger = MOVING
-// timer2_trigger set to MOVING
-// ^._.^:/> set timer3_start = MOVING
-// timer3_start set to MOVING
-// ^._.^:/> set timer3_duration = 0
-// timer3_duration set to 0
-// ^._.^:/> set timer3_trigger = MOVING
-// timer3_trigger set to MOVING
-// ^._.^:/> set timer4_sG                           <----- problem
-// ERROR IN set: INVALID NAME:
-// ^._.^:/> save
-// Successfully written to flash
 export const TIMER_KEYS = ["timer1", "timer2", "timer3", "timer4"];
 export const EVENT_KEYS = [
   "ev_liftoff",

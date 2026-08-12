@@ -1,11 +1,12 @@
 import { EVENT_KEYS } from "@/modules/settings.js";
+import { applyBoardValues } from "@/services/boardService.js";
 
 export function getEvents() {
-  EVENT_KEYS.forEach((key) => window.cats.board.getEvents(key));
+  return Promise.all(EVENT_KEYS.map((key) => window.cats.board.getEvents(key)));
 }
 
 export function setEvents(events) {
-  Object.keys(events).forEach((key) => {
+  const entries = Object.keys(events).map((key) => {
     const event = events[key];
 
     let values = [];
@@ -16,8 +17,7 @@ export function setEvents(events) {
 
     if (!values.length) values = [0, 0];
 
-    window.cats.board.setConfig(key, values.join());
+    return { key, value: values.join() };
   });
-
-  window.cats.board.save();
+  return applyBoardValues(entries);
 }
