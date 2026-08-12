@@ -33,6 +33,7 @@ export const IPC_CHANNELS = Object.freeze({
   PROFILE_EXPORT: "profile:export",
   PROFILE_OPEN: "profile:open",
   PROFILE_APPLY: "profile:apply",
+  PREFLIGHT_RUN: "preflight:run",
   FLIGHT_LOG_LOAD: "flight-log:load",
   FLIGHT_LOG_CURRENT: "flight-log:current",
   FLIGHT_LOG_EXPORT_CSV: "flight-log:export-csv",
