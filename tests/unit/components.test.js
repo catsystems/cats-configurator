@@ -12,6 +12,7 @@ import Profiles from "@/views/Profiles.vue";
 import Preflight from "@/views/Preflight.vue";
 import Logs from "@/views/Logs.vue";
 import Timers from "@/views/Timers.vue";
+import Cli from "@/views/Cli.vue";
 import Snackbar from "@/components/Snackbar.vue";
 import UnitSwitch from "@/components/UnitSwitch.vue";
 import UpdateDialog from "@/components/UpdateDialog.vue";
@@ -256,6 +257,48 @@ describe("renderer state components", () => {
     ]);
     expect(context.showErrorSnackbar).not.toHaveBeenCalled();
     expect(context.saveLoading).toBe(false);
+  });
+
+  it("navigates and searches connected-session CLI history", async () => {
+    const unsubscribe = vi.fn();
+    window.cats = {
+      serial: {
+        send: vi.fn().mockResolvedValue([]),
+        onData: vi.fn(() => unsubscribe),
+      },
+    };
+    const wrapper = mount(Cli, {
+      global: { plugins: [pinia, vuetify] },
+    });
+    const input = wrapper.get("input");
+
+    await input.setValue("status");
+    await input.trigger("keydown", { key: "Enter" });
+    await input.setValue("get timer4_duration");
+    await input.trigger("keydown", { key: "Enter" });
+
+    expect(window.cats.serial.send).toHaveBeenNthCalledWith(1, "status");
+    expect(window.cats.serial.send).toHaveBeenNthCalledWith(
+      2,
+      "get timer4_duration",
+    );
+    expect(wrapper.vm.cmd).toBe("");
+
+    await input.trigger("keydown", { key: "ArrowUp" });
+    expect(wrapper.vm.cmd).toBe("get timer4_duration");
+    await input.trigger("keydown", { key: "ArrowUp" });
+    expect(wrapper.vm.cmd).toBe("status");
+    await input.trigger("keydown", { key: "ArrowDown" });
+    expect(wrapper.vm.cmd).toBe("get timer4_duration");
+    await input.trigger("keydown", { key: "ArrowDown" });
+    expect(wrapper.vm.cmd).toBe("");
+
+    await input.setValue("timer");
+    await input.trigger("keydown", { key: "r", ctrlKey: true });
+    expect(wrapper.vm.cmd).toBe("get timer4_duration");
+
+    wrapper.unmount();
+    expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
   it("preserves the firmware's full recording mask while showing known data", async () => {

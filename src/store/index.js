@@ -5,6 +5,7 @@ export const useAppStore = defineStore("app", {
   state: () => ({
     serialPorts: [],
     active: false,
+    cliHistory: [],
     changedTab: null,
     static: {},
     config: {},
@@ -52,6 +53,12 @@ export const useAppStore = defineStore("app", {
     },
     setActiveState(value) {
       this.active = Boolean(value);
+      if (!this.active) this.cliHistory = [];
+    },
+    addCliHistory(command) {
+      const value = String(command).trim();
+      if (!value || this.cliHistory.at(-1) === value) return;
+      this.cliHistory.push(value);
     },
     setConfig(payload) {
       if (!payload.key) return;

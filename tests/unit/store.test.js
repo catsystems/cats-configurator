@@ -22,6 +22,19 @@ describe("application store", () => {
     });
   });
 
+  it("keeps CLI history for one connected board session", () => {
+    const store = useAppStore();
+    store.setActiveState(true);
+    store.addCliHistory("status");
+    store.addCliHistory("status");
+    store.addCliHistory("  get timer4_duration  ");
+
+    expect(store.cliHistory).toEqual(["status", "get timer4_duration"]);
+
+    store.setActiveState(false);
+    expect(store.cliHistory).toEqual([]);
+  });
+
   it("tracks event edits and unit-system state", () => {
     const store = useAppStore();
     store.setEvent({
