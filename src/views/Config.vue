@@ -338,7 +338,12 @@
         </v-col>
       </v-row>
     </v-container>
-    <ActionsBar :saving="saveLoading" @refresh="init" @save="onSave" />
+    <ActionsBar
+      :saving="saveLoading"
+      :changed="changed"
+      @refresh="init"
+      @save="onSave"
+    />
   </div>
 </template>
 
@@ -536,11 +541,13 @@ export default {
 
       this.saveLoading = true;
       try {
+        let metricData;
         if (this.useImperialUnits) {
-          await setConfigs(convertImperialDataToMetric(this.displayData));
+          metricData = convertImperialDataToMetric(this.displayData);
         } else {
-          await setConfigs(this.displayData);
+          metricData = this.displayData;
         }
+        await setConfigs(metricData, this.lastSavedData);
         await getConfigs();
       } catch (error) {
         this.showErrorSnackbar(error.message);
@@ -580,8 +587,12 @@ export default {
       );
 
       if (confirmed) {
-        await window.cats.board.reset();
-        this.init();
+        try {
+          await window.cats.board.reset();
+          await getConfigs();
+        } catch (error) {
+          this.showErrorSnackbar(error.message);
+        }
       }
     },
     convertStatusLine4(statusLine) {

@@ -6,18 +6,25 @@ export function getEvents() {
 }
 
 export function setEvents(events) {
-  const entries = Object.keys(events).map((key) => {
-    const event = events[key];
+  const entries = Object.keys(events)
+    .filter((key) => {
+      const event = events[key];
+      const values = event.actions.flatMap((action) => [
+        action.index,
+        action.value,
+      ]);
+      return event.values.join() !== values.join();
+    })
+    .map((key) => {
+      const event = events[key];
 
-    let values = [];
-    event.actions.forEach((action) => {
-      values.push(action.index);
-      values.push(action.value);
+      const values = event.actions.flatMap((action) => [
+        action.index,
+        action.value,
+      ]);
+      while (values.length < event.arrayLength) values.push(0);
+
+      return { key, value: values.slice(0, event.arrayLength).join() };
     });
-
-    if (!values.length) values = [0, 0];
-
-    return { key, value: values.join() };
-  });
   return applyBoardValues(entries);
 }

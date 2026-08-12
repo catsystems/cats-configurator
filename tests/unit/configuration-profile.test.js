@@ -3,6 +3,7 @@ import {
   changedProfileEntries,
   compareConfigurationProfile,
   createConfigurationProfile,
+  formatProfileValue,
   parseBoardIdentity,
   PROFILE_FORMAT,
   validateConfigurationProfile,
@@ -136,5 +137,18 @@ describe("versioned configuration profiles", () => {
       telemetryFirmwareVersion: "1.1.3",
     });
     expect(parseBoardIdentity(["Firmware: test"]).firmwareVersion).toBe("test");
+  });
+
+  it("describes event actions and recording masks in user-facing terms", () => {
+    expect(
+      formatProfileValue("ev_apogee", "2,1,1,2000,2,0,0,0,0,0,0,0,0,0,0,0"),
+    ).toBe("Pyro 1: ON → Delay: 2000 ms → Pyro 1: OFF");
+    expect(formatProfileValue("ev_custom1", "0,0,0,0")).toBe("No actions");
+    expect(formatProfileValue("rec_elements", 4294967295)).toBe(
+      "All available data",
+    );
+    expect(formatProfileValue("rec_elements", 112320)).toBe(
+      "Flight Info, Orientation, Flight State, Event Info, GNSS, Voltage + unknown/reserved flags",
+    );
   });
 });

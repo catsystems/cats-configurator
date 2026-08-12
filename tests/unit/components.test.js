@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import { nextTick } from "vue";
+import { isProxy, nextTick, reactive } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/App.vue";
 import Config from "@/views/Config.vue";
@@ -10,6 +10,8 @@ import AppFooter from "@/components/Footer.vue";
 import FlightLogWorkspace from "@/components/FlightLogWorkspace.vue";
 import Profiles from "@/views/Profiles.vue";
 import Preflight from "@/views/Preflight.vue";
+import Logs from "@/views/Logs.vue";
+import Timers from "@/views/Timers.vue";
 import Snackbar from "@/components/Snackbar.vue";
 import UnitSwitch from "@/components/UnitSwitch.vue";
 import UpdateDialog from "@/components/UpdateDialog.vue";
@@ -223,6 +225,61 @@ describe("renderer state components", () => {
     wrapper.unmount();
   });
 
+  it("saves timer values after editing reactive form data", async () => {
+    window.cats = {
+      board: {
+        applyConfig: vi.fn().mockResolvedValue({ ok: true, results: [] }),
+        getTimers: vi.fn().mockResolvedValue(),
+      },
+    };
+    const context = {
+      $refs: {
+        form: { validate: vi.fn().mockResolvedValue({ valid: true }) },
+      },
+      data: reactive({
+        timer1_active: { value: true },
+        timer1_start: { value: "LIFTOFF" },
+        timer1_duration: { value: 1000 },
+        timer1_trigger: { value: "APOGEE" },
+      }),
+      timerKeys: ["timer1"],
+      saveLoading: false,
+      showErrorSnackbar: vi.fn(),
+    };
+
+    await Timers.methods.onSave.call(context);
+
+    expect(window.cats.board.applyConfig).toHaveBeenCalledWith([
+      { key: "timer1_start", value: "LIFTOFF" },
+      { key: "timer1_duration", value: 1000 },
+      { key: "timer1_trigger", value: "APOGEE" },
+    ]);
+    expect(context.showErrorSnackbar).not.toHaveBeenCalled();
+    expect(context.saveLoading).toBe(false);
+  });
+
+  it("preserves the firmware's full recording mask while showing known data", async () => {
+    window.cats = {
+      board: {
+        getLogInfo: vi.fn(),
+        getConfig: vi.fn(),
+      },
+    };
+    const wrapper = mount(Logs, {
+      global: { plugins: [pinia, vuetify] },
+    });
+    const store = useAppStore();
+    store.setLog({ key: "rec_speed", value: "100Hz" });
+    store.setLog({ key: "rec_elements", value: 4294967295 });
+    await nextTick();
+    await nextTick();
+
+    expect(wrapper.vm.recElements).toHaveLength(10);
+    expect(wrapper.vm.rec_elements).toBe(4294967295);
+    expect(store.changedTab).toBeNull();
+    wrapper.unmount();
+  });
+
   it("renders event action labels instead of object serialization", async () => {
     const wrapper = mount(EditEventActionDialog, {
       props: {
@@ -270,15 +327,18 @@ describe("renderer state components", () => {
             changedCount: 1,
           },
         }),
-        apply: vi.fn().mockResolvedValue({
-          ok: true,
-          rows: [{ ...changedRow, boardValue: 300, status: "same" }],
-          compatibility: {
-            warnings: [],
-            canApply: true,
-            changedCount: 0,
-          },
-          results: [{ key: "main_altitude", status: "verified" }],
+        apply: vi.fn().mockImplementation(async (appliedProfile) => {
+          expect(isProxy(appliedProfile)).toBe(false);
+          return {
+            ok: true,
+            rows: [{ ...changedRow, boardValue: 300, status: "same" }],
+            compatibility: {
+              warnings: [],
+              canApply: true,
+              changedCount: 0,
+            },
+            results: [{ key: "main_altitude", status: "verified" }],
+          };
         }),
       },
     };
@@ -289,7 +349,8 @@ describe("renderer state components", () => {
     await wrapper.vm.openProfile();
     await nextTick();
     expect(wrapper.text()).toContain("Main Altitude");
-    expect(wrapper.text()).toContain("1 field will change");
+    expect(wrapper.text()).toContain("1 profile value differs from the board");
+    expect(wrapper.text()).toContain("Apply Profile to Board");
 
     await wrapper.vm.applyProfile();
     await nextTick();

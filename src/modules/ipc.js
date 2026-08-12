@@ -24,6 +24,7 @@ import {
   disconnect,
   getList,
   readBoardSnapshot,
+  resetBoardConfiguration,
   restoreBoardConfiguration,
 } from "./serial.js";
 import {
@@ -247,7 +248,7 @@ export function subscribeListeners(openExternal) {
   handle(IPC_CHANNELS.BOARD_GET_LOG_INFO, () => command("rec_info"));
   handle(IPC_CHANNELS.BOARD_DUMP, () => command("dump"));
   handle(IPC_CHANNELS.BOARD_RESTORE, () => restoreBoardConfiguration());
-  handle(IPC_CHANNELS.BOARD_RESET, () => command("defaults"));
+  handle(IPC_CHANNELS.BOARD_RESET, resetBoardConfiguration);
   handle(IPC_CHANNELS.BOARD_SAVE, () => command("save"));
   handle(IPC_CHANNELS.PROFILE_EXPORT, exportConfigurationProfile);
   handle(IPC_CHANNELS.PROFILE_OPEN, openConfigurationProfile);

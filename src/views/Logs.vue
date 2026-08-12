@@ -67,7 +67,12 @@
         </v-col>
       </v-row>
     </v-container>
-    <ActionsBar :saving="saveLoading" @refresh="init" @save="onSave" />
+    <ActionsBar
+      :saving="saveLoading"
+      :changed="updated"
+      @refresh="init"
+      @save="onSave"
+    />
   </div>
 </template>
 
@@ -77,6 +82,12 @@ import { useAppStore } from "@/store";
 import { getLogInfo, getLogData, setLogData } from "@/services/logService";
 import { LOG_ELEMENTS } from "@/modules/settings";
 import ActionsBar from "@/components/ActionsBar.vue";
+
+const UINT32_MASK = 0xffffffffn;
+const KNOWN_LOG_MASK = LOG_ELEMENTS.reduce(
+  (mask, { dec }) => mask | BigInt(dec),
+  0n,
+);
 
 export default {
   name: "LogsView",
@@ -88,6 +99,7 @@ export default {
       rec_speed: null,
       rec_elements: null,
       recElements: [],
+      unknownRecElements: 0,
       elementsSize: 0,
       logElements: LOG_ELEMENTS,
       saveLoading: false,
@@ -97,7 +109,7 @@ export default {
     logs: {
       handler(logs) {
         this.rec_speed = logs.rec_speed.value;
-        if (logs.rec_elements.value) {
+        if (logs.rec_elements.value !== undefined) {
           this.setRecElements(logs.rec_elements.value);
         }
       },
@@ -107,7 +119,8 @@ export default {
     recElements: {
       handler(elements) {
         const decimals = elements.map((element) => element.dec);
-        this.rec_elements = decimals.reduce((pv, cv) => pv + cv, 0);
+        this.rec_elements =
+          decimals.reduce((pv, cv) => pv + cv, 0) + this.unknownRecElements;
       },
       deep: true,
       immediate: true,
@@ -171,14 +184,17 @@ export default {
       getLogData();
     },
     setRecElements(value) {
+      const mask = BigInt(value);
+      this.unknownRecElements = Number(mask & (UINT32_MASK ^ KNOWN_LOG_MASK));
       LOG_ELEMENTS.forEach((element) => {
-        const isBitSet = value & (1 << element.bit);
+        const isBitSet = (mask & BigInt(element.dec)) !== 0n;
         const index = this.recElements.findIndex((e) => e.bit === element.bit);
 
         if (isBitSet && index === -1) this.recElements.push(element);
         if (!isBitSet && index > -1) this.recElements.splice(index, 1);
       });
 
+      this.rec_elements = Number(mask);
       const sizes = this.recElements.map((element) => element.size);
       this.elementsSize = sizes.reduce((pv, cv) => pv + cv, 0);
     },
@@ -190,7 +206,7 @@ export default {
 
       this.saveLoading = true;
       try {
-        await setLogData(data);
+        await setLogData(data, this.logs);
         await getLogData();
       } catch (error) {
         this.showErrorSnackbar(error.message);

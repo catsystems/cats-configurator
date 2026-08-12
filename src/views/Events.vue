@@ -38,7 +38,12 @@
         </v-slide-group-item>
       </v-slide-group>
     </v-container>
-    <ActionsBar :saving="saveLoading" @refresh="init" @save="saveData" />
+    <ActionsBar
+      :saving="saveLoading"
+      :changed="changed"
+      @refresh="init"
+      @save="saveData"
+    />
     <v-dialog v-model="addActionDialog" width="500">
       <AddEventActionDialog
         v-if="addActionDialog"
