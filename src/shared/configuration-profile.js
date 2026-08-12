@@ -2,11 +2,13 @@ import {
   CONFIG_KEYS,
   CONFIG_SETTINGS,
   EVENT_KEYS,
+  LOG_ELEMENTS,
   LOG_KEYS,
   PROFILE_BOARD_KEYS,
   TIMER_FIELDS,
   TIMER_KEYS,
 } from "../modules/settings.js";
+import { parseConfiguredActions } from "./preflight.js";
 
 export const PROFILE_FORMAT = "cats-configurator-profile";
 export const PROFILE_SCHEMA_VERSION = 1;
@@ -177,9 +179,56 @@ export function profileSectionForKey(key) {
 
 export function profileLabelForKey(key) {
   if (CONFIG_SETTINGS[key]?.name) return CONFIG_SETTINGS[key].name;
+  if (key === "rec_speed") return "Recording Rate";
+  if (key === "rec_elements") return "Recorded Data";
+  if (key.startsWith("ev_")) {
+    return `${key
+      .slice(3)
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase())} Actions`;
+  }
+  const timer = key.match(/^timer(\d+)_(.+)$/);
+  if (timer) {
+    const field = timer[2].replace(/\b\w/g, (letter) => letter.toUpperCase());
+    return `Timer ${timer[1]} ${field}`;
+  }
   return key
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatRecordingElements(value) {
+  let mask;
+  try {
+    mask = BigInt(String(value));
+  } catch {
+    return String(value);
+  }
+  if (mask === 0n) return "No recorded data";
+  if (mask === 0xffffffffn) return "All available data";
+
+  const enabled = LOG_ELEMENTS.filter(
+    ({ dec }) => (mask & BigInt(dec)) !== 0n,
+  ).map(({ name }) => name);
+  const knownMask = LOG_ELEMENTS.reduce(
+    (result, { dec }) => result | BigInt(dec),
+    0n,
+  );
+  const hasUnknownFlags = (mask & ~knownMask) !== 0n;
+  const summary = enabled.join(", ") || "No known data";
+  return hasUnknownFlags ? `${summary} + unknown/reserved flags` : summary;
+}
+
+export function formatProfileValue(key, value) {
+  if (value === null || value === undefined) return "—";
+  if (EVENT_KEYS.includes(key)) {
+    const actions = parseConfiguredActions(value);
+    return actions.length
+      ? actions.map(({ summary }) => summary).join(" → ")
+      : "No actions";
+  }
+  if (key === "rec_elements") return formatRecordingElements(value);
+  return String(value);
 }
 
 export function compareConfigurationProfile(profile, snapshot) {

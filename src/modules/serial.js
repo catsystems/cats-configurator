@@ -19,7 +19,7 @@ import {
   compareConfigurationProfile,
   parseBoardIdentity,
 } from "../shared/configuration-profile.js";
-import { IPC_CHANNELS } from "../shared/ipc.js";
+import { assertBoardEntries, IPC_CHANNELS } from "../shared/ipc.js";
 
 const CONFIG = { baudRate: 115200 };
 const BOARD_IDENTIFICATION_TIMEOUT_MS = 5000;
@@ -47,7 +47,7 @@ const fakeConfigurations = {
     type: "NUMBER",
     allowedRange: [10, 65535],
   },
-  acc_threshold: { value: 35, type: "NUMBER", allowedRange: [1, 100] },
+  acc_threshold: { value: 35, type: "NUMBER", allowedRange: [30, 80] },
   servo1_init_pos: { value: 0, type: "NUMBER", allowedRange: [0, 1000] },
   servo2_init_pos: { value: 0, type: "NUMBER", allowedRange: [0, 1000] },
   tele_enable: {
@@ -58,12 +58,12 @@ const fakeConfigurations = {
   tele_link_phrase: {
     value: "cats-test",
     type: "STRING",
-    allowedRange: [1, 32],
+    allowedRange: [4, 16],
   },
   tele_power_level: {
     value: 20,
     type: "NUMBER",
-    allowedRange: [-20, 22],
+    allowedRange: [16, 30],
   },
   tele_adaptive_power: {
     value: "OFF",
@@ -78,17 +78,17 @@ const fakeConfigurations = {
   tele_test_phrase: {
     value: "cats-test",
     type: "STRING",
-    allowedRange: [1, 32],
+    allowedRange: [4, 16],
   },
   rec_speed: {
-    value: "100 Hz",
+    value: "100Hz",
     type: "SELECT",
     allowedValues: ["OFF", "10 Hz", "50 Hz", "100 Hz"],
   },
   rec_elements: {
-    value: 65504,
+    value: 4294967295,
     type: "NUMBER",
-    allowedRange: [0, 131071],
+    allowedRange: [0, 4294967295],
   },
 };
 
@@ -111,7 +111,7 @@ function initialFakeConfig(key) {
       key,
       value: hasRecorderAction ? "7,2" : "0,0",
       type: "EVENT",
-      arrayLength: 8,
+      arrayLength: 16,
     };
   }
   const timerMatch = key.match(/^(timer[1-4])_(start|duration|trigger)$/);
@@ -122,7 +122,7 @@ function initialFakeConfig(key) {
       key,
       value: timer === "timer1" ? 1000 : 0,
       type: "NUMBER",
-      allowedRange: [0, 60000],
+      allowedRange: [0, 1200000],
     };
   }
   return {
@@ -433,11 +433,7 @@ function valuesMatch(expected, actual) {
 }
 
 async function applyConfiguration(entries) {
-  if (!Array.isArray(entries) || entries.length === 0) {
-    throw new TypeError(
-      "Configuration transaction requires at least one value.",
-    );
-  }
+  entries = assertBoardEntries(entries);
   const duplicateKeys = entries
     .map(({ key }) => key)
     .filter((key, index, keys) => keys.indexOf(key) !== index);
@@ -458,7 +454,13 @@ async function applyConfiguration(entries) {
 
     for (const [index, entry] of entries.entries()) {
       try {
-        const response = await execute(`set ${entry.key} = ${entry.value}`);
+        const boardValue =
+          typeof entry.value === "boolean"
+            ? entry.value
+              ? "ON"
+              : "OFF"
+            : entry.value;
+        const response = await execute(`set ${entry.key} = ${boardValue}`);
         if (!response.output.some((line) => /\bset to\b/i.test(line))) {
           throw new Error("Board did not acknowledge the new value.");
         }
@@ -510,6 +512,24 @@ async function applyConfiguration(entries) {
   });
 
   if (result.ok) sendToRenderer(IPC_CHANNELS.BOARD_CONFIG_SAVED, result);
+  return result;
+}
+
+async function resetBoardConfiguration() {
+  const result = await requireCommandEngine().transaction(async (execute) => {
+    const defaults = await execute("defaults");
+    if (
+      !defaults.output.some((line) => /reset to default values/i.test(line))
+    ) {
+      throw new Error("Board did not confirm the default configuration.");
+    }
+    const save = await execute("save");
+    if (!save.output.some((line) => /written to flash/i.test(line))) {
+      throw new Error("Board did not confirm the flash save.");
+    }
+    return { ok: true, saved: true };
+  });
+  sendToRenderer(IPC_CHANNELS.BOARD_CONFIG_SAVED, result);
   return result;
 }
 
@@ -598,15 +618,27 @@ async function restoreBoardConfiguration() {
   }
 
   const data = await fs.promises.readFile(selection.filePaths[0], "utf8");
-  const commands = data
+  const entries = data
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean);
-  await requireCommandEngine().transaction(async (execute) => {
-    for (const boardCommand of commands) await execute(boardCommand);
-    if (!commands.includes("save")) await execute("save");
-  });
-  return { canceled: false };
+    .filter(Boolean)
+    .map((line) => {
+      const match = line.match(/^set\s+([a-z0-9_]+)\s*=\s*(.+)$/i);
+      if (!match) {
+        throw new Error(
+          "Backup contains an unsupported command. Only configuration values can be restored.",
+        );
+      }
+      return { key: match[1], value: match[2] };
+    });
+  const result = await applyConfiguration(entries);
+  if (!result.ok) {
+    const failed = result.results.find(({ status }) => status === "failed");
+    throw new Error(
+      `Backup was not fully restored. ${failed?.key || "Board"}: ${failed?.message || "verification failed"}`,
+    );
+  }
+  return { canceled: false, ...result };
 }
 
 function saveDumpDataToFile(data) {
@@ -636,6 +668,7 @@ export {
   disconnect,
   getList,
   readBoardSnapshot,
+  resetBoardConfiguration,
   restoreBoardConfiguration,
   setSerialWindow,
 };

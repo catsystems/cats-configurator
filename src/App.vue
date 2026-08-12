@@ -58,6 +58,7 @@ export default {
         if (value && !wasActive) {
           if (this.$route.name !== "Config") this.$router.push("/config");
         } else if (!value && wasActive) {
+          this.setChangedTab(null);
           void window.cats.flightLog.clearOnboard();
           if (this.$route.meta.requiresBoard) this.$router.push("/");
         }
@@ -87,6 +88,7 @@ export default {
     ...mapActions(useAppStore, [
       "setStaticData",
       "setActiveState",
+      "setChangedTab",
       "setConfig",
       "setEvent",
       "setTimer",

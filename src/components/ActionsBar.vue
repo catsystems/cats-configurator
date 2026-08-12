@@ -5,7 +5,12 @@
       <v-btn class="mr-2" :disabled="saving" @click="$emit('refresh')">
         Refresh
       </v-btn>
-      <v-btn color="primary" :loading="saving" @click="$emit('save')">
+      <v-btn
+        color="primary"
+        :disabled="!changed"
+        :loading="saving"
+        @click="$emit('save')"
+      >
         Save
       </v-btn>
     </div>
@@ -17,6 +22,7 @@ export default {
   name: "ActionsBar",
   props: {
     saving: Boolean,
+    changed: Boolean,
   },
   emits: ["refresh", "save"],
 };

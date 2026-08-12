@@ -1,4 +1,8 @@
-import { EVENT_SETTINGS, TIMER_KEYS } from "../modules/settings.js";
+import {
+  EVENT_SETTINGS,
+  LOG_ELEMENTS,
+  TIMER_KEYS,
+} from "../modules/settings.js";
 
 const EVENT_SEQUENCE = [
   { key: "ev_liftoff", state: "LIFTOFF", label: "Liftoff", order: 2 },
@@ -176,10 +180,14 @@ export function buildPreflightReport(snapshot) {
   );
 
   const recordingElements = parseNumber(values.rec_elements);
+  const knownRecordingMask = LOG_ELEMENTS.reduce(
+    (mask, { dec }) => mask | dec,
+    0,
+  );
   const recordingDisabled =
     normalizeState(values.rec_speed) === "OFF" ||
     recordingElements === null ||
-    recordingElements <= 0;
+    (recordingElements & knownRecordingMask) === 0;
   const loggingEvents = EVENT_SEQUENCE.filter((event) =>
     actionsByEvent
       .get(event.key)
