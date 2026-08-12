@@ -259,7 +259,7 @@ describe("renderer state components", () => {
     expect(context.saveLoading).toBe(false);
   });
 
-  it("navigates and searches connected-session CLI history", async () => {
+  it("navigates and selects from connected-session CLI history", async () => {
     const unsubscribe = vi.fn();
     window.cats = {
       serial: {
@@ -268,9 +268,12 @@ describe("renderer state components", () => {
       },
     };
     const wrapper = mount(Cli, {
+      attachTo: document.body,
       global: { plugins: [pinia, vuetify] },
     });
     const input = wrapper.get("input");
+    expect(input.attributes("placeholder")).toContain("Up: previous");
+    expect(input.attributes("placeholder")).toContain("Ctrl+R: history");
 
     await input.setValue("status");
     await input.trigger("keydown", { key: "Enter" });
@@ -293,9 +296,24 @@ describe("renderer state components", () => {
     await input.trigger("keydown", { key: "ArrowDown" });
     expect(wrapper.vm.cmd).toBe("");
 
-    await input.setValue("timer");
     await input.trigger("keydown", { key: "r", ctrlKey: true });
-    expect(wrapper.vm.cmd).toBe("get timer4_duration");
+    await nextTick();
+    await nextTick();
+    expect(wrapper.vm.historyOpen).toBe(true);
+    expect(document.body.textContent).toContain("Command history");
+    expect(document.body.textContent).toContain("get timer4_duration");
+
+    const historyDialog = document.querySelector(".history-dialog");
+    historyDialog.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+    );
+    await nextTick();
+    historyDialog.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
+    await nextTick();
+    expect(wrapper.vm.cmd).toBe("status");
+    expect(wrapper.vm.historyOpen).toBe(false);
 
     wrapper.unmount();
     expect(unsubscribe).toHaveBeenCalledOnce();

@@ -387,7 +387,11 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await page.evaluate(() => {
       window.location.hash = "#/cli";
     });
-    const commandInput = page.getByPlaceholder("Write your command here");
+    const commandInput = page.getByPlaceholder(/Write your command here/);
+    await expect(commandInput).toHaveAttribute(
+      "placeholder",
+      /Up: previous, Ctrl\+R: history/,
+    );
     await commandInput.fill("status");
     await commandInput.press("Enter");
     await expect(page.getByText("test> status")).toBeVisible();
@@ -405,8 +409,12 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await commandInput.press("ArrowDown");
     await expect(commandInput).toHaveValue("");
 
-    await commandInput.fill("stat");
     await commandInput.press("Control+r");
+    await expect(
+      page.getByText("Command history", { exact: true }),
+    ).toBeVisible();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
     await expect(commandInput).toHaveValue("status");
 
     await page.evaluate(() => {
@@ -417,7 +425,7 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       window.location.hash = "#/cli";
     });
     const restoredCommandInput = page.getByPlaceholder(
-      "Write your command here",
+      /Write your command here/,
     );
     await restoredCommandInput.press("ArrowUp");
     await expect(restoredCommandInput).toHaveValue("get timer4_duration");
