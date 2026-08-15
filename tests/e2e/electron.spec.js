@@ -89,9 +89,18 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await expect(flightsLink).toHaveAttribute("target", "_blank");
 
     const configurationLink = page.getByRole("link", {
-      name: "Configuration",
+      name: "Configuration & Logging",
       exact: true,
     });
+    await expect(
+      page.getByRole("link", { name: "Events & Timers", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Timers", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Logging", exact: true }),
+    ).toHaveCount(0);
     const flightLogsLink = page.getByRole("link", {
       name: "Flight Logs",
       exact: true,
@@ -308,7 +317,7 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await page.evaluate(() => {
       window.location.hash = "#/events";
     });
-    await expect(page.getByText(/^liftoff$/i)).toBeVisible();
+    await expect(page.getByText(/^liftoff$/i).first()).toBeVisible();
     await expect(page.getByText(/^recorder$/i)).toBeVisible();
     await expect(page.getByText(/^log$/i)).toBeVisible();
 
@@ -356,7 +365,7 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       page.getByRole("button", { name: "Open Profile" }),
     ).toBeVisible();
     await expect(
-      page.getByText(/values read from the connected board/),
+      page.getByText(/settings read from the connected board/),
     ).toBeVisible();
     await expect(
       page.getByText("Current board value", { exact: true }),
@@ -369,6 +378,8 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       page.getByText("Flight Preflight", { exact: true }),
     ).toBeVisible();
     await expect(page.getByText("Event & Timer Simulator")).toBeVisible();
+    await expect(page.getByText("Flight Event Sequence")).toBeVisible();
+    await expect(page.getByText("Timer Chains", { exact: true })).toBeVisible();
     await expect(page.getByText("WARNING", { exact: true })).toBeVisible();
     await expect(page.getByText("Checks performed (7)")).toBeVisible();
     await expect(page.getByText("Liftoff detection: 35 m/s²")).toBeVisible();
@@ -379,6 +390,8 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     });
     await expect(page.getByText("Recording", { exact: true })).toBeVisible();
     await expect(page.getByText("Elements", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Free space:\s*99\.90%/)).toBeVisible();
+    await expect(page.getByText(/Estimated logging time:/)).toBeVisible();
     await expect(configurationLink).not.toHaveAttribute(
       "aria-disabled",
       "true",

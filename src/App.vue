@@ -34,10 +34,16 @@ export default {
     return {
       subscriptions: [],
       navItems: [
-        { title: "Configuration", link: "/config", requiresBoard: true },
-        { title: "Events", link: "/events", requiresBoard: true },
-        { title: "Timers", link: "/timer", requiresBoard: true },
-        { title: "Logging", link: "/logging", requiresBoard: true },
+        {
+          title: "Configuration & Logging",
+          link: "/config",
+          requiresBoard: true,
+        },
+        {
+          title: "Events & Timers",
+          link: "/events",
+          requiresBoard: true,
+        },
         { title: "Profiles", link: "/profiles", requiresBoard: true },
         { title: "Preflight", link: "/preflight", requiresBoard: true },
         { title: "CLI", link: "/cli", requiresBoard: true },

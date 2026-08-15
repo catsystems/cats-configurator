@@ -337,11 +337,34 @@
           </v-card>
         </v-col>
       </v-row>
+      <v-row>
+        <v-col>
+          <v-expansion-panels v-model="openSections" multiple>
+            <v-expansion-panel value="logging">
+              <v-expansion-panel-title>
+                <span class="text-h6">Logging &amp; Recording</span>
+                <v-chip
+                  v-if="loggingChanged"
+                  class="ml-3"
+                  color="warning"
+                  size="small"
+                  variant="tonal"
+                >
+                  Unsaved changes
+                </v-chip>
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <Logs ref="logging" embedded @change="onLoggingChange" />
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+          </v-expansion-panels>
+        </v-col>
+      </v-row>
     </v-container>
     <ActionsBar
       :saving="saveLoading"
       :changed="changed"
-      @refresh="init"
+      @refresh="refreshAll"
       @save="onSave"
     />
   </div>
@@ -352,6 +375,7 @@ import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
 import { getConfigs, setConfigs } from "@/services/configService";
 import ActionsBar from "@/components/ActionsBar.vue";
+import Logs from "@/views/Logs.vue";
 import { getDisplayValue } from "@/utils/unitConversions";
 import {
   convertLengthToImperial,
@@ -418,6 +442,7 @@ export default {
   name: "ConfigView",
   components: {
     ActionsBar,
+    Logs,
   },
   data() {
     return {
@@ -429,23 +454,15 @@ export default {
       imperialData: null,
       lastSavedData: null,
       lastSavedImperialData: null,
+      loggingChanged: false,
+      openSections: [],
       subscriptions: [],
     };
   },
   watch: {
     displayData: {
-      handler(data) {
-        let changed;
-        if (this.useImperialUnits) {
-          changed =
-            JSON.stringify(data) !== JSON.stringify(this.lastSavedImperialData);
-        } else {
-          changed = JSON.stringify(data) !== JSON.stringify(this.lastSavedData);
-        }
-
-        if (this.changed !== changed) {
-          this.setChangedTab(changed ? "config" : null);
-        }
+      handler() {
+        this.updateChangedState();
       },
       deep: true,
     },
@@ -471,11 +488,16 @@ export default {
     ...mapState(useAppStore, {
       config: "config",
       status: (store) => store.static.status,
-      changedTab: "changedTab",
       useImperialUnits: "useImperialUnits",
     }),
+    configurationChanged() {
+      const savedData = this.useImperialUnits
+        ? this.lastSavedImperialData
+        : this.lastSavedData;
+      return JSON.stringify(this.displayData) !== JSON.stringify(savedData);
+    },
     changed() {
-      return this.changedTab === "config";
+      return this.configurationChanged || this.loggingChanged;
     },
     processedStatus() {
       if (!this.status || !Array.isArray(this.status)) {
@@ -493,6 +515,9 @@ export default {
     },
   },
   mounted() {
+    if (this.$route?.query?.section === "logging") {
+      this.openSections = ["logging"];
+    }
     this.init();
     this.subscriptions.push(
       window.cats.board.onDumpComplete((result) => {
@@ -521,6 +546,17 @@ export default {
       getConfigs();
       this.getInfo();
     },
+    refreshAll() {
+      this.init();
+      this.$refs.logging?.init();
+    },
+    onLoggingChange(changed) {
+      this.loggingChanged = changed;
+      this.updateChangedState();
+    },
+    updateChangedState() {
+      this.setChangedTab(this.changed ? "config" : null);
+    },
     getInfo() {
       window.cats.board.getInfo();
       if (this.timer) clearInterval(this.timer);
@@ -529,26 +565,31 @@ export default {
       }, 250); // every 250 ms
     },
     async onSave() {
-      const forms = [
-        this.$refs.generalForm,
-        this.$refs.telemetryForm,
-        this.$refs.testingForm,
-      ].filter(Boolean);
-      const validation = await Promise.all(
-        forms.map((form) => form.validate()),
-      );
-      if (validation.some(({ valid }) => !valid)) return;
+      if (this.configurationChanged) {
+        const forms = [
+          this.$refs.generalForm,
+          this.$refs.telemetryForm,
+          this.$refs.testingForm,
+        ].filter(Boolean);
+        const validation = await Promise.all(
+          forms.map((form) => form.validate()),
+        );
+        if (validation.some(({ valid }) => !valid)) return;
+      }
 
       this.saveLoading = true;
       try {
-        let metricData;
-        if (this.useImperialUnits) {
-          metricData = convertImperialDataToMetric(this.displayData);
-        } else {
-          metricData = this.displayData;
+        if (this.configurationChanged) {
+          let metricData;
+          if (this.useImperialUnits) {
+            metricData = convertImperialDataToMetric(this.displayData);
+          } else {
+            metricData = this.displayData;
+          }
+          await setConfigs(metricData, this.lastSavedData);
+          await getConfigs();
         }
-        await setConfigs(metricData, this.lastSavedData);
-        await getConfigs();
+        if (this.loggingChanged) await this.$refs.logging?.onSave();
       } catch (error) {
         this.showErrorSnackbar(error.message);
       } finally {

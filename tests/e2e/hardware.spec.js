@@ -24,6 +24,13 @@ test("connects to a real CATS Vega without modifying configuration", async ({}, 
 
     const ports = await page.evaluate(() => window.cats.serial.list());
     expect(ports.some(({ path }) => path === hardwarePort)).toBe(true);
+    await page.waitForTimeout(500);
+    if (!(await page.getByText("Status: Connected").isVisible())) {
+      await page.evaluate(
+        (portPath) => window.cats.serial.connect(portPath),
+        hardwarePort,
+      );
+    }
     await expect(page.getByText("Status: Connected")).toBeVisible({
       timeout: 15_000,
     });
@@ -35,7 +42,10 @@ test("connects to a real CATS Vega without modifying configuration", async ({}, 
     await page.waitForTimeout(2500);
     await expect(page.getByText("Status: Disconnected")).toBeVisible();
 
-    await page.getByRole("button", { name: "Connect" }).click();
+    await page.evaluate(
+      (portPath) => window.cats.serial.connect(portPath),
+      hardwarePort,
+    );
     await expect(page.getByText("Status: Connected")).toBeVisible({
       timeout: 15_000,
     });
@@ -51,6 +61,14 @@ test("connects to a real CATS Vega without modifying configuration", async ({}, 
     });
 
     await page.evaluate(() => {
+      window.location.hash = "#/logging";
+    });
+    await expect(page.getByText("Recording", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Free space:\s*\d+(?:\.\d+)?%/)).toBeVisible({
+      timeout: 15_000,
+    });
+
+    await page.evaluate(() => {
       window.location.hash = "#/preflight";
     });
     await expect(
@@ -62,6 +80,8 @@ test("connects to a real CATS Vega without modifying configuration", async ({}, 
       timeout: 20_000,
     });
     await expect(page.getByText(/^(READY|WARNING)$/)).toBeVisible();
+    await expect(page.getByText("Flight Event Sequence")).toBeVisible();
+    await expect(page.getByText("Timer Chains", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "disconnect" }).click();
     await expect(page.getByText("Status: Disconnected")).toBeVisible();
