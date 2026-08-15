@@ -198,7 +198,7 @@
 </template>
 
 <script>
-import { mapActions } from "pinia";
+import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
 import { formatProfileValue } from "@/shared/configuration-profile.js";
 
@@ -206,8 +206,6 @@ export default {
   name: "ProfilesView",
   data() {
     return {
-      currentProfile: null,
-      currentRows: [],
       currentError: null,
       profile: null,
       rows: [],
@@ -225,22 +223,32 @@ export default {
     };
   },
   computed: {
+    ...mapState(useAppStore, ["currentBoardProfile"]),
+    currentProfile() {
+      return this.currentBoardProfile?.profile ?? null;
+    },
+    currentRows() {
+      return this.currentBoardProfile?.rows ?? [];
+    },
     displayProfile() {
       return this.viewMode === "board" ? this.currentProfile : this.profile;
     },
   },
   mounted() {
-    this.loadCurrentProfile();
+    if (!this.currentBoardProfile) this.loadCurrentProfile();
   },
   methods: {
-    ...mapActions(useAppStore, ["showSuccessSnackbar", "showErrorSnackbar"]),
+    ...mapActions(useAppStore, [
+      "setCurrentBoardProfile",
+      "showSuccessSnackbar",
+      "showErrorSnackbar",
+    ]),
     async loadCurrentProfile() {
       this.currentLoading = true;
       this.currentError = null;
       try {
         const result = await window.cats.profiles.current();
-        this.currentProfile = result.profile;
-        this.currentRows = result.rows;
+        this.setCurrentBoardProfile(result);
       } catch (error) {
         this.currentError = error.message;
         this.showErrorSnackbar(error.message);

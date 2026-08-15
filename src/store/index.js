@@ -7,6 +7,7 @@ export const useAppStore = defineStore("app", {
     active: false,
     cliHistory: [],
     preflightReport: null,
+    currentBoardProfile: null,
     changedTab: null,
     static: {},
     config: {},
@@ -57,6 +58,7 @@ export const useAppStore = defineStore("app", {
       if (!this.active) {
         this.cliHistory = [];
         this.preflightReport = null;
+        this.currentBoardProfile = null;
       }
     },
     addCliHistory(command) {
@@ -99,6 +101,12 @@ export const useAppStore = defineStore("app", {
     },
     clearPreflightReport() {
       this.preflightReport = null;
+    },
+    setCurrentBoardProfile(profile) {
+      this.currentBoardProfile = profile;
+    },
+    clearCurrentBoardProfile() {
+      this.currentBoardProfile = null;
     },
     addEventAction({ key, action }) {
       this.events[key].actions.push(action);
