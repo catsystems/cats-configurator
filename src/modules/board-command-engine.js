@@ -74,7 +74,6 @@ export class BoardCommandEngine {
         ) {
           attempt.acknowledged = true;
           attempt.output.length = 0;
-          this.#scheduleSettle();
         }
       } else if (attempt.acknowledged) {
         this.#finishAttempt();
@@ -88,7 +87,6 @@ export class BoardCommandEngine {
     ) {
       attempt.acknowledged = true;
       attempt.output.length = 0;
-      this.#scheduleSettle();
       return true;
     }
 
