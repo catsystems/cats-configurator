@@ -71,6 +71,7 @@ export default {
       }),
       window.cats.board.onConfigSaved(() => {
         this.clearPreflightReport();
+        this.clearCurrentBoardProfile();
         this.showSuccessSnackbar("Values saved successfully!");
       }),
     );
@@ -95,6 +96,7 @@ export default {
       "setTimer",
       "setLog",
       "clearPreflightReport",
+      "clearCurrentBoardProfile",
       "showSuccessSnackbar",
       "showErrorSnackbar",
       "setUpdateState",

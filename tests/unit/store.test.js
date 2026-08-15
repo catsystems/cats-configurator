@@ -29,12 +29,14 @@ describe("application store", () => {
     store.addCliHistory("status");
     store.addCliHistory("  get timer4_duration  ");
     store.setPreflightReport({ status: "READY" });
+    store.setCurrentBoardProfile({ profile: { schemaVersion: 1 } });
 
     expect(store.cliHistory).toEqual(["status", "get timer4_duration"]);
 
     store.setActiveState(false);
     expect(store.cliHistory).toEqual([]);
     expect(store.preflightReport).toBeNull();
+    expect(store.currentBoardProfile).toBeNull();
   });
 
   it("tracks event edits and unit-system state", () => {
