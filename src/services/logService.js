@@ -1,4 +1,3 @@
-import { LOG_KEYS } from "@/modules/settings.js";
 import { applyBoardValues } from "@/services/boardService.js";
 
 export function getLogInfo() {
@@ -6,7 +5,7 @@ export function getLogInfo() {
 }
 
 export function getLogData() {
-  return Promise.all(LOG_KEYS.map((key) => window.cats.board.getConfig(key)));
+  return window.cats.board.getConfigs();
 }
 
 export function setLogData({ speed, elements }, original = {}) {

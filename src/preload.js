@@ -91,6 +91,7 @@ const cats = {
     onData: (callback) => subscribe(IPC_CHANNELS.SERIAL_DATA, callback),
   },
   board: {
+    getConfigs: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_CONFIGS),
     getConfig: (key) => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_CONFIG, key),
     setConfig: (key, value) =>
       ipcRenderer.invoke(IPC_CHANNELS.BOARD_SET_CONFIG, { key, value }),

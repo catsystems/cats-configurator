@@ -1,4 +1,4 @@
-import { Notification, dialog } from "electron";
+import { Notification, app, dialog } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { ReadlineParser, SerialPort } from "serialport";
@@ -10,6 +10,7 @@ import {
 import {
   normalizeBoardCommand,
   parseConfigResponse,
+  parseConfigResponses,
   parseData,
   parsePromptCommand,
 } from "./serial-parser.js";
@@ -29,6 +30,7 @@ let port;
 let parser;
 let commandEngine;
 let currentNotification;
+let communicationLogStream;
 
 const useFakeSerial = process.env.CATS_FAKE_SERIAL === "1";
 const fakeSerialStartedAt = Date.now();
@@ -159,6 +161,12 @@ function coerceFakeValue(config, value) {
 }
 
 function fakeOutputForCommand(boardCommand) {
+  if (/^get\s*$/i.test(boardCommand)) {
+    return PROFILE_BOARD_KEYS.flatMap((key) => [
+      ...fakeConfigLines(fakeConfigForKey(key)),
+      "",
+    ]);
+  }
   const getMatch = boardCommand.match(/^get ([a-z0-9_]+)$/i);
   if (getMatch) {
     const config = fakeConfigForKey(getMatch[1]);
@@ -205,17 +213,66 @@ function feedFakeCommand(boardCommand) {
     ...fakeOutputForCommand(boardCommand),
     "^._.^:/>",
   ];
-  queueMicrotask(() => lines.forEach((line) => commandEngine?.receive(line)));
+  queueMicrotask(() =>
+    lines.forEach((line) => {
+      writeCommunicationLog("RX", line);
+      commandEngine?.receive(line);
+    }),
+  );
 }
 
 function createCommandEngine(write) {
   return new BoardCommandEngine({
-    write,
+    write: (boardCommand) => {
+      writeCommunicationLog("TX", boardCommand);
+      return write(boardCommand);
+    },
     parsePrompt: parsePromptCommand,
     normalizeCommand: normalizeBoardCommand,
     timeoutMs: 2500,
     retries: 1,
   });
+}
+
+function writeCommunicationLog(direction, message) {
+  if (!communicationLogStream?.writable) return;
+  const text = String(message).replace(/[\r\n]+/g, "\\n");
+  communicationLogStream.write(
+    `${new Date().toISOString()} ${direction} ${text}\n`,
+  );
+}
+
+function startCommunicationLog(serialPath) {
+  if (communicationLogStream) {
+    writeCommunicationLog("SESSION", "Connection replaced");
+    communicationLogStream.end();
+  }
+
+  try {
+    const logDirectory = app.getPath("logs");
+    fs.mkdirSync(logDirectory, { recursive: true });
+    const stream = fs.createWriteStream(
+      path.join(logDirectory, "vega-communication.log"),
+      { flags: "a", encoding: "utf8" },
+    );
+    communicationLogStream = stream;
+    stream.on("error", (error) => {
+      console.error("Could not write Vega communication log:", error);
+      if (communicationLogStream === stream) communicationLogStream = null;
+    });
+    writeCommunicationLog("SESSION", `Connecting to ${serialPath}`);
+  } catch (error) {
+    communicationLogStream = null;
+    console.error("Could not open Vega communication log:", error);
+  }
+}
+
+function stopCommunicationLog(message) {
+  if (!communicationLogStream) return;
+  writeCommunicationLog("SESSION", message);
+  const stream = communicationLogStream;
+  communicationLogStream = null;
+  stream.end();
 }
 
 function writeSerialCommand(candidatePort, boardCommand) {
@@ -251,6 +308,7 @@ async function getList() {
 
 function connect(serialPath) {
   if (useFakeSerial) {
+    startCommunicationLog(serialPath);
     commandEngine?.cancel("Board connection replaced.");
     commandEngine = createCommandEngine(feedFakeCommand);
     queueMicrotask(() => {
@@ -272,6 +330,8 @@ function connect(serialPath) {
     return;
   }
 
+  startCommunicationLog(serialPath);
+
   const candidatePort = new SerialPort(
     { ...CONFIG, path: serialPath },
     (error) => {
@@ -279,6 +339,8 @@ function connect(serialPath) {
       if (port === candidatePort) port = null;
       commandEngine?.cancel(error);
       commandEngine = null;
+      writeCommunicationLog("ERROR", error.message);
+      stopCommunicationLog("Connection failed");
       sendToRenderer(IPC_CHANNELS.SERIAL_ERROR, error.message);
     },
   );
@@ -292,6 +354,7 @@ function connect(serialPath) {
   parser.on("data", onData);
 
   candidatePort.on("error", (error) => {
+    writeCommunicationLog("ERROR", error.message);
     sendToRenderer(IPC_CHANNELS.SERIAL_ERROR, error.message);
     commandEngine?.cancel(error);
     if (candidatePort.isOpen) candidatePort.close();
@@ -299,9 +362,12 @@ function connect(serialPath) {
       port = null;
       parser = null;
       commandEngine = null;
+      stopCommunicationLog("Connection failed");
     }
   });
   candidatePort.on("open", () => {
+    writeCommunicationLog("SESSION", "Port opened");
+    writeCommunicationLog("TX", "<wake>");
     candidatePort.write("\n");
     sendToRenderer(IPC_CHANNELS.SERIAL_CONNECTED);
     void identifyBoard();
@@ -311,6 +377,7 @@ function connect(serialPath) {
     parser = null;
     commandEngine?.cancel();
     commandEngine = null;
+    stopCommunicationLog("Port closed");
     notify({ title: "Port is disconnected." });
     sendToRenderer(IPC_CHANNELS.BOARD_ACTIVE, false);
     sendToRenderer(IPC_CHANNELS.SERIAL_DISCONNECTED);
@@ -346,9 +413,11 @@ async function identifyBoard() {
 }
 
 function disconnect() {
+  writeCommunicationLog("SESSION", "Disconnect requested");
   commandEngine?.cancel();
   if (useFakeSerial) {
     commandEngine = null;
+    stopCommunicationLog("Port closed");
     queueMicrotask(() => {
       sendToRenderer(IPC_CHANNELS.BOARD_ACTIVE, false);
       sendToRenderer(IPC_CHANNELS.SERIAL_DISCONNECTED);
@@ -359,6 +428,7 @@ function disconnect() {
 }
 
 function onData(data) {
+  writeCommunicationLog("RX", data);
   if (commandEngine?.receive(data)) return;
   if (data.includes("CATS is now ready")) void identifyBoard();
 }
@@ -371,6 +441,61 @@ function requireCommandEngine() {
 function emitConfig(config) {
   sendToRenderer(IPC_CHANNELS.BOARD_CONFIG_DATA, config);
   return config;
+}
+
+function emitConfigs(configs) {
+  sendToRenderer(IPC_CHANNELS.BOARD_CONFIG_DATA, configs);
+  return configs;
+}
+
+async function collectBoardConfigurations(execute) {
+  let configs = [];
+  try {
+    const response = await execute("get");
+    configs = parseConfigResponses(response.output);
+  } catch (error) {
+    if (!(error instanceof BoardCommandError)) throw error;
+  }
+
+  const configsByKey = new Map(
+    configs
+      .filter(({ key, type }) => key && type)
+      .map((config) => [config.key, config]),
+  );
+  const unsupportedKeys = [];
+
+  for (const key of PROFILE_BOARD_KEYS) {
+    if (configsByKey.has(key)) continue;
+    try {
+      const response = await execute(`get ${key}`);
+      const config = parseConfigResponse(response.output);
+      configsByKey.set(key, config);
+    } catch (error) {
+      if (
+        error instanceof BoardCommandError &&
+        /invalid name/i.test(error.message)
+      ) {
+        unsupportedKeys.push(key);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return {
+    configs: PROFILE_BOARD_KEYS.flatMap((key) =>
+      configsByKey.has(key) ? [configsByKey.get(key)] : [],
+    ),
+    unsupportedKeys,
+  };
+}
+
+async function readBoardConfigurations() {
+  const result = await requireCommandEngine().transaction((execute) =>
+    collectBoardConfigurations(execute),
+  );
+  emitConfigs(result.configs);
+  return result;
 }
 
 function processCommandResponse(boardCommand, output) {
@@ -386,6 +511,9 @@ function processCommandResponse(boardCommand, output) {
   }
   if (boardCommand.startsWith("get ")) {
     return emitConfig(parseConfigResponse(output));
+  }
+  if (boardCommand === "get") {
+    return emitConfigs(parseConfigResponses(output));
   }
   if (boardCommand === "dump") {
     const start = output.indexOf("#Configuration dump");
@@ -546,24 +674,11 @@ async function resetBoardConfiguration() {
 async function readBoardSnapshot() {
   return requireCommandEngine().transaction(async (execute) => {
     const version = await execute("version");
-    const values = {};
-    const unsupportedKeys = [];
-
-    for (const key of PROFILE_BOARD_KEYS) {
-      try {
-        const response = await execute(`get ${key}`);
-        values[key] = parseConfigResponse(response.output).value;
-      } catch (error) {
-        if (
-          error instanceof BoardCommandError &&
-          /invalid name/i.test(error.message)
-        ) {
-          unsupportedKeys.push(key);
-          continue;
-        }
-        throw error;
-      }
-    }
+    const { configs, unsupportedKeys } =
+      await collectBoardConfigurations(execute);
+    const values = Object.fromEntries(
+      configs.map(({ key, value }) => [key, value]),
+    );
 
     return {
       board: parseBoardIdentity(version.output),
@@ -677,6 +792,7 @@ export {
   connect,
   disconnect,
   getList,
+  readBoardConfigurations,
   readBoardSnapshot,
   resetBoardConfiguration,
   restoreBoardConfiguration,

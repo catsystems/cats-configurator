@@ -1,8 +1,7 @@
-import { TIMER_KEYS } from "@/modules/settings.js";
 import { applyBoardValues } from "@/services/boardService.js";
 
 export function getTimers() {
-  return Promise.all(TIMER_KEYS.map((key) => window.cats.board.getTimers(key)));
+  return window.cats.board.getConfigs();
 }
 
 export function setTimers(data, original = {}) {
