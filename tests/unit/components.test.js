@@ -204,7 +204,6 @@ describe("renderer state components", () => {
         getConfigs: vi.fn(),
         getInfo: vi.fn(),
         getLogInfo: vi.fn(),
-        onDumpComplete: vi.fn(() => unsubscribe),
       },
       serial: {
         onDisconnected: vi.fn(() => unsubscribe),
@@ -226,7 +225,69 @@ describe("renderer state components", () => {
 
     expect(wrapper.text()).toContain("General");
     expect(wrapper.text()).toContain("Main Altitude");
+    expect(wrapper.text()).toContain("Reset Config");
+    expect(wrapper.text()).not.toContain("Reset Settings");
     expect(wrapper.get('input[type="number"]').element.value).toBe("200");
+    wrapper.unmount();
+  });
+
+  it("hides flight estimates reported in invalid or testing states", async () => {
+    const unsubscribe = vi.fn();
+    window.cats = {
+      board: {
+        getConfigs: vi.fn(),
+        getInfo: vi.fn(),
+        getLogInfo: vi.fn(),
+      },
+      serial: {
+        onDisconnected: vi.fn(() => unsubscribe),
+      },
+    };
+
+    const wrapper = mount(Config, {
+      global: { plugins: [pinia, vuetify] },
+    });
+    const store = useAppStore();
+    store.setStaticData({
+      key: "status",
+      value: [
+        "System time: 22991 ticks",
+        "State: INVALID",
+        "Voltage: 0.43V",
+        "h: 9259.75m, v: -766316443749893141430272.00m/s, a: 2.01m/s^2",
+      ],
+    });
+    await nextTick();
+
+    expect(wrapper.text()).toContain("State: INVALID");
+    expect(wrapper.text()).not.toContain("9259.75m");
+
+    store.setStaticData({
+      key: "status",
+      value: [
+        "System time: 22995 ticks",
+        "State: TESTING",
+        "Voltage: 0.43V",
+        "h: 8000.00m, v: -999999.00m/s, a: 2.01m/s^2",
+      ],
+    });
+    await nextTick();
+
+    expect(wrapper.text()).toContain("State: TESTING");
+    expect(wrapper.text()).not.toContain("8000.00m");
+
+    store.setStaticData({
+      key: "status",
+      value: [
+        "System time: 23000 ticks",
+        "State: READY",
+        "Voltage: 0.43V",
+        "h: 1.25m, v: 0.50m/s, a: 0.01m/s^2",
+      ],
+    });
+    await nextTick();
+
+    expect(wrapper.text()).toContain("h: 1.25m");
     wrapper.unmount();
   });
 
@@ -437,6 +498,7 @@ describe("renderer state components", () => {
             status: "verified",
           })),
         })),
+        reset: vi.fn().mockResolvedValue({ ok: true, saved: true }),
       },
       profiles: {
         current: vi.fn().mockResolvedValue({
@@ -497,6 +559,21 @@ describe("renderer state components", () => {
     expect(wrapper.text()).toContain("Main Altitude");
     expect(wrapper.text()).toContain("2 profile entries differ from the board");
     expect(wrapper.text()).toContain("Apply Profile to Board");
+    expect(wrapper.text()).toContain("Reset Config");
+    expect(wrapper.text()).not.toContain("Reset Settings");
+    expect(wrapper.findAll("thead th").map((header) => header.text())).toEqual([
+      "Section",
+      "Setting",
+      "Profile",
+      "",
+      "Board",
+      "Difference",
+      "Apply result",
+      "Action",
+    ]);
+    expect(
+      wrapper.findAll('[aria-label="Profile value will replace board value"]'),
+    ).toHaveLength(2);
     const timerRow = wrapper.vm.comparisonRows.find(
       ({ key }) => key === "timer1",
     );
@@ -533,13 +610,24 @@ describe("renderer state components", () => {
       "Profile applied and verified.",
     );
     expect(window.cats.profiles.current).toHaveBeenCalledTimes(3);
+
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    await wrapper.vm.resetConfig();
+    expect(window.cats.board.reset).toHaveBeenCalledOnce();
+    expect(wrapper.vm.viewMode).toBe("board");
+    expect(wrapper.vm.profile).toBeNull();
+    expect(window.cats.profiles.current).toHaveBeenCalledTimes(4);
+    expect(useAppStore().snackbar.message).toBe(
+      "Configuration reset to default values.",
+    );
+    confirm.mockRestore();
     wrapper.unmount();
 
     const cachedWrapper = mount(Profiles, {
       global: { plugins: [pinia, vuetify] },
     });
     await nextTick();
-    expect(window.cats.profiles.current).toHaveBeenCalledTimes(3);
+    expect(window.cats.profiles.current).toHaveBeenCalledTimes(4);
     expect(cachedWrapper.text()).toContain(
       "Showing 1 board setting read from the connected board",
     );
