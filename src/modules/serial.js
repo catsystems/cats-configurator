@@ -1,4 +1,4 @@
-import { Notification, app, dialog } from "electron";
+import { Notification, app } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { ReadlineParser, SerialPort } from "serialport";
@@ -515,14 +515,6 @@ function processCommandResponse(boardCommand, output) {
   if (boardCommand === "get") {
     return emitConfigs(parseConfigResponses(output));
   }
-  if (boardCommand === "dump") {
-    const start = output.indexOf("#Configuration dump");
-    const end = output.indexOf("#End of configuration dump");
-    const lines = output.slice(start + 1, end < 0 ? undefined : end);
-    saveDumpDataToFile(lines.join("\n"));
-    sendToRenderer(IPC_CHANNELS.BOARD_DUMP_COMPLETE);
-    return lines;
-  }
   if (boardCommand === "defaults") {
     notify({ title: "Config reset to default" });
   }
@@ -733,45 +725,6 @@ async function applyConfigurationProfile(profile) {
   };
 }
 
-async function restoreBoardConfiguration() {
-  const selection = await dialog.showOpenDialog(mainWindow, {
-    properties: ["openFile"],
-    filters: [{ name: "CATS configuration", extensions: ["txt"] }],
-  });
-  if (selection.canceled || selection.filePaths.length === 0) {
-    return { canceled: true };
-  }
-
-  const data = await fs.promises.readFile(selection.filePaths[0], "utf8");
-  const entries = data
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const match = line.match(/^set\s+([a-z0-9_]+)\s*=\s*(.+)$/i);
-      if (!match) {
-        throw new Error(
-          "Backup contains an unsupported command. Only configuration values can be restored.",
-        );
-      }
-      return { key: match[1], value: match[2] };
-    });
-  const result = await applyConfiguration(entries);
-  if (!result.ok) {
-    const failed = result.results.find(({ status }) => status === "failed");
-    throw new Error(
-      `Backup was not fully restored. ${failed?.key || "Board"}: ${failed?.message || "verification failed"}`,
-    );
-  }
-  return { canceled: false, ...result };
-}
-
-function saveDumpDataToFile(data) {
-  const paths = dialog.showOpenDialogSync({ properties: ["openDirectory"] });
-  if (!paths) throw new Error("No directory selected for backup.");
-  fs.writeFileSync(path.join(paths[0], "backup_cats_config.txt"), data);
-}
-
 function notify(payload) {
   if (currentNotification) currentNotification.close();
   currentNotification = new Notification(payload);
@@ -795,6 +748,5 @@ export {
   readBoardConfigurations,
   readBoardSnapshot,
   resetBoardConfiguration,
-  restoreBoardConfiguration,
   setSerialWindow,
 };

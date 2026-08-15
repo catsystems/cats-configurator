@@ -1,24 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { IPC_CHANNELS } from "@/shared/ipc.js";
 import { PROFILE_BOARD_KEYS } from "@/modules/settings.js";
 
 const serialState = vi.hoisted(() => ({
   instances: [],
   notifications: [],
-  openDialogResult: { canceled: true, filePaths: [] },
   parser: null,
 }));
 
 vi.mock("electron", () => ({
   app: {
     getPath: vi.fn(() => process.env.TEMP),
-  },
-  dialog: {
-    showOpenDialog: vi.fn(() => serialState.openDialogResult),
-    showOpenDialogSync: vi.fn(),
   },
   Notification: class {
     constructor(payload) {
@@ -81,7 +73,6 @@ describe("serial board identification", () => {
     vi.useFakeTimers();
     serialState.instances.length = 0;
     serialState.notifications.length = 0;
-    serialState.openDialogResult = { canceled: true, filePaths: [] };
     serialState.parser = null;
     sent = [];
     serial = await import("@/modules/serial.js");
@@ -361,64 +352,5 @@ describe("serial board identification", () => {
       IPC_CHANNELS.BOARD_CONFIG_SAVED,
       { ok: true, saved: true },
     ]);
-  });
-
-  it("restores text backups through verified configuration writes", async () => {
-    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "cats-restore-"));
-    const backupPath = path.join(directory, "backup.txt");
-    await fs.writeFile(backupPath, "set timer4_duration = 1200\n");
-    serialState.openDialogResult = {
-      canceled: false,
-      filePaths: [backupPath],
-    };
-    serial.connect("COM4");
-    const port = serialState.instances[0];
-    await identify(port);
-
-    try {
-      const restore = serial.restoreBoardConfiguration();
-      for (const [command, output] of [
-        ["set timer4_duration = 1200", ["timer4_duration set to 1200"]],
-        ["save", ["Successfully written to flash"]],
-        [
-          "get timer4_duration",
-          ["timer4_duration = 1200", "Allowed range: 0 - 1200000"],
-        ],
-      ]) {
-        await vi.waitFor(() =>
-          expect(port.write).toHaveBeenCalledWith(
-            `${command}\n`,
-            expect.any(Function),
-          ),
-        );
-        respond(command, output);
-      }
-
-      await expect(restore).resolves.toMatchObject({
-        canceled: false,
-        ok: true,
-        saved: true,
-      });
-    } finally {
-      await fs.rm(directory, { recursive: true, force: true });
-    }
-  });
-
-  it("rejects non-configuration commands in text backups", async () => {
-    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "cats-restore-"));
-    const backupPath = path.join(directory, "backup.txt");
-    await fs.writeFile(backupPath, "reboot\n");
-    serialState.openDialogResult = {
-      canceled: false,
-      filePaths: [backupPath],
-    };
-
-    try {
-      await expect(serial.restoreBoardConfiguration()).rejects.toThrow(
-        "Only configuration values can be restored",
-      );
-    } finally {
-      await fs.rm(directory, { recursive: true, force: true });
-    }
   });
 });

@@ -15,6 +15,14 @@
         <v-btn color="primary" :loading="openLoading" @click="openProfile">
           Open Profile
         </v-btn>
+        <v-btn
+          color="error"
+          variant="outlined"
+          :loading="resetLoading"
+          @click="resetConfig"
+        >
+          Reset Config
+        </v-btn>
       </v-card-title>
 
       <v-card-text>
@@ -144,8 +152,9 @@
                 <tr>
                   <th>Section</th>
                   <th>Setting</th>
-                  <th>Board</th>
                   <th>Profile</th>
+                  <th class="profile-direction"></th>
+                  <th>Board</th>
                   <th>Difference</th>
                   <th>Apply result</th>
                   <th>Action</th>
@@ -161,10 +170,20 @@
                     </div>
                   </td>
                   <td class="profile-value">
-                    {{ formatRowValue(row, "boardValue") }}
+                    {{ formatRowValue(row, "profileValue") }}
+                  </td>
+                  <td class="profile-direction">
+                    <v-icon
+                      v-if="row.status === 'changed'"
+                      aria-label="Profile value will replace board value"
+                      color="warning"
+                      size="small"
+                    >
+                      mdi-arrow-right
+                    </v-icon>
                   </td>
                   <td class="profile-value">
-                    {{ formatRowValue(row, "profileValue") }}
+                    {{ formatRowValue(row, "boardValue") }}
                   </td>
                   <td>
                     <v-chip :color="statusColor(row.status)" size="small">
@@ -278,6 +297,7 @@ export default {
       currentLoading: false,
       exportLoading: false,
       openLoading: false,
+      resetLoading: false,
       applyLoading: false,
       applyRowLoading: null,
     };
@@ -350,6 +370,35 @@ export default {
         this.showErrorSnackbar(error.message);
       } finally {
         this.openLoading = false;
+      }
+    },
+    async resetConfig() {
+      const confirmed = window.confirm(
+        "Configuration is about to be reset to default values,\nwould you like to proceed?",
+      );
+      if (!confirmed) return;
+
+      this.resetLoading = true;
+      try {
+        await window.cats.board.reset();
+        this.profile = null;
+        this.rows = [];
+        this.compatibility = {
+          warnings: [],
+          canApply: false,
+          changedCount: 0,
+        };
+        this.applyResults = {};
+        this.viewMode = "board";
+        this.setCurrentBoardProfile(null);
+        await this.loadCurrentProfile();
+        if (!this.currentError) {
+          this.showSuccessSnackbar("Configuration reset to default values.");
+        }
+      } catch (error) {
+        this.showErrorSnackbar(error.message);
+      } finally {
+        this.resetLoading = false;
       }
     },
     async applyProfile() {
@@ -507,5 +556,11 @@ export default {
 .profile-value {
   max-width: 260px;
   overflow-wrap: anywhere;
+}
+
+.profile-direction {
+  width: 36px;
+  padding-inline: 4px !important;
+  text-align: center !important;
 }
 </style>
