@@ -84,41 +84,14 @@
               </v-form>
             </v-card-text>
             <v-card-actions>
-              <v-row density="compact">
-                <v-col cols="6">
-                  <v-btn
-                    color="primary"
-                    variant="elevated"
-                    :disabled="changed"
-                    :loading="backupLoading"
-                    block
-                    @click="backupConfig"
-                  >
-                    Backup Config
-                  </v-btn>
-                </v-col>
-                <v-col cols="6">
-                  <v-btn
-                    color="primary"
-                    variant="elevated"
-                    block
-                    :loading="restoreLoading"
-                    @click="loadConfig"
-                  >
-                    Load Config
-                  </v-btn>
-                </v-col>
-                <v-col cols="12">
-                  <v-btn
-                    color="error"
-                    variant="elevated"
-                    block
-                    @click="resetConfig"
-                  >
-                    Reset Settings
-                  </v-btn>
-                </v-col>
-              </v-row>
+              <v-btn
+                color="error"
+                variant="elevated"
+                block
+                @click="resetConfig"
+              >
+                Reset Config
+              </v-btn>
             </v-card-actions>
           </v-card>
         </v-col>
@@ -137,7 +110,7 @@
                 v-text="item"
               ></div>
               <div
-                v-if="processedStatus && processedStatus.length > 3"
+                v-if="showFlightEstimate && processedStatus.length > 3"
                 class="mb-2"
                 v-text="processedStatus[3]"
               ></div>
@@ -448,8 +421,6 @@ export default {
   data() {
     return {
       timer: null,
-      backupLoading: false,
-      restoreLoading: false,
       saveLoading: false,
       data: null,
       imperialData: null,
@@ -511,6 +482,10 @@ export default {
         return line;
       });
     },
+    showFlightEstimate() {
+      const state = this.status?.find((line) => /^State:/i.test(line));
+      return !/^State:\s*(?:INVALID|TESTING)\b/i.test(state || "");
+    },
     displayData() {
       return this.useImperialUnits ? this.imperialData : this.data;
     },
@@ -521,11 +496,6 @@ export default {
     }
     this.init();
     this.subscriptions.push(
-      window.cats.board.onDumpComplete((result) => {
-        this.backupLoading = false;
-        if (result?.error) this.showErrorSnackbar(result.error);
-        else this.showSuccessSnackbar("Backup created!");
-      }),
       window.cats.serial.onDisconnected(() => clearInterval(this.timer)),
     );
     if (this.useImperialUnits && this.data !== null) {
@@ -594,32 +564,6 @@ export default {
         this.showErrorSnackbar(error.message);
       } finally {
         this.saveLoading = false;
-      }
-    },
-    async backupConfig() {
-      this.backupLoading = true;
-      try {
-        await window.cats.board.dump();
-      } catch (error) {
-        this.backupLoading = false;
-        this.showErrorSnackbar(error.message);
-      }
-    },
-    async loadConfig() {
-      const confirmed = window.confirm(
-        "Configuration is about to be restored,\nwould you like to proceed?",
-      );
-
-      if (confirmed) {
-        this.restoreLoading = true;
-        try {
-          const result = await window.cats.board.restore();
-          if (!result.canceled) setTimeout(this.init, 100);
-        } catch (error) {
-          this.showErrorSnackbar(error.message);
-        } finally {
-          this.restoreLoading = false;
-        }
       }
     },
     async resetConfig() {

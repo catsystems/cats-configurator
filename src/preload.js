@@ -101,8 +101,6 @@ const cats = {
     getTimers: (key) => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_TIMERS, key),
     getInfo: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_INFO),
     getLogInfo: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_LOG_INFO),
-    dump: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_DUMP),
-    restore: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_RESTORE),
     reset: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_RESET),
     save: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_SAVE),
     onActive: (callback) => subscribe(IPC_CHANNELS.BOARD_ACTIVE, callback),
@@ -111,8 +109,6 @@ const cats = {
     onConfig: (callback) => subscribe(IPC_CHANNELS.BOARD_CONFIG_DATA, callback),
     onConfigSaved: (callback) =>
       subscribe(IPC_CHANNELS.BOARD_CONFIG_SAVED, callback),
-    onDumpComplete: (callback) =>
-      subscribe(IPC_CHANNELS.BOARD_DUMP_COMPLETE, callback),
   },
   profiles: {
     current: () => ipcRenderer.invoke(IPC_CHANNELS.PROFILE_CURRENT),
