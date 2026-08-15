@@ -201,8 +201,9 @@ describe("renderer state components", () => {
     const unsubscribe = vi.fn();
     window.cats = {
       board: {
-        getConfig: vi.fn(),
+        getConfigs: vi.fn(),
         getInfo: vi.fn(),
+        getLogInfo: vi.fn(),
         onDumpComplete: vi.fn(() => unsubscribe),
       },
       serial: {
@@ -233,7 +234,7 @@ describe("renderer state components", () => {
     window.cats = {
       board: {
         applyConfig: vi.fn().mockResolvedValue({ ok: true, results: [] }),
-        getTimers: vi.fn().mockResolvedValue(),
+        getConfigs: vi.fn().mockResolvedValue(),
       },
     };
     const context = {
@@ -326,7 +327,7 @@ describe("renderer state components", () => {
     window.cats = {
       board: {
         getLogInfo: vi.fn(),
-        getConfig: vi.fn(),
+        getConfigs: vi.fn(),
       },
     };
     const wrapper = mount(Logs, {

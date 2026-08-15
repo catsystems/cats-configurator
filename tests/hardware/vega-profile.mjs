@@ -4,7 +4,7 @@ import { ReadlineParser, SerialPort } from "serialport";
 import { BoardCommandEngine } from "../../src/modules/board-command-engine.js";
 import {
   normalizeBoardCommand,
-  parseConfigResponse,
+  parseConfigResponses,
   parsePromptCommand,
 } from "../../src/modules/serial-parser.js";
 import { PROFILE_BOARD_KEYS } from "../../src/modules/settings.js";
@@ -51,14 +51,22 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 250));
   const snapshot = await engine.transaction(async (execute) => {
     const version = await execute("version");
-    const values = {};
-    for (const key of PROFILE_BOARD_KEYS) {
-      const response = await execute("get " + key);
-      values[key] = parseConfigResponse(response.output).value;
+    const response = await execute("get");
+    const configs = new Map(
+      parseConfigResponses(response.output).map((config) => [
+        config.key,
+        config,
+      ]),
+    );
+    const missingKeys = PROFILE_BOARD_KEYS.filter((key) => !configs.has(key));
+    if (missingKeys.length) {
+      throw new Error("Bulk get omitted: " + missingKeys.join(", "));
     }
     return {
       board: parseBoardIdentity(version.output),
-      values,
+      values: Object.fromEntries(
+        PROFILE_BOARD_KEYS.map((key) => [key, configs.get(key).value]),
+      ),
       unsupportedKeys: [],
     };
   });

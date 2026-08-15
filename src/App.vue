@@ -69,11 +69,14 @@ export default {
           if (this.$route.meta.requiresBoard) this.$router.push("/");
         }
       }),
-      window.cats.board.onConfig((config) => {
-        if (config.type === "EVENT") this.setEvent(config);
-        else if (config.key.includes("timer")) this.setTimer(config);
-        else if (config.key.includes("rec_")) this.setLog(config);
-        else this.setConfig(config);
+      window.cats.board.onConfig((payload) => {
+        const configs = Array.isArray(payload) ? payload : [payload];
+        configs.forEach((config) => {
+          if (config.type === "EVENT") this.setEvent(config);
+          else if (config.key.includes("timer")) this.setTimer(config);
+          else if (config.key.includes("rec_")) this.setLog(config);
+          else this.setConfig(config);
+        });
       }),
       window.cats.board.onConfigSaved(() => {
         this.clearPreflightReport();

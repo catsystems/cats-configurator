@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { IPC_CHANNELS } from "@/shared/ipc.js";
+import { PROFILE_BOARD_KEYS } from "@/modules/settings.js";
 
 const serialState = vi.hoisted(() => ({
   instances: [],
@@ -12,6 +13,9 @@ const serialState = vi.hoisted(() => ({
 }));
 
 vi.mock("electron", () => ({
+  app: {
+    getPath: vi.fn(() => process.env.TEMP),
+  },
   dialog: {
     showOpenDialog: vi.fn(() => serialState.openDialogResult),
     showOpenDialogSync: vi.fn(),
@@ -93,6 +97,29 @@ describe("serial board identification", () => {
     serialState.parser.emit("data", "^._.^:/>");
   }
 
+  function configOutput(key) {
+    if (key.startsWith("ev_")) {
+      return [`${key} = 0,0`, "Array length: 16"];
+    }
+    if (key.endsWith("_duration")) {
+      return [`${key} = 1000`, "Allowed range: 0 - 1200000"];
+    }
+    if (/^timer[1-4]_(start|trigger)$/.test(key)) {
+      return [`${key} = READY`, "Allowed values: CALIBRATE, READY, LIFTOFF"];
+    }
+    if (["tele_link_phrase", "tele_test_phrase"].includes(key)) {
+      return [`${key} = cats1234`, "String length: 4 - 16"];
+    }
+    if (
+      ["tele_enable", "tele_adaptive_power", "test_mode", "rec_speed"].includes(
+        key,
+      )
+    ) {
+      return [`${key} = OFF`, "Allowed values: OFF, ON"];
+    }
+    return [`${key} = 0`, "Allowed range: 0 - 4294967295"];
+  }
+
   async function identify(port) {
     port.openSuccessfully();
     respond("version", ["Board: CATS Vega", "Firmware: test"]);
@@ -133,6 +160,45 @@ describe("serial board identification", () => {
     ).toBe(false);
     expect(port.isOpen).toBe(true);
     serial.disconnect();
+  });
+
+  it("loads all settings with one bulk get and falls back only for a missing key", async () => {
+    serial.connect("COM4");
+    const port = serialState.instances[0];
+    await identify(port);
+
+    const missingKey = PROFILE_BOARD_KEYS.at(-1);
+    const read = serial.readBoardConfigurations();
+    await vi.waitFor(() =>
+      expect(port.write).toHaveBeenCalledWith("get\n", expect.any(Function)),
+    );
+    respond(
+      "get",
+      PROFILE_BOARD_KEYS.filter((key) => key !== missingKey).flatMap(
+        configOutput,
+      ),
+    );
+    await vi.waitFor(() =>
+      expect(port.write).toHaveBeenCalledWith(
+        `get ${missingKey}\n`,
+        expect.any(Function),
+      ),
+    );
+    respond(`get ${missingKey}`, configOutput(missingKey));
+
+    await expect(read).resolves.toMatchObject({
+      configs: expect.arrayContaining([
+        expect.objectContaining({ key: missingKey }),
+      ]),
+      unsupportedKeys: [],
+    });
+    expect(sent).toContainEqual([
+      IPC_CHANNELS.BOARD_CONFIG_DATA,
+      expect.arrayContaining([expect.objectContaining({ key: missingKey })]),
+    ]);
+    expect(
+      port.write.mock.calls.filter(([command]) => command.startsWith("get ")),
+    ).toHaveLength(1);
   });
 
   it("rejects and closes a responsive non-CATS device", async () => {

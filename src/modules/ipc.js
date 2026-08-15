@@ -23,6 +23,7 @@ import {
   connect,
   disconnect,
   getList,
+  readBoardConfigurations,
   readBoardSnapshot,
   resetBoardConfiguration,
   restoreBoardConfiguration,
@@ -231,6 +232,7 @@ export function subscribeListeners(openExternal) {
     return true;
   });
 
+  handle(IPC_CHANNELS.BOARD_GET_CONFIGS, readBoardConfigurations);
   handle(IPC_CHANNELS.BOARD_GET_CONFIG, (key) =>
     command(`get ${assertBoardKey(key)}`),
   );

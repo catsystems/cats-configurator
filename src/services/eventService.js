@@ -1,8 +1,7 @@
-import { EVENT_KEYS } from "@/modules/settings.js";
 import { applyBoardValues } from "@/services/boardService.js";
 
 export function getEvents() {
-  return Promise.all(EVENT_KEYS.map((key) => window.cats.board.getEvents(key)));
+  return window.cats.board.getConfigs();
 }
 
 export function setEvents(events) {

@@ -19,6 +19,7 @@ export const IPC_CHANNELS = Object.freeze({
   BOARD_CONFIG_DATA: "board:config-data",
   BOARD_CONFIG_SAVED: "board:config-saved",
   BOARD_DUMP_COMPLETE: "board:dump-complete",
+  BOARD_GET_CONFIGS: "board:get-configs",
   BOARD_GET_CONFIG: "board:get-config",
   BOARD_SET_CONFIG: "board:set-config",
   BOARD_APPLY_CONFIG: "board:apply-config",
