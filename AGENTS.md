@@ -1,5 +1,13 @@
 # CATS Configurator repository instructions
 
+## Local toolchain
+
+- Use Node.js 24 and npm with `package-lock.json`. Do not use pnpm or yarn in
+  this checkout.
+- If npm is unavailable but dependencies are already installed, use the
+  configured Node runtime with the existing local package executables. Do not
+  switch package managers or reinstall dependencies merely to run a check.
+
 ## Commit and publishing discipline
 
 - Use a descriptive, imperative subject that explains the outcome of the
