@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   buildPreflightReport,
   parseConfiguredActions,
+  PREFLIGHT_CHECKS,
   simulateFlightSequence,
 } from "@/shared/preflight.js";
 
 function safeSnapshot(overrides = {}) {
   const values = {
     main_altitude: 200,
+    acc_threshold: 35,
     test_mode: "OFF",
     rec_speed: "100 Hz",
     rec_elements: 65504,
@@ -36,7 +38,6 @@ describe("guided preflight and event simulation", () => {
 
     expect(report.status).toBe("READY");
     expect(report.summary).toMatchObject({
-      blockedCount: 0,
       warningCount: 0,
     });
     expect(report.checks.every(({ status }) => status === "ready")).toBe(true);
@@ -51,7 +52,7 @@ describe("guided preflight and event simulation", () => {
     ]);
   });
 
-  it("blocks test mode, disabled recording, and conflicting deployment", () => {
+  it("warns about test mode, disabled recording, and deployment issues", () => {
     const report = buildPreflightReport(
       safeSnapshot({
         test_mode: "ON",
@@ -62,16 +63,14 @@ describe("guided preflight and event simulation", () => {
       }),
     );
 
-    expect(report.status).toBe("BLOCKED");
+    expect(report.status).toBe("WARNING");
     expect(report.checks.find(({ id }) => id === "testing-mode").status).toBe(
-      "blocked",
+      "warning",
     );
     expect(report.checks.find(({ id }) => id === "recording").status).toBe(
-      "blocked",
+      "warning",
     );
-    expect(
-      report.checks.find(({ id }) => id === "pyro-conflicts").detail,
-    ).toContain("Pyro 1");
+    expect(report.checks.some(({ id }) => id === "pyro-conflicts")).toBe(false);
     expect(
       report.checks.find(({ id }) => id === "deployment-plan").detail,
     ).toContain("too early");
@@ -87,7 +86,7 @@ describe("guided preflight and event simulation", () => {
     );
     expect(
       reversed.checks.find(({ id }) => id === "event-order"),
-    ).toMatchObject({ status: "blocked" });
+    ).toMatchObject({ status: "warning" });
 
     const cyclic = buildPreflightReport(
       safeSnapshot({
@@ -100,7 +99,7 @@ describe("guided preflight and event simulation", () => {
       }),
     );
     expect(cyclic.checks.find(({ id }) => id === "timer-chains")).toMatchObject(
-      { status: "blocked", detail: "Active timer triggers form a cycle." },
+      { status: "warning", detail: "Active timer triggers form a cycle." },
     );
   });
 
@@ -115,9 +114,28 @@ describe("guided preflight and event simulation", () => {
   it("does not treat reserved logging bits as recorded flight data", () => {
     const report = buildPreflightReport(safeSnapshot({ rec_elements: 98304 }));
     expect(report.checks.find(({ id }) => id === "recording")).toMatchObject({
-      status: "blocked",
+      status: "warning",
       title: "Flight recording is not armed",
     });
+  });
+
+  it("warns when liftoff detection acceleration is above 50 m/s²", () => {
+    const report = buildPreflightReport(safeSnapshot({ acc_threshold: 51 }));
+    expect(
+      report.checks.find(({ id }) => id === "liftoff-threshold"),
+    ).toMatchObject({ status: "warning", title: "Liftoff threshold is high" });
+  });
+
+  it("documents every preflight check", () => {
+    expect(PREFLIGHT_CHECKS.map(({ id }) => id)).toEqual([
+      "testing-mode",
+      "liftoff-threshold",
+      "recording",
+      "deployment-plan",
+      "timer-chains",
+      "event-order",
+      "recorder-stop",
+    ]);
   });
 
   it("decodes event actions and places active timers in the timeline", () => {
@@ -136,5 +154,11 @@ describe("guided preflight and event simulation", () => {
       kind: "timer",
       detail: "LIFTOFF + 750 ms → APOGEE",
     });
+    expect(timeline.find(({ id }) => id === "ev_liftoff").settings).toEqual([
+      "Liftoff detection: 35 m/s²",
+    ]);
+    expect(
+      timeline.find(({ id }) => id === "ev_main_deployment").settings,
+    ).toEqual(["Deployment altitude: 200 m"]);
   });
 });

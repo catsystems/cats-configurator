@@ -60,7 +60,7 @@ try {
   });
 
   const report = buildPreflightReport(snapshot);
-  if (!["READY", "WARNING", "BLOCKED"].includes(report.status)) {
+  if (!["READY", "WARNING"].includes(report.status)) {
     throw new Error("Preflight did not produce a valid overall result.");
   }
   if (report.checks.length < 6 || report.timeline.length < 7) {
@@ -73,8 +73,6 @@ try {
       ": " +
       report.status +
       " (" +
-      report.summary.blockedCount +
-      " blocked, " +
       report.summary.warningCount +
       " warnings, " +
       report.summary.readyCount +

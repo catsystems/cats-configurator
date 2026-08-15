@@ -28,11 +28,13 @@ describe("application store", () => {
     store.addCliHistory("status");
     store.addCliHistory("status");
     store.addCliHistory("  get timer4_duration  ");
+    store.setPreflightReport({ status: "READY" });
 
     expect(store.cliHistory).toEqual(["status", "get timer4_duration"]);
 
     store.setActiveState(false);
     expect(store.cliHistory).toEqual([]);
+    expect(store.preflightReport).toBeNull();
   });
 
   it("tracks event edits and unit-system state", () => {

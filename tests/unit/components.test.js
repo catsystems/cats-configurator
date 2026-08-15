@@ -378,6 +378,21 @@ describe("renderer state components", () => {
     };
     window.cats = {
       profiles: {
+        current: vi.fn().mockResolvedValue({
+          profile,
+          rows: [
+            {
+              ...changedRow,
+              profileValue: 200,
+              status: "same",
+            },
+          ],
+          compatibility: {
+            warnings: [],
+            canApply: true,
+            changedCount: 0,
+          },
+        }),
         open: vi.fn().mockResolvedValue({
           canceled: false,
           profile,
@@ -407,11 +422,25 @@ describe("renderer state components", () => {
       global: { plugins: [pinia, vuetify] },
     });
 
+    await vi.waitFor(() =>
+      expect(window.cats.profiles.current).toHaveBeenCalled(),
+    );
+    await nextTick();
+    expect(wrapper.text()).toContain(
+      "Showing 1 board value read from the connected board",
+    );
+
     await wrapper.vm.openProfile();
     await nextTick();
     expect(wrapper.text()).toContain("Main Altitude");
     expect(wrapper.text()).toContain("1 profile value differs from the board");
     expect(wrapper.text()).toContain("Apply Profile to Board");
+
+    wrapper.vm.viewMode = "board";
+    await nextTick();
+    expect(wrapper.text()).toContain("Current board value");
+    wrapper.vm.viewMode = "comparison";
+    await nextTick();
 
     await wrapper.vm.applyProfile();
     await nextTick();
@@ -423,19 +452,19 @@ describe("renderer state components", () => {
     wrapper.unmount();
   });
 
-  it("renders a guided preflight report and simulated timeline", async () => {
+  it("renders and reuses a cached guided preflight report", async () => {
     window.cats = {
       preflight: {
         run: vi.fn().mockResolvedValue({
-          status: "BLOCKED",
+          status: "WARNING",
           generatedAt: "2026-08-12T08:00:00.000Z",
           board: { model: "CATS Vega", firmwareVersion: "3.0.2" },
-          summary: { blockedCount: 1, warningCount: 0, readyCount: 1 },
+          summary: { warningCount: 1, readyCount: 1 },
           checks: [
             {
               id: "testing-mode",
               category: "Board mode",
-              status: "blocked",
+              status: "warning",
               title: "Testing mode is enabled",
               detail: "Disable testing mode before flight.",
             },
@@ -446,6 +475,7 @@ describe("renderer state components", () => {
               kind: "event",
               title: "Liftoff",
               detail: "Flight event: LIFTOFF",
+              settings: ["Liftoff detection: 35 m/s²"],
               actions: ["Recorder: LOG"],
             },
           ],
@@ -460,11 +490,21 @@ describe("renderer state components", () => {
       expect(window.cats.preflight.run).toHaveBeenCalled(),
     );
     await nextTick();
-    expect(wrapper.text()).toContain("BLOCKED");
+    expect(wrapper.text()).toContain("WARNING");
     expect(wrapper.text()).toContain("Testing mode is enabled");
     expect(wrapper.text()).toContain("Event & Timer Simulator");
+    expect(wrapper.text()).toContain("Liftoff detection: 35 m/s²");
     expect(wrapper.text()).toContain("Recorder: LOG");
+    expect(wrapper.text()).toContain("Checks performed (7)");
     wrapper.unmount();
+
+    const cachedWrapper = mount(Preflight, {
+      global: { plugins: [pinia, vuetify] },
+    });
+    await nextTick();
+    expect(window.cats.preflight.run).toHaveBeenCalledOnce();
+    expect(cachedWrapper.text()).toContain("WARNING");
+    cachedWrapper.unmount();
   });
 
   it("clears the previous flight-log session when a new file fails", async () => {
