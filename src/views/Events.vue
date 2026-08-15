@@ -139,7 +139,6 @@ export default {
     },
     refreshAll() {
       this.init();
-      this.$refs.timers?.init();
     },
     onTimersChange(changed) {
       this.timersChanged = changed;
@@ -153,7 +152,6 @@ export default {
       try {
         if (this.isEventsChanged) {
           await setEvents(this.events);
-          await getEvents();
         }
         if (this.timersChanged) await this.$refs.timers?.onSave();
       } catch (error) {

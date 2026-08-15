@@ -222,7 +222,7 @@ export default {
     },
   },
   mounted() {
-    this.init();
+    if (!this.embedded) this.init();
   },
   methods: {
     ...mapActions(useAppStore, ["setChangedTab", "showErrorSnackbar"]),
@@ -254,7 +254,6 @@ export default {
       this.saveLoading = true;
       try {
         await setLogData(data, this.logs);
-        await getLogData();
       } catch (error) {
         this.showErrorSnackbar(error.message);
       } finally {

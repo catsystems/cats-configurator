@@ -110,3 +110,30 @@ export function parseConfigResponse(lines) {
 
   return config;
 }
+
+export function parseConfigResponses(lines) {
+  const responses = [];
+  let response = [];
+
+  for (const line of lines) {
+    if (/^[a-z0-9_]+\s+=\s+/i.test(line)) {
+      if (response.length) responses.push(response);
+      response = [line];
+    } else if (response.length && line.trim()) {
+      response.push(line);
+    }
+  }
+  if (response.length) responses.push(response);
+
+  const configs = responses.map(parseConfigResponse);
+  const keys = new Set();
+  for (const config of configs) {
+    if (keys.has(config.key)) {
+      throw new Error(
+        `Board returned duplicate configuration value: ${config.key}.`,
+      );
+    }
+    keys.add(config.key);
+  }
+  return configs;
+}

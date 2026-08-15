@@ -374,6 +374,7 @@
 import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
 import { getConfigs, setConfigs } from "@/services/configService";
+import { getLogInfo } from "@/services/logService";
 import ActionsBar from "@/components/ActionsBar.vue";
 import Logs from "@/views/Logs.vue";
 import { getDisplayValue } from "@/utils/unitConversions";
@@ -544,11 +545,11 @@ export default {
     ]),
     init() {
       getConfigs();
+      getLogInfo();
       this.getInfo();
     },
     refreshAll() {
       this.init();
-      this.$refs.logging?.init();
     },
     onLoggingChange(changed) {
       this.loggingChanged = changed;
@@ -562,7 +563,7 @@ export default {
       if (this.timer) clearInterval(this.timer);
       this.timer = setInterval(() => {
         window.cats.board.getInfo();
-      }, 250); // every 250 ms
+      }, 1000);
     },
     async onSave() {
       if (this.configurationChanged) {
@@ -587,7 +588,6 @@ export default {
             metricData = this.displayData;
           }
           await setConfigs(metricData, this.lastSavedData);
-          await getConfigs();
         }
         if (this.loggingChanged) await this.$refs.logging?.onSave();
       } catch (error) {

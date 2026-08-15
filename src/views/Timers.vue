@@ -152,7 +152,7 @@ export default {
     },
   },
   mounted() {
-    this.init();
+    if (!this.embedded) this.init();
   },
   methods: {
     ...mapActions(useAppStore, ["setChangedTab", "showErrorSnackbar"]),
@@ -177,7 +177,6 @@ export default {
         const dataCopy = JSON.parse(JSON.stringify(this.data));
         for (const key of this.timerKeys) delete dataCopy[`${key}_active`];
         await setTimers(dataCopy, this.timers);
-        await getTimers();
       } catch (error) {
         this.showErrorSnackbar(error.message);
       } finally {

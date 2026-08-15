@@ -2,9 +2,7 @@ import { CONFIG_SETTINGS } from "@/modules/settings.js";
 import { applyBoardValues } from "@/services/boardService.js";
 
 export function getConfigs() {
-  return Promise.all(
-    Object.keys(CONFIG_SETTINGS).map((key) => window.cats.board.getConfig(key)),
-  );
+  return window.cats.board.getConfigs();
 }
 
 export function setConfigs(data, original = {}) {

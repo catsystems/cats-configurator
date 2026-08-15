@@ -5,6 +5,7 @@ import {
   parseAllowedValues,
   parseCommand,
   parseConfigResponse,
+  parseConfigResponses,
   parseConfigValue,
   parseData,
   parseEventData,
@@ -64,5 +65,50 @@ describe("serial response parsing", () => {
       type: "EVENT",
       values: [2, 1, 7, 2],
     });
+  });
+
+  it("parses every configuration from a bulk get response", () => {
+    expect(
+      parseConfigResponses([
+        "main_altitude = 200",
+        "Allowed range: 10 - 65535",
+        "",
+        "tele_enable = ON",
+        "Allowed values: OFF, ON",
+        "",
+        "ev_apogee = 2,1,7,2",
+        "Array length: 8",
+        "set_by_user: TRUE",
+      ]),
+    ).toEqual([
+      {
+        key: "main_altitude",
+        value: 200,
+        type: "NUMBER",
+        allowedRange: [10, 65535],
+      },
+      {
+        key: "tele_enable",
+        value: "ON",
+        type: "SELECT",
+        allowedValues: ["OFF", "ON"],
+      },
+      expect.objectContaining({
+        key: "ev_apogee",
+        type: "EVENT",
+        values: [2, 1, 7, 2],
+      }),
+    ]);
+  });
+
+  it("rejects duplicate values in a bulk get response", () => {
+    expect(() =>
+      parseConfigResponses([
+        "main_altitude = 200",
+        "Allowed range: 10 - 65535",
+        "main_altitude = 250",
+        "Allowed range: 10 - 65535",
+      ]),
+    ).toThrow("duplicate configuration value: main_altitude");
   });
 });
