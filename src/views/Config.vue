@@ -563,7 +563,7 @@ export default {
       if (this.timer) clearInterval(this.timer);
       this.timer = setInterval(() => {
         window.cats.board.getInfo();
-      }, 1000);
+      }, 250);
     },
     async onSave() {
       if (this.configurationChanged) {
