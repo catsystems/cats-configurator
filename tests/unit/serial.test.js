@@ -172,6 +172,21 @@ describe("serial board identification", () => {
     ).toBe(false);
   });
 
+  it("accepts the expected disconnect after a CLI reboot command", async () => {
+    serial.connect("COM4");
+    const port = serialState.instances[0];
+    await identify(port);
+
+    const reboot = serial.cliCommand("reboot");
+    await vi.waitFor(() =>
+      expect(port.write).toHaveBeenCalledWith("reboot\n", expect.any(Function)),
+    );
+    port.close();
+
+    await expect(reboot).resolves.toEqual([]);
+    expect(sent).toContainEqual([IPC_CHANNELS.SERIAL_DISCONNECTED, undefined]);
+  });
+
   it("waits for a delayed flash save before verifying a transaction", async () => {
     serial.connect("COM4");
     const port = serialState.instances[0];
