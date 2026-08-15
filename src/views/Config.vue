@@ -342,7 +342,7 @@
           <v-expansion-panels v-model="openSections" multiple>
             <v-expansion-panel value="logging">
               <v-expansion-panel-title>
-                <span class="text-h6">Logging &amp; Recording</span>
+                <span class="text-h6">Logging</span>
                 <v-chip
                   v-if="loggingChanged"
                   class="ml-3"

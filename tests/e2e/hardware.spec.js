@@ -72,7 +72,7 @@ test("connects to a real CATS Vega without modifying configuration", async ({}, 
       window.location.hash = "#/preflight";
     });
     await expect(
-      page.getByText("Flight Preflight", { exact: true }),
+      page.getByText("Preflight Check", { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByText("Preflight Report", { exact: true }),
