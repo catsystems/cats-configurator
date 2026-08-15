@@ -355,6 +355,12 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await expect(
       page.getByRole("button", { name: "Open Profile" }),
     ).toBeVisible();
+    await expect(
+      page.getByText(/values read from the connected board/),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Current board value", { exact: true }),
+    ).toBeVisible();
 
     await page.evaluate(() => {
       window.location.hash = "#/preflight";
@@ -363,7 +369,10 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       page.getByText("Flight Preflight", { exact: true }),
     ).toBeVisible();
     await expect(page.getByText("Event & Timer Simulator")).toBeVisible();
-    await expect(page.getByText("BLOCKED", { exact: true })).toBeVisible();
+    await expect(page.getByText("WARNING", { exact: true })).toBeVisible();
+    await expect(page.getByText("Checks performed (7)")).toBeVisible();
+    await expect(page.getByText("Liftoff detection: 35 m/s²")).toBeVisible();
+    await expect(page.getByText("Deployment altitude: 200 m")).toBeVisible();
 
     await page.evaluate(() => {
       window.location.hash = "#/logging";

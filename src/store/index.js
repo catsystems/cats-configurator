@@ -6,6 +6,7 @@ export const useAppStore = defineStore("app", {
     serialPorts: [],
     active: false,
     cliHistory: [],
+    preflightReport: null,
     changedTab: null,
     static: {},
     config: {},
@@ -53,7 +54,10 @@ export const useAppStore = defineStore("app", {
     },
     setActiveState(value) {
       this.active = Boolean(value);
-      if (!this.active) this.cliHistory = [];
+      if (!this.active) {
+        this.cliHistory = [];
+        this.preflightReport = null;
+      }
     },
     addCliHistory(command) {
       const value = String(command).trim();
@@ -89,6 +93,12 @@ export const useAppStore = defineStore("app", {
     },
     setChangedTab(tab) {
       this.changedTab = tab;
+    },
+    setPreflightReport(report) {
+      this.preflightReport = report;
+    },
+    clearPreflightReport() {
+      this.preflightReport = null;
     },
     addEventAction({ key, action }) {
       this.events[key].actions.push(action);

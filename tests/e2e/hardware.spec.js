@@ -56,10 +56,12 @@ test("connects to a real CATS Vega without modifying configuration", async ({}, 
     await expect(
       page.getByText("Flight Preflight", { exact: true }),
     ).toBeVisible();
-    await expect(page.getByText("Safety Report", { exact: true })).toBeVisible({
+    await expect(
+      page.getByText("Preflight Report", { exact: true }),
+    ).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText(/^(READY|WARNING|BLOCKED)$/)).toBeVisible();
+    await expect(page.getByText(/^(READY|WARNING)$/)).toBeVisible();
 
     await page.getByRole("button", { name: "disconnect" }).click();
     await expect(page.getByText("Status: Disconnected")).toBeVisible();

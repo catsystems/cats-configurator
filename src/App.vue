@@ -70,6 +70,7 @@ export default {
         else this.setConfig(config);
       }),
       window.cats.board.onConfigSaved(() => {
+        this.clearPreflightReport();
         this.showSuccessSnackbar("Values saved successfully!");
       }),
     );
@@ -93,6 +94,7 @@ export default {
       "setEvent",
       "setTimer",
       "setLog",
+      "clearPreflightReport",
       "showSuccessSnackbar",
       "showErrorSnackbar",
       "setUpdateState",

@@ -36,6 +36,49 @@ const STATE_ORDER = new Map([
 const DEPLOYMENT_ACTIONS = new Set([2, 3, 5, 6]);
 const EARLY_EVENT_KEYS = new Set(["ev_liftoff", "ev_burnout"]);
 
+export const PREFLIGHT_CHECKS = Object.freeze([
+  {
+    id: "testing-mode",
+    title: "Testing mode",
+    description: "Warns when testing mode is enabled.",
+  },
+  {
+    id: "liftoff-threshold",
+    title: "Liftoff detection threshold",
+    description: "Warns when liftoff detection acceleration is above 50 m/s².",
+  },
+  {
+    id: "recording",
+    title: "Flight recording",
+    description:
+      "Checks recording speed, selected data, and that an event starts LOG recording.",
+  },
+  {
+    id: "deployment-plan",
+    title: "Deployment plan",
+    description:
+      "Checks apogee and main deployment outputs, early deployment actions, and main altitude.",
+  },
+  {
+    id: "timer-chains",
+    title: "Timer chains",
+    description:
+      "Checks active timer values, event names, self-triggers, and cycles.",
+  },
+  {
+    id: "event-order",
+    title: "Event order",
+    description:
+      "Warns when an active timer triggers an earlier core flight state.",
+  },
+  {
+    id: "recorder-stop",
+    title: "Recorder stop",
+    description:
+      "Warns when armed recording is not stopped by the touchdown event.",
+  },
+]);
+
 function normalizeState(value) {
   return String(value ?? "")
     .trim()
@@ -120,6 +163,20 @@ function findGraphCycle(edges) {
 }
 
 export function simulateFlightSequence(values) {
+  const liftoffThreshold = parseNumber(values.acc_threshold);
+  const mainAltitude = parseNumber(values.main_altitude);
+  const settingsByEvent = new Map([
+    [
+      "ev_liftoff",
+      liftoffThreshold === null
+        ? []
+        : [`Liftoff detection: ${liftoffThreshold} m/s²`],
+    ],
+    [
+      "ev_main_deployment",
+      mainAltitude === null ? [] : [`Deployment altitude: ${mainAltitude} m`],
+    ],
+  ]);
   const events = EVENT_SEQUENCE.map((event) => ({
     id: event.key,
     kind: "event",
@@ -127,6 +184,7 @@ export function simulateFlightSequence(values) {
     title: event.label,
     trigger: event.state,
     detail: `Flight event: ${event.state}`,
+    settings: settingsByEvent.get(event.key) ?? [],
     actions: parseConfiguredActions(values[event.key]).map(
       ({ summary }) => summary,
     ),
@@ -144,6 +202,7 @@ export function simulateFlightSequence(values) {
         title: `Timer ${index + 1}`,
         trigger,
         detail: `${start} + ${duration} ms → ${trigger}`,
+        settings: [],
         actions: [`Trigger event: ${trigger}`],
       },
     ];
@@ -169,12 +228,35 @@ export function buildPreflightReport(snapshot) {
     check(
       "testing-mode",
       "Board mode",
-      testingEnabled ? "blocked" : "ready",
+      testingEnabled ? "warning" : "ready",
       testingEnabled ? "Testing mode is enabled" : "Testing mode is off",
       testingEnabled
         ? "Disable testing mode before preparing the vehicle for flight."
         : "The board is using normal flight behavior.",
       ["test_mode"],
+      { label: "Open Configuration", route: "/config" },
+    ),
+  );
+
+  const liftoffThreshold = parseNumber(values.acc_threshold);
+  const liftoffThresholdWarning =
+    liftoffThreshold === null || liftoffThreshold > 50;
+  checks.push(
+    check(
+      "liftoff-threshold",
+      "Flight detection",
+      liftoffThresholdWarning ? "warning" : "ready",
+      liftoffThreshold === null
+        ? "Liftoff threshold is unavailable"
+        : liftoffThresholdWarning
+          ? "Liftoff threshold is high"
+          : "Liftoff threshold is within the usual range",
+      liftoffThreshold === null
+        ? "The board did not provide a liftoff detection acceleration."
+        : liftoffThresholdWarning
+          ? `Liftoff detection acceleration is ${liftoffThreshold} m/s²; review values above 50 m/s².`
+          : `Liftoff detection acceleration is ${liftoffThreshold} m/s².`,
+      ["acc_threshold"],
       { label: "Open Configuration", route: "/config" },
     ),
   );
@@ -203,7 +285,7 @@ export function buildPreflightReport(snapshot) {
     check(
       "recording",
       "Recording",
-      recordingBlocked ? "blocked" : "ready",
+      recordingBlocked ? "warning" : "ready",
       recordingBlocked
         ? "Flight recording is not armed"
         : "Flight recording is armed",
@@ -212,43 +294,6 @@ export function buildPreflightReport(snapshot) {
       recordingDisabled
         ? { label: "Review Logging", route: "/logging" }
         : { label: "Review Events", route: "/events" },
-    ),
-  );
-
-  const pyroFirings = new Map([
-    [2, []],
-    [3, []],
-  ]);
-  for (const event of EVENT_SEQUENCE) {
-    for (const action of actionsByEvent.get(event.key)) {
-      if ([2, 3].includes(action.index) && action.value === 1) {
-        pyroFirings.get(action.index).push(event.label);
-      }
-    }
-  }
-  const repeatedPyros = [...pyroFirings.entries()].filter(
-    ([_index, events]) => events.length > 1,
-  );
-  checks.push(
-    check(
-      "pyro-conflicts",
-      "Deployment",
-      repeatedPyros.length ? "blocked" : "ready",
-      repeatedPyros.length
-        ? "A pyro channel is scheduled more than once"
-        : "Pyro channels have single firing points",
-      repeatedPyros.length
-        ? repeatedPyros
-            .map(
-              ([index, events]) =>
-                `${EVENT_SETTINGS[index].name}: ${events.join(", ")}`,
-            )
-            .join("; ")
-        : "No pyro channel has more than one ON action.",
-      EVENT_SEQUENCE.filter((event) =>
-        repeatedPyros.some(([_index, events]) => events.includes(event.label)),
-      ).map(({ key }) => key),
-      { label: "Review Events", route: "/events" },
     ),
   );
 
@@ -288,7 +333,7 @@ export function buildPreflightReport(snapshot) {
     check(
       "deployment-plan",
       "Deployment",
-      deploymentIssues.length ? "blocked" : "ready",
+      deploymentIssues.length ? "warning" : "ready",
       deploymentIssues.length
         ? "Deployment plan is inconsistent"
         : "Apogee and main deployment outputs are configured",
@@ -343,7 +388,7 @@ export function buildPreflightReport(snapshot) {
     check(
       "timer-chains",
       "Timers",
-      timerIssues.length ? "blocked" : "ready",
+      timerIssues.length ? "warning" : "ready",
       timerIssues.length ? "Timer chain is invalid" : "Timer chains are valid",
       timerIssues.length
         ? timerIssues.join(" ")
@@ -362,7 +407,7 @@ export function buildPreflightReport(snapshot) {
     check(
       "event-order",
       "Event sequence",
-      orderingIssues.length ? "blocked" : "ready",
+      orderingIssues.length ? "warning" : "ready",
       orderingIssues.length
         ? "An event is triggered out of flight order"
         : "Event order is physically possible",
@@ -391,20 +436,17 @@ export function buildPreflightReport(snapshot) {
     );
   }
 
-  const blockedCount = checks.filter(
-    ({ status }) => status === "blocked",
-  ).length;
   const warningCount = checks.filter(
     ({ status }) => status === "warning",
   ).length;
   const readyCount = checks.filter(({ status }) => status === "ready").length;
-  const status = blockedCount ? "BLOCKED" : warningCount ? "WARNING" : "READY";
+  const status = warningCount ? "WARNING" : "READY";
 
   return {
     status,
     generatedAt: new Date().toISOString(),
     board: snapshot.board ?? {},
-    summary: { blockedCount, warningCount, readyCount },
+    summary: { warningCount, readyCount },
     checks,
     timeline: simulateFlightSequence(values),
   };

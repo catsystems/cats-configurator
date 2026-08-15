@@ -30,6 +30,7 @@ export const IPC_CHANNELS = Object.freeze({
   BOARD_RESTORE: "board:restore",
   BOARD_RESET: "board:reset",
   BOARD_SAVE: "board:save",
+  PROFILE_CURRENT: "profile:current",
   PROFILE_EXPORT: "profile:export",
   PROFILE_OPEN: "profile:open",
   PROFILE_APPLY: "profile:apply",

@@ -11,7 +11,8 @@
       <v-card-text>
         <v-alert type="info" variant="tonal">
           This is a read-only check. It simulates the configured event and timer
-          sequence without enabling test mode or activating any output.
+          sequence without enabling test mode or activating any output. Findings
+          are advisory warnings and do not disable Configurator operations.
         </v-alert>
       </v-card-text>
     </v-card>
@@ -32,15 +33,7 @@
       </v-alert>
 
       <v-row class="mb-2">
-        <v-col cols="12" md="4">
-          <v-card color="error" variant="tonal">
-            <v-card-text>
-              <div class="text-h4">{{ report.summary.blockedCount }}</div>
-              <div>Blocked checks</div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-        <v-col cols="12" md="4">
+        <v-col cols="12" md="6">
           <v-card color="warning" variant="tonal">
             <v-card-text>
               <div class="text-h4">{{ report.summary.warningCount }}</div>
@@ -48,7 +41,7 @@
             </v-card-text>
           </v-card>
         </v-col>
-        <v-col cols="12" md="4">
+        <v-col cols="12" md="6">
           <v-card color="success" variant="tonal">
             <v-card-text>
               <div class="text-h4">{{ report.summary.readyCount }}</div>
@@ -58,10 +51,31 @@
         </v-col>
       </v-row>
 
+      <v-expansion-panels class="mb-4">
+        <v-expansion-panel>
+          <v-expansion-panel-title>
+            Checks performed ({{ checkDefinitions.length }})
+          </v-expansion-panel-title>
+          <v-expansion-panel-text>
+            <v-list density="compact">
+              <v-list-item
+                v-for="definition in checkDefinitions"
+                :key="definition.id"
+              >
+                <v-list-item-title>{{ definition.title }}</v-list-item-title>
+                <v-list-item-subtitle>
+                  {{ definition.description }}
+                </v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
+
       <v-row>
         <v-col cols="12" lg="7">
           <v-card height="100%">
-            <v-card-title>Safety Report</v-card-title>
+            <v-card-title>Preflight Report</v-card-title>
             <v-card-text>
               <v-list lines="three">
                 <v-list-item
@@ -134,6 +148,20 @@
                       {{ item.detail }}
                     </div>
                     <div
+                      v-if="item.settings?.length"
+                      class="d-flex flex-wrap ga-1 mb-2"
+                    >
+                      <v-chip
+                        v-for="setting in item.settings"
+                        :key="setting"
+                        color="info"
+                        size="small"
+                        variant="tonal"
+                      >
+                        {{ setting }}
+                      </v-chip>
+                    </div>
+                    <div
                       v-if="item.actions.length"
                       class="d-flex flex-wrap ga-1"
                     >
@@ -161,42 +189,45 @@
 </template>
 
 <script>
-import { mapActions } from "pinia";
+import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
+import { PREFLIGHT_CHECKS } from "@/shared/preflight.js";
 
 export default {
   name: "PreflightView",
   data() {
     return {
       loading: false,
-      report: null,
+      checkDefinitions: PREFLIGHT_CHECKS,
     };
   },
   computed: {
+    ...mapState(useAppStore, ["preflightReport"]),
+    report() {
+      return this.preflightReport;
+    },
     reportAlertType() {
       return {
         READY: "success",
         WARNING: "warning",
-        BLOCKED: "error",
       }[this.report?.status];
     },
     reportMessage() {
       return {
         READY: "All required safety checks passed.",
-        WARNING: "No blocking issue was found, but review the warnings.",
-        BLOCKED: "Resolve every blocked check before flight.",
+        WARNING: "Review the warnings before flight.",
       }[this.report?.status];
     },
   },
   mounted() {
-    this.runPreflight();
+    if (!this.report) this.runPreflight();
   },
   methods: {
-    ...mapActions(useAppStore, ["showErrorSnackbar"]),
+    ...mapActions(useAppStore, ["setPreflightReport", "showErrorSnackbar"]),
     async runPreflight() {
       this.loading = true;
       try {
-        this.report = await window.cats.preflight.run();
+        this.setPreflightReport(await window.cats.preflight.run());
       } catch (error) {
         this.showErrorSnackbar(error.message);
       } finally {
@@ -207,14 +238,12 @@ export default {
       return {
         ready: "success",
         warning: "warning",
-        blocked: "error",
       }[status];
     },
     checkIcon(status) {
       return {
         ready: "mdi-check-circle",
         warning: "mdi-alert",
-        blocked: "mdi-close-circle",
       }[status];
     },
     formatDate(value) {
@@ -245,10 +274,6 @@ export default {
 
 .preflight-check--warning {
   border-left-color: rgb(var(--v-theme-warning));
-}
-
-.preflight-check--blocked {
-  border-left-color: rgb(var(--v-theme-error));
 }
 
 .flight-timeline {
