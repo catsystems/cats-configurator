@@ -449,7 +449,18 @@ describe("renderer state components", () => {
     expect(useAppStore().snackbar.message).toBe(
       "Profile applied and verified.",
     );
+    expect(window.cats.profiles.current).toHaveBeenCalledTimes(2);
     wrapper.unmount();
+
+    const cachedWrapper = mount(Profiles, {
+      global: { plugins: [pinia, vuetify] },
+    });
+    await nextTick();
+    expect(window.cats.profiles.current).toHaveBeenCalledTimes(2);
+    expect(cachedWrapper.text()).toContain(
+      "Showing 1 board value read from the connected board",
+    );
+    cachedWrapper.unmount();
   });
 
   it("renders and reuses a cached guided preflight report", async () => {
