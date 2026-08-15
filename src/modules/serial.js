@@ -411,10 +411,20 @@ async function command(boardCommand, { poll = false } = {}) {
 }
 
 async function cliCommand(boardCommand) {
-  const response = await requireCommandEngine().run(boardCommand, {
-    timeoutMs: 5000,
-    retries: 0,
-  });
+  let response;
+  try {
+    response = await requireCommandEngine().run(boardCommand, {
+      timeoutMs: 5000,
+      retries: 0,
+    });
+  } catch (error) {
+    const expectedRebootDisconnect =
+      normalizeBoardCommand(boardCommand) === "reboot" &&
+      error instanceof BoardCommandError &&
+      error.message === "Board connection closed.";
+    if (expectedRebootDisconnect) return [];
+    throw error;
+  }
   if (useFakeSerial) {
     sendToRenderer(IPC_CHANNELS.SERIAL_DATA, `test> ${boardCommand}`);
   }
