@@ -156,6 +156,17 @@ async function exportConfigurationProfile() {
   return { canceled: false, profile };
 }
 
+async function currentConfigurationProfile() {
+  const snapshot = await readBoardSnapshot();
+  const profile = createConfigurationProfile(snapshot, {
+    appVersion: app.getVersion(),
+  });
+  return {
+    profile,
+    ...compareConfigurationProfile(profile, snapshot),
+  };
+}
+
 async function openConfigurationProfile() {
   const selection = await dialog.showOpenDialog(trustedWindow, {
     title: "Open CATS configuration profile",
@@ -250,6 +261,7 @@ export function subscribeListeners(openExternal) {
   handle(IPC_CHANNELS.BOARD_RESTORE, () => restoreBoardConfiguration());
   handle(IPC_CHANNELS.BOARD_RESET, resetBoardConfiguration);
   handle(IPC_CHANNELS.BOARD_SAVE, () => command("save"));
+  handle(IPC_CHANNELS.PROFILE_CURRENT, currentConfigurationProfile);
   handle(IPC_CHANNELS.PROFILE_EXPORT, exportConfigurationProfile);
   handle(IPC_CHANNELS.PROFILE_OPEN, openConfigurationProfile);
   handle(IPC_CHANNELS.PROFILE_APPLY, (profile) => {

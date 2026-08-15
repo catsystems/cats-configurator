@@ -18,112 +18,180 @@
       </v-card-title>
 
       <v-card-text>
-        <v-alert v-if="!profile" type="info" variant="tonal">
-          Export the connected board as a versioned JSON profile, or open a
-          profile to compare every setting before applying it.
+        <v-alert type="info" variant="tonal" class="mb-4">
+          Review the connected board profile at any time, export it as JSON, or
+          open another profile for a field-by-field comparison.
         </v-alert>
 
-        <template v-else>
+        <v-progress-linear
+          v-if="currentLoading"
+          indeterminate
+          color="primary"
+          class="mb-4"
+        />
+
+        <div class="d-flex align-center flex-wrap ga-2 mb-4">
+          <v-btn-toggle v-model="viewMode" mandatory color="primary">
+            <v-btn value="board">Connected Board</v-btn>
+            <v-btn value="comparison" :disabled="!profile">
+              Profile Comparison
+            </v-btn>
+          </v-btn-toggle>
+          <v-spacer />
+          <v-btn
+            v-if="viewMode === 'board'"
+            variant="text"
+            prepend-icon="mdi-refresh"
+            :loading="currentLoading"
+            @click="loadCurrentProfile"
+          >
+            Refresh Board
+          </v-btn>
+        </div>
+
+        <template v-if="displayProfile">
           <div class="profile-summary mb-4">
             <div>
               <strong>Board:</strong>
-              {{ profile.source.boardModel || "Unknown" }}
+              {{ displayProfile.source.boardModel || "Unknown" }}
             </div>
             <div>
               <strong>Firmware:</strong>
-              {{ profile.source.firmwareVersion || "Unknown" }}
+              {{ displayProfile.source.firmwareVersion || "Unknown" }}
             </div>
-            <div><strong>Schema:</strong> {{ profile.schemaVersion }}</div>
             <div>
-              <strong>Created:</strong> {{ formatDate(profile.createdAt) }}
+              <strong>Schema:</strong> {{ displayProfile.schemaVersion }}
+            </div>
+            <div>
+              <strong>Captured:</strong>
+              {{ formatDate(displayProfile.createdAt) }}
             </div>
           </div>
 
-          <v-alert
-            v-if="compatibility.warnings.length === 0"
-            type="success"
-            variant="tonal"
-            class="mb-3"
-          >
-            Profile is compatible with the connected board.
-          </v-alert>
-          <v-alert
-            v-for="warning in compatibility.warnings"
-            :key="warning.message"
-            :type="warning.severity === 'error' ? 'error' : 'warning'"
-            variant="tonal"
-            class="mb-3"
-          >
-            {{ warning.message }}
-          </v-alert>
-
-          <div class="d-flex align-center mb-3">
-            <div class="text-body-2">
-              {{ compatibility.changedCount }} profile value{{
-                compatibility.changedCount === 1 ? "" : "s"
+          <template v-if="viewMode === 'board'">
+            <v-alert type="success" variant="tonal" class="mb-3">
+              Showing {{ currentRows.length }} board value{{
+                currentRows.length === 1 ? "" : "s"
               }}
-              {{ compatibility.changedCount === 1 ? "differs" : "differ" }}
-              from the board.
-            </div>
-            <v-spacer />
-            <v-btn
-              color="primary"
-              :disabled="
-                !compatibility.canApply || compatibility.changedCount === 0
-              "
-              :loading="applyLoading"
-              @click="applyProfile"
-            >
-              Apply Profile to Board
-            </v-btn>
-          </div>
+              read from the connected board.
+            </v-alert>
 
-          <v-table fixed-header height="560" class="profile-diff-table">
-            <thead>
-              <tr>
-                <th>Section</th>
-                <th>Setting</th>
-                <th>Board</th>
-                <th>Profile</th>
-                <th>Difference</th>
-                <th>Apply result</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in rows" :key="row.key">
-                <td>{{ row.section }}</td>
-                <td>
-                  <div>{{ row.label }}</div>
-                  <div class="text-caption text-medium-emphasis">
-                    {{ row.key }}
-                  </div>
-                </td>
-                <td class="profile-value">
-                  {{ formatValue(row.key, row.boardValue) }}
-                </td>
-                <td class="profile-value">
-                  {{ formatValue(row.key, row.profileValue) }}
-                </td>
-                <td>
-                  <v-chip :color="statusColor(row.status)" size="small">
-                    {{ statusLabel(row.status) }}
-                  </v-chip>
-                </td>
-                <td>
-                  <v-chip
-                    v-if="applyResults[row.key]"
-                    :color="resultColor(applyResults[row.key].status)"
-                    size="small"
-                    variant="tonal"
-                  >
-                    {{ statusLabel(applyResults[row.key].status) }}
-                  </v-chip>
-                  <span v-else class="text-medium-emphasis">—</span>
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
+            <v-table fixed-header height="560" class="profile-diff-table">
+              <thead>
+                <tr>
+                  <th>Section</th>
+                  <th>Setting</th>
+                  <th>Current board value</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in currentRows" :key="row.key">
+                  <td>{{ row.section }}</td>
+                  <td>
+                    <div>{{ row.label }}</div>
+                    <div class="text-caption text-medium-emphasis">
+                      {{ row.key }}
+                    </div>
+                  </td>
+                  <td class="profile-value">
+                    {{ formatValue(row.key, row.boardValue) }}
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </template>
+
+          <template v-else>
+            <v-alert
+              v-if="compatibility.warnings.length === 0"
+              type="success"
+              variant="tonal"
+              class="mb-3"
+            >
+              Profile is compatible with the connected board.
+            </v-alert>
+            <v-alert
+              v-for="warning in compatibility.warnings"
+              :key="warning.message"
+              :type="warning.severity === 'error' ? 'error' : 'warning'"
+              variant="tonal"
+              class="mb-3"
+            >
+              {{ warning.message }}
+            </v-alert>
+
+            <div class="d-flex align-center mb-3">
+              <div class="text-body-2">
+                {{ compatibility.changedCount }} profile value{{
+                  compatibility.changedCount === 1 ? "" : "s"
+                }}
+                {{ compatibility.changedCount === 1 ? "differs" : "differ" }}
+                from the board.
+              </div>
+              <v-spacer />
+              <v-btn
+                color="primary"
+                :disabled="
+                  !compatibility.canApply || compatibility.changedCount === 0
+                "
+                :loading="applyLoading"
+                @click="applyProfile"
+              >
+                Apply Profile to Board
+              </v-btn>
+            </div>
+
+            <v-table fixed-header height="560" class="profile-diff-table">
+              <thead>
+                <tr>
+                  <th>Section</th>
+                  <th>Setting</th>
+                  <th>Board</th>
+                  <th>Profile</th>
+                  <th>Difference</th>
+                  <th>Apply result</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in rows" :key="row.key">
+                  <td>{{ row.section }}</td>
+                  <td>
+                    <div>{{ row.label }}</div>
+                    <div class="text-caption text-medium-emphasis">
+                      {{ row.key }}
+                    </div>
+                  </td>
+                  <td class="profile-value">
+                    {{ formatValue(row.key, row.boardValue) }}
+                  </td>
+                  <td class="profile-value">
+                    {{ formatValue(row.key, row.profileValue) }}
+                  </td>
+                  <td>
+                    <v-chip :color="statusColor(row.status)" size="small">
+                      {{ statusLabel(row.status) }}
+                    </v-chip>
+                  </td>
+                  <td>
+                    <v-chip
+                      v-if="applyResults[row.key]"
+                      :color="resultColor(applyResults[row.key].status)"
+                      size="small"
+                      variant="tonal"
+                    >
+                      {{ statusLabel(applyResults[row.key].status) }}
+                    </v-chip>
+                    <span v-else class="text-medium-emphasis">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </template>
         </template>
+
+        <v-alert v-else-if="currentError" type="error" variant="tonal">
+          {{ currentError }}
+        </v-alert>
       </v-card-text>
     </v-card>
   </v-container>
@@ -138,6 +206,9 @@ export default {
   name: "ProfilesView",
   data() {
     return {
+      currentProfile: null,
+      currentRows: [],
+      currentError: null,
       profile: null,
       rows: [],
       compatibility: {
@@ -146,13 +217,37 @@ export default {
         changedCount: 0,
       },
       applyResults: {},
+      viewMode: "board",
+      currentLoading: false,
       exportLoading: false,
       openLoading: false,
       applyLoading: false,
     };
   },
+  computed: {
+    displayProfile() {
+      return this.viewMode === "board" ? this.currentProfile : this.profile;
+    },
+  },
+  mounted() {
+    this.loadCurrentProfile();
+  },
   methods: {
     ...mapActions(useAppStore, ["showSuccessSnackbar", "showErrorSnackbar"]),
+    async loadCurrentProfile() {
+      this.currentLoading = true;
+      this.currentError = null;
+      try {
+        const result = await window.cats.profiles.current();
+        this.currentProfile = result.profile;
+        this.currentRows = result.rows;
+      } catch (error) {
+        this.currentError = error.message;
+        this.showErrorSnackbar(error.message);
+      } finally {
+        this.currentLoading = false;
+      }
+    },
     async exportProfile() {
       this.exportLoading = true;
       try {
@@ -175,6 +270,7 @@ export default {
         this.rows = result.rows;
         this.compatibility = result.compatibility;
         this.applyResults = {};
+        this.viewMode = "comparison";
       } catch (error) {
         this.showErrorSnackbar(error.message);
       } finally {
@@ -192,6 +288,7 @@ export default {
           result.results.map((field) => [field.key, field]),
         );
         if (result.ok) {
+          await this.loadCurrentProfile();
           this.showSuccessSnackbar("Profile applied and verified.");
         } else {
           const failed = result.results.find(({ status }) =>

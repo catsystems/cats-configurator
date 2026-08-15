@@ -114,6 +114,7 @@ const cats = {
       subscribe(IPC_CHANNELS.BOARD_DUMP_COMPLETE, callback),
   },
   profiles: {
+    current: () => ipcRenderer.invoke(IPC_CHANNELS.PROFILE_CURRENT),
     export: () => ipcRenderer.invoke(IPC_CHANNELS.PROFILE_EXPORT),
     open: () => ipcRenderer.invoke(IPC_CHANNELS.PROFILE_OPEN),
     apply: (profile) => ipcRenderer.invoke(IPC_CHANNELS.PROFILE_APPLY, profile),
