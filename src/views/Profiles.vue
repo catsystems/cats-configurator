@@ -214,9 +214,14 @@
 import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
 import { formatProfileValue } from "@/shared/configuration-profile.js";
+import { getDisplayValue } from "@/utils/unitConversions.js";
 
 const TIMER_FIELD_ORDER = ["start", "duration", "trigger"];
 const STATUS_PRIORITY = ["unsupported", "missing", "changed", "same"];
+const PROFILE_UNITS = {
+  main_altitude: { parameter: "altitude", metricUnit: "m" },
+  acc_threshold: { parameter: "acceleration", metricUnit: "m/s²" },
+};
 
 function groupProfileRows(rows) {
   const grouped = [];
@@ -278,7 +283,7 @@ export default {
     };
   },
   computed: {
-    ...mapState(useAppStore, ["currentBoardProfile"]),
+    ...mapState(useAppStore, ["currentBoardProfile", "useImperialUnits"]),
     currentProfile() {
       return this.currentBoardProfile?.profile ?? null;
     },
@@ -424,6 +429,15 @@ export default {
       return Number.isNaN(date.valueOf()) ? value : date.toLocaleString();
     },
     formatValue(key, value) {
+      const unit = PROFILE_UNITS[key];
+      if (unit && Number.isFinite(Number(value))) {
+        return this.useImperialUnits
+          ? getDisplayValue(value, unit.parameter, {
+              numeric: false,
+              decimals: 0,
+            })
+          : `${value} ${unit.metricUnit}`;
+      }
       return formatProfileValue(key, value);
     },
     formatRowValue(row, source) {

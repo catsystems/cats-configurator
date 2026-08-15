@@ -62,7 +62,14 @@
                   v-for="element in logElements"
                   :key="element.name"
                 >
-                  <v-tooltip location="top" :text="element.description">
+                  <v-tooltip
+                    location="top"
+                    offset="2"
+                    max-width="340"
+                    open-delay="100"
+                    content-class="logging-element-tooltip"
+                    :text="element.description"
+                  >
                     <template #activator="{ props: tooltipProps }">
                       <v-checkbox
                         v-bind="tooltipProps"
@@ -283,4 +290,12 @@ export default {
 };
 </script>
 
-<style></style>
+<style>
+.logging-element-tooltip {
+  padding: 8px 12px !important;
+  line-height: 1.35;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+</style>

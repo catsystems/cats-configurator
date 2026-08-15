@@ -71,7 +71,7 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       });
     await expect(page).toHaveTitle("CATS Configurator");
     await expect(page.getByText("Status: Disconnected")).toBeVisible();
-    await expect(page.getByText("App version: 1.3.2")).toBeVisible();
+    await expect(page.getByText("App version: 1.4.0")).toBeVisible();
     await expect(page.getByText("CATS", { exact: true })).toBeVisible();
     await expect(page.getByText("Configurator", { exact: true })).toBeVisible();
     await expect(
@@ -380,6 +380,7 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await expect(
       page.getByText("Current board value", { exact: true }),
     ).toBeVisible();
+    await expect(page.getByText("656 ft", { exact: true })).toBeVisible();
 
     await page.evaluate(() => {
       window.location.hash = "#/preflight";
@@ -392,8 +393,8 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await expect(page.getByText("Timer Chains", { exact: true })).toBeVisible();
     await expect(page.getByText("WARNING", { exact: true })).toBeVisible();
     await expect(page.getByText("Checks performed")).toHaveCount(0);
-    await expect(page.getByText("Liftoff detection: 35 m/s²")).toBeVisible();
-    await expect(page.getByText("Deployment altitude: 200 m")).toBeVisible();
+    await expect(page.getByText("Liftoff detection: 115 ft/s²")).toBeVisible();
+    await expect(page.getByText("Deployment altitude: 656 ft")).toBeVisible();
 
     await page.evaluate(() => {
       window.location.hash = "#/logging";
