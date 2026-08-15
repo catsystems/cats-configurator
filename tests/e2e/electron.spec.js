@@ -89,7 +89,7 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await expect(flightsLink).toHaveAttribute("target", "_blank");
 
     const configurationLink = page.getByRole("link", {
-      name: "Configuration & Logging",
+      name: "Configuration",
       exact: true,
     });
     await expect(
@@ -342,6 +342,16 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       "rgb(255, 167, 38)",
     );
 
+    const lastTimerCard = page.locator(".timer-card").last();
+    await lastTimerCard.scrollIntoViewIfNeeded();
+    const [lastTimerBounds, actionsBarBounds] = await Promise.all([
+      lastTimerCard.boundingBox(),
+      page.locator(".actions-bar").boundingBox(),
+    ]);
+    expect(lastTimerBounds.y + lastTimerBounds.height).toBeLessThanOrEqual(
+      actionsBarBounds.y,
+    );
+
     const timerDuration = page.locator('input[type="number"]').first();
     await timerDuration.fill("1200");
     await expect(configurationLink).toHaveAttribute("aria-disabled", "true");
@@ -375,13 +385,13 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       window.location.hash = "#/preflight";
     });
     await expect(
-      page.getByText("Flight Preflight", { exact: true }),
+      page.getByText("Preflight Check", { exact: true }),
     ).toBeVisible();
     await expect(page.getByText("Event & Timer Simulator")).toBeVisible();
     await expect(page.getByText("Flight Event Sequence")).toBeVisible();
     await expect(page.getByText("Timer Chains", { exact: true })).toBeVisible();
     await expect(page.getByText("WARNING", { exact: true })).toBeVisible();
-    await expect(page.getByText("Checks performed (7)")).toBeVisible();
+    await expect(page.getByText("Checks performed")).toHaveCount(0);
     await expect(page.getByText("Liftoff detection: 35 m/s²")).toBeVisible();
     await expect(page.getByText("Deployment altitude: 200 m")).toBeVisible();
 
@@ -392,6 +402,10 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await expect(page.getByText("Elements", { exact: true })).toBeVisible();
     await expect(page.getByText(/Free space:\s*99\.90%/)).toBeVisible();
     await expect(page.getByText(/Estimated logging time:/)).toBeVisible();
+    await page.getByText("IMU", { exact: true }).hover();
+    await expect(
+      page.getByText("Raw accelerometer and gyroscope samples from each IMU."),
+    ).toBeVisible();
     await expect(configurationLink).not.toHaveAttribute(
       "aria-disabled",
       "true",

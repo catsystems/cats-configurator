@@ -106,16 +106,28 @@ describe("guided preflight and event simulation", () => {
   it("warns when recording is never stopped", () => {
     const report = buildPreflightReport(safeSnapshot({ ev_touchdown: "0,0" }));
     expect(report.status).toBe("WARNING");
-    expect(
-      report.checks.find(({ id }) => id === "recorder-stop"),
-    ).toMatchObject({ status: "warning" });
+    expect(report.checks.find(({ id }) => id === "recording")).toMatchObject({
+      status: "warning",
+      title: "Flight recording stop is not configured",
+    });
   });
 
   it("does not treat reserved logging bits as recorded flight data", () => {
     const report = buildPreflightReport(safeSnapshot({ rec_elements: 98304 }));
     expect(report.checks.find(({ id }) => id === "recording")).toMatchObject({
       status: "warning",
-      title: "Flight recording is not armed",
+      title: "Flight recording is disabled",
+    });
+  });
+
+  it("reports configured recording start and stop together", () => {
+    const recording = buildPreflightReport(safeSnapshot()).checks.find(
+      ({ id }) => id === "recording",
+    );
+    expect(recording).toMatchObject({
+      status: "ready",
+      title: "Flight recording starts and stops",
+      detail: "Recording starts at Liftoff and stops at Touchdown.",
     });
   });
 
@@ -134,7 +146,6 @@ describe("guided preflight and event simulation", () => {
       "deployment-plan",
       "timer-chains",
       "event-order",
-      "recorder-stop",
     ]);
   });
 

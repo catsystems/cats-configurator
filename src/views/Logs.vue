@@ -62,12 +62,17 @@
                   v-for="element in logElements"
                   :key="element.name"
                 >
-                  <v-checkbox
-                    v-model="recElements"
-                    :label="element.name"
-                    :value="element"
-                    hide-details
-                  ></v-checkbox>
+                  <v-tooltip location="top" :text="element.description">
+                    <template #activator="{ props: tooltipProps }">
+                      <v-checkbox
+                        v-bind="tooltipProps"
+                        v-model="recElements"
+                        :label="element.name"
+                        :value="element"
+                        hide-details
+                      ></v-checkbox>
+                    </template>
+                  </v-tooltip>
                 </v-col>
               </v-row>
             </v-card-text>

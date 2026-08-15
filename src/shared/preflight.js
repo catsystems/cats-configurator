@@ -51,7 +51,7 @@ export const PREFLIGHT_CHECKS = Object.freeze([
     id: "recording",
     title: "Flight recording",
     description:
-      "Checks recording speed, selected data, and that an event starts LOG recording.",
+      "Checks recording speed, selected data, LOG start, and OFF at touchdown.",
   },
   {
     id: "deployment-plan",
@@ -70,12 +70,6 @@ export const PREFLIGHT_CHECKS = Object.freeze([
     title: "Event order",
     description:
       "Warns when an active timer triggers an earlier core flight state.",
-  },
-  {
-    id: "recorder-stop",
-    title: "Recorder stop",
-    description:
-      "Warns when armed recording is not stopped by the touchdown event.",
   },
 ]);
 
@@ -275,22 +269,42 @@ export function buildPreflightReport(snapshot) {
       .get(event.key)
       .some((action) => action.index === 7 && action.value === 2),
   );
-  const recordingBlocked = recordingDisabled || loggingEvents.length === 0;
-  const recordingDetail = recordingDisabled
-    ? "Recording speed or recorded elements are disabled."
+  const touchdownRecorderOff = actionsByEvent
+    .get("ev_touchdown")
+    .some((action) => action.index === 7 && action.value === 0);
+  const recordingIssues = [];
+  if (recordingDisabled) {
+    recordingIssues.push("Recording speed or recorded elements are disabled.");
+  }
+  if (loggingEvents.length === 0) {
+    recordingIssues.push("No event starts the recorder in LOG mode.");
+  } else if (!touchdownRecorderOff) {
+    recordingIssues.push("No Recorder: OFF action is configured at touchdown.");
+  }
+  const recordingWarning = recordingIssues.length > 0;
+  const recordingTitle = recordingDisabled
+    ? "Flight recording is disabled"
     : loggingEvents.length === 0
-      ? "No event starts the recorder in LOG mode."
-      : `Recording starts at ${loggingEvents.map(({ label }) => label).join(", ")}.`;
+      ? "Flight recording start is not configured"
+      : !touchdownRecorderOff
+        ? "Flight recording stop is not configured"
+        : "Flight recording starts and stops";
+  const recordingDetail = recordingWarning
+    ? recordingIssues.join(" ")
+    : `Recording starts at ${loggingEvents.map(({ label }) => label).join(", ")} and stops at Touchdown.`;
   checks.push(
     check(
       "recording",
       "Recording",
-      recordingBlocked ? "warning" : "ready",
-      recordingBlocked
-        ? "Flight recording is not armed"
-        : "Flight recording is armed",
+      recordingWarning ? "warning" : "ready",
+      recordingTitle,
       recordingDetail,
-      ["rec_speed", "rec_elements", ...loggingEvents.map(({ key }) => key)],
+      [
+        "rec_speed",
+        "rec_elements",
+        ...loggingEvents.map(({ key }) => key),
+        "ev_touchdown",
+      ],
       recordingDisabled
         ? { label: "Review Logging", route: "/config?section=logging" }
         : { label: "Review Events", route: "/events" },
@@ -418,23 +432,6 @@ export function buildPreflightReport(snapshot) {
       { label: "Review Timers", route: "/events?section=timers" },
     ),
   );
-
-  const touchdownRecorderOff = actionsByEvent
-    .get("ev_touchdown")
-    .some((action) => action.index === 7 && action.value === 0);
-  if (!touchdownRecorderOff && !recordingBlocked) {
-    checks.push(
-      check(
-        "recorder-stop",
-        "Recording",
-        "warning",
-        "Recorder is not stopped at touchdown",
-        "Consider adding Recorder: OFF to the touchdown event.",
-        ["ev_touchdown"],
-        { label: "Review Events", route: "/events" },
-      ),
-    );
-  }
 
   const warningCount = checks.filter(
     ({ status }) => status === "warning",

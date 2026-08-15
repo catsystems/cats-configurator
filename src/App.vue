@@ -35,7 +35,7 @@ export default {
       subscriptions: [],
       navItems: [
         {
-          title: "Configuration & Logging",
+          title: "Configuration",
           link: "/config",
           requiresBoard: true,
         },

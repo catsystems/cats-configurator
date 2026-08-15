@@ -435,7 +435,7 @@ export default {
       const duration = value("duration");
       const trigger = value("trigger");
       return Number(duration) === 0
-        ? `Disabled · ${start} → ${trigger}`
+        ? "Disabled"
         : `${start} → ${trigger} · ${duration} ms`;
     },
     applyResultForRow(row) {

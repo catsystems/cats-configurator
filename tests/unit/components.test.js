@@ -345,6 +345,13 @@ describe("renderer state components", () => {
     await nextTick();
 
     expect(wrapper.vm.recElements).toHaveLength(10);
+    expect(wrapper.vm.logElements.every(({ description }) => description)).toBe(
+      true,
+    );
+    expect(
+      wrapper.vm.logElements.find(({ name }) => name === "Flight Info")
+        .description,
+    ).toBe("Estimated altitude, velocity, and acceleration.");
     expect(wrapper.vm.rec_elements).toBe(4294967295);
     expect(wrapper.text()).toContain("Free space: 75.00%");
     expect(wrapper.text()).not.toContain("Estimated logging time: Unavailable");
@@ -487,7 +494,8 @@ describe("renderer state components", () => {
     );
     expect(timerRow.fields).toHaveLength(3);
     expect(wrapper.text()).toContain("LIFTOFF → APOGEE · 1000 ms");
-    expect(wrapper.text()).toContain("Disabled · CALIBRATE → CALIBRATE");
+    expect(wrapper.text()).toContain("Disabled");
+    expect(wrapper.text()).not.toContain("CALIBRATE → CALIBRATE");
 
     await wrapper.vm.applyProfileRow(timerRow);
     expect(window.cats.board.applyConfig).toHaveBeenCalledWith([
@@ -571,6 +579,7 @@ describe("renderer state components", () => {
     );
     await nextTick();
     expect(wrapper.text()).toContain("WARNING");
+    expect(wrapper.text()).toContain("Preflight Check");
     expect(wrapper.text()).toContain("Testing mode is enabled");
     expect(wrapper.text()).toContain("Event & Timer Simulator");
     expect(wrapper.text()).toContain("Flight Event Sequence");
@@ -578,7 +587,7 @@ describe("renderer state components", () => {
     expect(wrapper.text()).toContain("Liftoff detection: 35 m/s²");
     expect(wrapper.text()).toContain("Recorder: LOG");
     expect(wrapper.text()).toContain("LIFTOFF + 1000 ms → APOGEE");
-    expect(wrapper.text()).toContain("Checks performed (7)");
+    expect(wrapper.text()).not.toContain("Checks performed");
     wrapper.unmount();
 
     const cachedWrapper = mount(Preflight, {
