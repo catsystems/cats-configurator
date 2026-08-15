@@ -1,6 +1,6 @@
 <template>
   <div>
-    <v-container fluid>
+    <v-container fluid :class="{ 'pa-0': embedded }">
       <v-form ref="form">
         <v-row v-if="data && Object.keys(data).length >= timerKeys.length * 3">
           <v-col sm="12" md="6" xxl="3" v-for="key in timerKeys" :key="key">
@@ -97,8 +97,9 @@
       </v-form>
     </v-container>
     <ActionsBar
+      v-if="!embedded"
       :saving="saveLoading"
-      :changed="changedTab === 'timers'"
+      :changed="updated"
       @refresh="init"
       @save="onSave"
     />
@@ -114,6 +115,10 @@ import { TIMER_KEYS } from "@/modules/settings";
 
 export default {
   name: "TimerView",
+  props: {
+    embedded: Boolean,
+  },
+  emits: ["change"],
   components: {
     ActionsBar,
   },
@@ -125,15 +130,12 @@ export default {
     };
   },
   watch: {
-    data: {
-      handler(data) {
-        let changed = JSON.stringify(data) !== JSON.stringify(this.timers);
-
-        if (this.changed !== changed) {
-          this.setChangedTab(changed ? "timers" : null);
-        }
+    updated: {
+      handler(changed) {
+        if (this.embedded) this.$emit("change", changed);
+        else this.setChangedTab(changed ? "timers" : null);
       },
-      deep: true,
+      immediate: true,
     },
     timers: {
       handler(timers) {
@@ -144,7 +146,10 @@ export default {
     },
   },
   computed: {
-    ...mapState(useAppStore, ["timers", "changedTab"]),
+    ...mapState(useAppStore, ["timers"]),
+    updated() {
+      return JSON.stringify(this.data) !== JSON.stringify(this.timers);
+    },
   },
   mounted() {
     this.init();

@@ -120,12 +120,15 @@
           <v-card height="100%">
             <v-card-title>Event &amp; Timer Simulator</v-card-title>
             <v-card-subtitle>
-              Relative flight sequence and configured actions
+              Flight events and independently triggered timer chains
             </v-card-subtitle>
             <v-card-text class="pt-4">
+              <div class="text-subtitle-1 font-weight-medium mb-3">
+                Flight Event Sequence
+              </div>
               <div class="flight-timeline">
                 <div
-                  v-for="item in report.timeline"
+                  v-for="item in eventTimeline"
                   :key="item.id"
                   class="flight-timeline__entry"
                 >
@@ -136,12 +139,8 @@
                   <div class="flight-timeline__content">
                     <div class="d-flex align-center ga-2">
                       <strong>{{ item.title }}</strong>
-                      <v-chip
-                        :color="item.kind === 'timer' ? 'info' : 'primary'"
-                        size="x-small"
-                        variant="tonal"
-                      >
-                        {{ item.kind }}
+                      <v-chip color="primary" size="x-small" variant="tonal">
+                        event
                       </v-chip>
                     </div>
                     <div class="text-caption text-medium-emphasis mb-2">
@@ -180,6 +179,45 @@
                   </div>
                 </div>
               </div>
+              <v-divider class="my-5" />
+              <div class="text-subtitle-1 font-weight-medium mb-3">
+                Timer Chains
+              </div>
+              <div v-if="timerTimeline.length" class="flight-timeline">
+                <div
+                  v-for="item in timerTimeline"
+                  :key="item.id"
+                  class="flight-timeline__entry"
+                >
+                  <div
+                    class="flight-timeline__marker flight-timeline__marker--timer"
+                  ></div>
+                  <div class="flight-timeline__content">
+                    <div class="d-flex align-center ga-2">
+                      <strong>{{ item.title }}</strong>
+                      <v-chip color="info" size="x-small" variant="tonal">
+                        timer
+                      </v-chip>
+                    </div>
+                    <div class="text-caption text-medium-emphasis mb-2">
+                      {{ item.detail }}
+                    </div>
+                    <div class="d-flex flex-wrap ga-1">
+                      <v-chip
+                        v-for="action in item.actions"
+                        :key="action"
+                        size="small"
+                        variant="outlined"
+                      >
+                        {{ action }}
+                      </v-chip>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <v-alert v-else type="info" variant="tonal" density="compact">
+                No timers are active.
+              </v-alert>
             </v-card-text>
           </v-card>
         </v-col>
@@ -205,6 +243,12 @@ export default {
     ...mapState(useAppStore, ["preflightReport"]),
     report() {
       return this.preflightReport;
+    },
+    eventTimeline() {
+      return this.report?.timeline.filter(({ kind }) => kind === "event") ?? [];
+    },
+    timerTimeline() {
+      return this.report?.timeline.filter(({ kind }) => kind === "timer") ?? [];
     },
     reportAlertType() {
       return {

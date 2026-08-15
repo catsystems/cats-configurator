@@ -332,11 +332,22 @@ describe("renderer state components", () => {
     const store = useAppStore();
     store.setLog({ key: "rec_speed", value: "100Hz" });
     store.setLog({ key: "rec_elements", value: 4294967295 });
+    store.setStaticData({
+      key: "rec_info",
+      value: [
+        "Space:",
+        "  Total: 1024 KB",
+        "   Used: 256 KB (25.00%)",
+        "   Free: 768 KB (75.00%)",
+      ],
+    });
     await nextTick();
     await nextTick();
 
     expect(wrapper.vm.recElements).toHaveLength(10);
     expect(wrapper.vm.rec_elements).toBe(4294967295);
+    expect(wrapper.text()).toContain("Free space: 75.00%");
+    expect(wrapper.text()).not.toContain("Estimated logging time: Unavailable");
     expect(store.changedTab).toBeNull();
     wrapper.unmount();
   });
@@ -376,7 +387,43 @@ describe("renderer state components", () => {
       profileValue: 300,
       status: "changed",
     };
+    const timerRows = [
+      {
+        key: "timer1_start",
+        section: "Timers",
+        label: "Timer 1 Start",
+        boardValue: "LIFTOFF",
+        profileValue: "CALIBRATE",
+        status: "changed",
+      },
+      {
+        key: "timer1_duration",
+        section: "Timers",
+        label: "Timer 1 Duration",
+        boardValue: 1000,
+        profileValue: 0,
+        status: "changed",
+      },
+      {
+        key: "timer1_trigger",
+        section: "Timers",
+        label: "Timer 1 Trigger",
+        boardValue: "APOGEE",
+        profileValue: "CALIBRATE",
+        status: "changed",
+      },
+    ];
     window.cats = {
+      board: {
+        applyConfig: vi.fn().mockImplementation(async (entries) => ({
+          ok: true,
+          results: entries.map(({ key, value }) => ({
+            key,
+            actual: value,
+            status: "verified",
+          })),
+        })),
+      },
       profiles: {
         current: vi.fn().mockResolvedValue({
           profile,
@@ -396,11 +443,11 @@ describe("renderer state components", () => {
         open: vi.fn().mockResolvedValue({
           canceled: false,
           profile,
-          rows: [changedRow],
+          rows: [changedRow, ...timerRows],
           compatibility: {
             warnings: [],
             canApply: true,
-            changedCount: 1,
+            changedCount: 4,
           },
         }),
         apply: vi.fn().mockImplementation(async (appliedProfile) => {
@@ -427,14 +474,28 @@ describe("renderer state components", () => {
     );
     await nextTick();
     expect(wrapper.text()).toContain(
-      "Showing 1 board value read from the connected board",
+      "Showing 1 board setting read from the connected board",
     );
 
     await wrapper.vm.openProfile();
     await nextTick();
     expect(wrapper.text()).toContain("Main Altitude");
-    expect(wrapper.text()).toContain("1 profile value differs from the board");
+    expect(wrapper.text()).toContain("2 profile entries differ from the board");
     expect(wrapper.text()).toContain("Apply Profile to Board");
+    const timerRow = wrapper.vm.comparisonRows.find(
+      ({ key }) => key === "timer1",
+    );
+    expect(timerRow.fields).toHaveLength(3);
+    expect(wrapper.text()).toContain("LIFTOFF → APOGEE · 1000 ms");
+    expect(wrapper.text()).toContain("Disabled · CALIBRATE → CALIBRATE");
+
+    await wrapper.vm.applyProfileRow(timerRow);
+    expect(window.cats.board.applyConfig).toHaveBeenCalledWith([
+      { key: "timer1_start", value: "CALIBRATE" },
+      { key: "timer1_duration", value: 0 },
+      { key: "timer1_trigger", value: "CALIBRATE" },
+    ]);
+    expect(wrapper.vm.changedEntryCount).toBe(1);
 
     wrapper.vm.viewMode = "board";
     await nextTick();
@@ -449,16 +510,16 @@ describe("renderer state components", () => {
     expect(useAppStore().snackbar.message).toBe(
       "Profile applied and verified.",
     );
-    expect(window.cats.profiles.current).toHaveBeenCalledTimes(2);
+    expect(window.cats.profiles.current).toHaveBeenCalledTimes(3);
     wrapper.unmount();
 
     const cachedWrapper = mount(Profiles, {
       global: { plugins: [pinia, vuetify] },
     });
     await nextTick();
-    expect(window.cats.profiles.current).toHaveBeenCalledTimes(2);
+    expect(window.cats.profiles.current).toHaveBeenCalledTimes(3);
     expect(cachedWrapper.text()).toContain(
-      "Showing 1 board value read from the connected board",
+      "Showing 1 board setting read from the connected board",
     );
     cachedWrapper.unmount();
   });
@@ -489,6 +550,14 @@ describe("renderer state components", () => {
               settings: ["Liftoff detection: 35 m/s²"],
               actions: ["Recorder: LOG"],
             },
+            {
+              id: "timer1",
+              kind: "timer",
+              title: "Timer 1",
+              detail: "LIFTOFF + 1000 ms → APOGEE",
+              settings: [],
+              actions: ["Trigger event: APOGEE"],
+            },
           ],
         }),
       },
@@ -504,8 +573,11 @@ describe("renderer state components", () => {
     expect(wrapper.text()).toContain("WARNING");
     expect(wrapper.text()).toContain("Testing mode is enabled");
     expect(wrapper.text()).toContain("Event & Timer Simulator");
+    expect(wrapper.text()).toContain("Flight Event Sequence");
+    expect(wrapper.text()).toContain("Timer Chains");
     expect(wrapper.text()).toContain("Liftoff detection: 35 m/s²");
     expect(wrapper.text()).toContain("Recorder: LOG");
+    expect(wrapper.text()).toContain("LIFTOFF + 1000 ms → APOGEE");
     expect(wrapper.text()).toContain("Checks performed (7)");
     wrapper.unmount();
 

@@ -292,7 +292,7 @@ export function buildPreflightReport(snapshot) {
       recordingDetail,
       ["rec_speed", "rec_elements", ...loggingEvents.map(({ key }) => key)],
       recordingDisabled
-        ? { label: "Review Logging", route: "/logging" }
+        ? { label: "Review Logging", route: "/config?section=logging" }
         : { label: "Review Events", route: "/events" },
     ),
   );
@@ -400,7 +400,7 @@ export function buildPreflightReport(snapshot) {
         `${timer}_duration`,
         `${timer}_trigger`,
       ]),
-      { label: "Review Timers", route: "/timer" },
+      { label: "Review Timers", route: "/events?section=timers" },
     ),
   );
   checks.push(
@@ -415,7 +415,7 @@ export function buildPreflightReport(snapshot) {
         ? orderingIssues.join(" ")
         : "Active timers do not trigger an earlier core flight state.",
       activeTimers.flatMap((timer) => [`${timer}_start`, `${timer}_trigger`]),
-      { label: "Review Timers", route: "/timer" },
+      { label: "Review Timers", route: "/events?section=timers" },
     ),
   );
 

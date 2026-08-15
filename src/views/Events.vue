@@ -1,6 +1,7 @@
 <template>
   <div>
     <v-container fluid>
+      <div class="text-h5 mb-3">Flight Events</div>
       <v-slide-group show-arrows>
         <v-slide-group-item v-for="key in Object.keys(events)" :key="key">
           <v-card class="event-column-card" variant="flat" max-height="100%">
@@ -37,11 +38,16 @@
           </v-card>
         </v-slide-group-item>
       </v-slide-group>
+      <v-divider class="my-6" />
+      <section ref="timersSection">
+        <div class="text-h5 mb-3">Timers</div>
+        <Timers ref="timers" embedded @change="onTimersChange" />
+      </section>
     </v-container>
     <ActionsBar
       :saving="saveLoading"
       :changed="changed"
-      @refresh="init"
+      @refresh="refreshAll"
       @save="saveData"
     />
     <v-dialog v-model="addActionDialog" width="500">
@@ -73,6 +79,7 @@ import ActionsBar from "@/components/ActionsBar.vue";
 import EventAction from "@/components/EventAction.vue";
 import AddEventActionDialog from "@/components/AddEventActionDialog.vue";
 import EditEventActionDialog from "@/components/EditEventActionDialog.vue";
+import Timers from "@/views/Timers.vue";
 
 export default {
   name: "EventsView",
@@ -81,6 +88,7 @@ export default {
     EventAction,
     AddEventActionDialog,
     EditEventActionDialog,
+    Timers,
   },
   data() {
     return {
@@ -90,12 +98,13 @@ export default {
       currentAction: null,
       currentActionIndex: null,
       saveLoading: false,
+      timersChanged: false,
     };
   },
   computed: {
-    ...mapState(useAppStore, ["changedTab", "events", "isEventsChanged"]),
+    ...mapState(useAppStore, ["events", "isEventsChanged"]),
     changed() {
-      return this.changedTab === "events";
+      return this.isEventsChanged || this.timersChanged;
     },
     currentEvent() {
       const event = this.events[this.currentKey];
@@ -108,11 +117,14 @@ export default {
   },
   watch: {
     isEventsChanged(changed) {
-      this.setChangedTab(changed ? "events" : null);
+      this.updateChangedState(changed, this.timersChanged);
     },
   },
   mounted() {
     this.init();
+    if (this.$route?.query?.section === "timers") {
+      this.$nextTick(() => this.$refs.timersSection?.scrollIntoView());
+    }
   },
   methods: {
     ...mapActions(useAppStore, [
@@ -125,11 +137,25 @@ export default {
     init() {
       getEvents();
     },
+    refreshAll() {
+      this.init();
+      this.$refs.timers?.init();
+    },
+    onTimersChange(changed) {
+      this.timersChanged = changed;
+      this.updateChangedState(this.isEventsChanged, changed);
+    },
+    updateChangedState(eventsChanged, timersChanged) {
+      this.setChangedTab(eventsChanged || timersChanged ? "events" : null);
+    },
     async saveData() {
       this.saveLoading = true;
       try {
-        await setEvents(this.events);
-        await getEvents();
+        if (this.isEventsChanged) {
+          await setEvents(this.events);
+          await getEvents();
+        }
+        if (this.timersChanged) await this.$refs.timers?.onSave();
       } catch (error) {
         this.showErrorSnackbar(error.message);
       } finally {
