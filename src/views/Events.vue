@@ -1,6 +1,6 @@
 <template>
   <div>
-    <v-container fluid>
+    <v-container fluid class="events-content">
       <div class="text-h5 mb-3">Flight Events</div>
       <v-slide-group show-arrows>
         <v-slide-group-item v-for="key in Object.keys(events)" :key="key">
@@ -192,6 +192,10 @@ export default {
 </script>
 
 <style scoped>
+.events-content {
+  padding-bottom: 76px;
+}
+
 .event-action {
   max-height: calc(100vh - 290px);
   overflow: scroll;

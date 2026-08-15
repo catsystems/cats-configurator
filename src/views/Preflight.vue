@@ -2,7 +2,7 @@
   <v-container fluid class="preflight-view pa-6">
     <v-card class="mb-4">
       <v-card-title class="d-flex align-center flex-wrap ga-3">
-        <span>Flight Preflight</span>
+        <span>Preflight Check</span>
         <v-spacer />
         <v-btn color="primary" :loading="loading" @click="runPreflight">
           Run Preflight
@@ -50,27 +50,6 @@
           </v-card>
         </v-col>
       </v-row>
-
-      <v-expansion-panels class="mb-4">
-        <v-expansion-panel>
-          <v-expansion-panel-title>
-            Checks performed ({{ checkDefinitions.length }})
-          </v-expansion-panel-title>
-          <v-expansion-panel-text>
-            <v-list density="compact">
-              <v-list-item
-                v-for="definition in checkDefinitions"
-                :key="definition.id"
-              >
-                <v-list-item-title>{{ definition.title }}</v-list-item-title>
-                <v-list-item-subtitle>
-                  {{ definition.description }}
-                </v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-          </v-expansion-panel-text>
-        </v-expansion-panel>
-      </v-expansion-panels>
 
       <v-row>
         <v-col cols="12" lg="7">
@@ -229,14 +208,12 @@
 <script>
 import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
-import { PREFLIGHT_CHECKS } from "@/shared/preflight.js";
 
 export default {
   name: "PreflightView",
   data() {
     return {
       loading: false,
-      checkDefinitions: PREFLIGHT_CHECKS,
     };
   },
   computed: {
