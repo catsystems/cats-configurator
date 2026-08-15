@@ -44,6 +44,9 @@ describe("renderer state components", () => {
     wrapper.vm.useImperialUnitsState = true;
     await nextTick();
     expect(store.useImperialUnits).toBe(true);
+    expect(wrapper.findComponent({ name: "VSwitch" }).classes()).toContain(
+      "unit-switch--active",
+    );
   });
 
   it("renders and dismisses store-backed snackbar messages", async () => {
@@ -352,6 +355,9 @@ describe("renderer state components", () => {
       wrapper.vm.logElements.find(({ name }) => name === "Flight Info")
         .description,
     ).toBe("Estimated altitude, velocity, and acceleration.");
+    const tooltip = wrapper.findAllComponents({ name: "VTooltip" })[0];
+    expect(tooltip.props("offset")).toBe("2");
+    expect(tooltip.props("contentClass")).toBe("logging-element-tooltip");
     expect(wrapper.vm.rec_elements).toBe(4294967295);
     expect(wrapper.text()).toContain("Free space: 75.00%");
     expect(wrapper.text()).not.toContain("Estimated logging time: Unavailable");
@@ -483,6 +489,7 @@ describe("renderer state components", () => {
     expect(wrapper.text()).toContain(
       "Showing 1 board setting read from the connected board",
     );
+    expect(wrapper.text()).toContain("200 m");
 
     await wrapper.vm.openProfile();
     await nextTick();
@@ -496,6 +503,12 @@ describe("renderer state components", () => {
     expect(wrapper.text()).toContain("LIFTOFF → APOGEE · 1000 ms");
     expect(wrapper.text()).toContain("Disabled");
     expect(wrapper.text()).not.toContain("CALIBRATE → CALIBRATE");
+
+    const store = useAppStore();
+    store.toggleUnitSystem();
+    await nextTick();
+    expect(wrapper.text()).toContain("656 ft");
+    expect(wrapper.text()).toContain("984 ft");
 
     await wrapper.vm.applyProfileRow(timerRow);
     expect(window.cats.board.applyConfig).toHaveBeenCalledWith([
@@ -588,6 +601,11 @@ describe("renderer state components", () => {
     expect(wrapper.text()).toContain("Recorder: LOG");
     expect(wrapper.text()).toContain("LIFTOFF + 1000 ms → APOGEE");
     expect(wrapper.text()).not.toContain("Checks performed");
+
+    useAppStore().toggleUnitSystem();
+    await nextTick();
+    expect(wrapper.text()).toContain("Liftoff detection: 115 ft/s²");
+    expect(wrapper.text()).not.toContain("Liftoff detection: 35 m/s²");
     wrapper.unmount();
 
     const cachedWrapper = mount(Preflight, {

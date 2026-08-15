@@ -72,7 +72,7 @@
                     {{ item.title }}
                   </v-list-item-title>
                   <v-list-item-subtitle>
-                    {{ item.category }} · {{ item.detail }}
+                    {{ item.category }} · {{ formatPreflightText(item.detail) }}
                   </v-list-item-subtitle>
                   <template #append>
                     <div class="d-flex align-center ga-2">
@@ -123,7 +123,7 @@
                       </v-chip>
                     </div>
                     <div class="text-caption text-medium-emphasis mb-2">
-                      {{ item.detail }}
+                      {{ formatPreflightText(item.detail) }}
                     </div>
                     <div
                       v-if="item.settings?.length"
@@ -136,7 +136,7 @@
                         size="small"
                         variant="tonal"
                       >
-                        {{ setting }}
+                        {{ formatPreflightText(setting) }}
                       </v-chip>
                     </div>
                     <div
@@ -179,7 +179,7 @@
                       </v-chip>
                     </div>
                     <div class="text-caption text-medium-emphasis mb-2">
-                      {{ item.detail }}
+                      {{ formatPreflightText(item.detail) }}
                     </div>
                     <div class="d-flex flex-wrap ga-1">
                       <v-chip
@@ -208,6 +208,7 @@
 <script>
 import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
+import { getDisplayValue } from "@/utils/unitConversions.js";
 
 export default {
   name: "PreflightView",
@@ -217,7 +218,7 @@ export default {
     };
   },
   computed: {
-    ...mapState(useAppStore, ["preflightReport"]),
+    ...mapState(useAppStore, ["preflightReport", "useImperialUnits"]),
     report() {
       return this.preflightReport;
     },
@@ -266,6 +267,21 @@ export default {
         ready: "mdi-check-circle",
         warning: "mdi-alert",
       }[status];
+    },
+    formatPreflightText(value) {
+      if (!this.useImperialUnits) return value;
+      const convert = (number, parameter) =>
+        getDisplayValue(number, parameter, {
+          numeric: false,
+          decimals: 0,
+        });
+      return String(value)
+        .replace(/(-?\d+(?:\.\d+)?)\s*m\/s²/g, (_, number) =>
+          convert(number, "acceleration"),
+        )
+        .replace(/(-?\d+(?:\.\d+)?)\s*m(?![a-zA-Z/²])/g, (_, number) =>
+          convert(number, "altitude"),
+        );
     },
     formatDate(value) {
       const date = new Date(value);
