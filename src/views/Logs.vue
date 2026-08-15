@@ -1,6 +1,6 @@
 <template>
   <div>
-    <v-container fluid>
+    <v-container fluid :class="{ 'pa-0': embedded }">
       <v-row>
         <v-col>
           <v-card height="100%">
@@ -35,9 +35,17 @@
                 class="mb-2"
                 v-text="item"
               />
-              <div class="mb-2">Free space: {{ freeSpacePercentage }}%</div>
               <div class="mb-2">
-                Logging time: {{ convertTime(loggingTime) }}
+                Free space:
+                {{
+                  freeSpacePercentage === null
+                    ? "Unavailable"
+                    : `${freeSpacePercentage}%`
+                }}
+              </div>
+              <div class="mb-2">
+                Estimated logging time:
+                {{ convertTime(loggingTime) || "Unavailable" }}
               </div>
             </v-card-text>
           </v-card>
@@ -68,6 +76,7 @@
       </v-row>
     </v-container>
     <ActionsBar
+      v-if="!embedded"
       :saving="saveLoading"
       :changed="updated"
       @refresh="init"
@@ -89,8 +98,37 @@ const KNOWN_LOG_MASK = LOG_ELEMENTS.reduce(
   0n,
 );
 
+function parseStorageAmount(line) {
+  const match = String(line ?? "").match(/:\s*([\d.]+)\s*(KB|bytes|B)?/i);
+  if (!match) return null;
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) return null;
+  return /^KB$/i.test(match[2] ?? "") ? value * 1024 : value;
+}
+
+function parseFlashUsage(lines) {
+  if (!Array.isArray(lines)) return null;
+  const legacy = lines.find((line) => /Flash usage:/i.test(line));
+  if (legacy) {
+    const values = legacy.match(/[\d.]+/g)?.map(Number) ?? [];
+    if (values.length >= 2) return { used: values[0], size: values[1] };
+  }
+
+  const size = parseStorageAmount(
+    lines.find((line) => /^\s*Total:/i.test(line)),
+  );
+  const used = parseStorageAmount(
+    lines.find((line) => /^\s*Used:/i.test(line)),
+  );
+  return size !== null && used !== null ? { used, size } : null;
+}
+
 export default {
   name: "LogsView",
+  props: {
+    embedded: Boolean,
+  },
+  emits: ["change"],
   components: {
     ActionsBar,
   },
@@ -126,6 +164,10 @@ export default {
       immediate: true,
     },
     updated(v) {
+      if (this.embedded) {
+        this.$emit("change", v);
+        return;
+      }
       if ((this.changedTab === "logs") !== v) {
         this.setChangedTab(v ? "logs" : null);
       }
@@ -134,7 +176,7 @@ export default {
   computed: {
     ...mapState(useAppStore, {
       logs: "logs",
-      flash_info: (store) => store.static.flash_info,
+      flash_info: (store) => store.static.rec_info,
       changedTab: "changedTab",
     }),
     updated() {
@@ -144,23 +186,10 @@ export default {
       );
     },
     flashUsage() {
-      if (!this.flash_info || !this.flash_info.length) return null;
-
-      let flashUsageString = this.flash_info.find((item) =>
-        item.includes("Flash usage:"),
-      );
-      const usedSize = flashUsageString.match(/\d+/)[0];
-      flashUsageString = flashUsageString.replace(usedSize, "");
-      const flahSize = flashUsageString.match(/\d+/)[0];
-
-      return {
-        used: Number(usedSize),
-        size: Number(flahSize),
-      };
+      return parseFlashUsage(this.flash_info);
     },
     freeSpacePercentage() {
-      if (!this.flashUsage || !this.flashUsage.used || !this.flashUsage.size)
-        return null;
+      if (!this.flashUsage || !this.flashUsage.size) return null;
       return (
         100 -
         (this.flashUsage.used / this.flashUsage.size) * 100
@@ -169,9 +198,15 @@ export default {
     loggingTime() {
       if (!this.elementsSize || !this.flashUsage || !this.flashUsage.size)
         return null;
-
-      const recSpeed = Number(this.logs.rec_speed.value.match(/\d+/)[0]);
-      return this.flashUsage.size / (this.elementsSize * recSpeed);
+      const recSpeed = Number(
+        String(this.logs.rec_speed.value).match(/\d+/)?.[0] ?? 0,
+      );
+      if (!recSpeed) return null;
+      const freeBytes = Math.max(
+        0,
+        this.flashUsage.size - this.flashUsage.used,
+      );
+      return freeBytes / (this.elementsSize * recSpeed);
     },
   },
   mounted() {

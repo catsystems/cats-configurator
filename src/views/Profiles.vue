@@ -20,7 +20,7 @@
       <v-card-text>
         <v-alert type="info" variant="tonal" class="mb-4">
           Review the connected board profile at any time, export it as JSON, or
-          open another profile for a field-by-field comparison.
+          open another profile for a setting-by-setting comparison.
         </v-alert>
 
         <v-progress-linear
@@ -70,7 +70,7 @@
 
           <template v-if="viewMode === 'board'">
             <v-alert type="success" variant="tonal" class="mb-3">
-              Showing {{ currentRows.length }} board value{{
+              Showing {{ currentRows.length }} board setting{{
                 currentRows.length === 1 ? "" : "s"
               }}
               read from the connected board.
@@ -94,7 +94,7 @@
                     </div>
                   </td>
                   <td class="profile-value">
-                    {{ formatValue(row.key, row.boardValue) }}
+                    {{ formatRowValue(row, "boardValue") }}
                   </td>
                 </tr>
               </tbody>
@@ -122,18 +122,16 @@
 
             <div class="d-flex align-center mb-3">
               <div class="text-body-2">
-                {{ compatibility.changedCount }} profile value{{
-                  compatibility.changedCount === 1 ? "" : "s"
+                {{ changedEntryCount }} profile
+                {{
+                  changedEntryCount === 1 ? "entry differs" : "entries differ"
                 }}
-                {{ compatibility.changedCount === 1 ? "differs" : "differ" }}
                 from the board.
               </div>
               <v-spacer />
               <v-btn
                 color="primary"
-                :disabled="
-                  !compatibility.canApply || compatibility.changedCount === 0
-                "
+                :disabled="!compatibility.canApply || changedEntryCount === 0"
                 :loading="applyLoading"
                 @click="applyProfile"
               >
@@ -150,10 +148,11 @@
                   <th>Profile</th>
                   <th>Difference</th>
                   <th>Apply result</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in rows" :key="row.key">
+                <tr v-for="row in comparisonRows" :key="row.key">
                   <td>{{ row.section }}</td>
                   <td>
                     <div>{{ row.label }}</div>
@@ -162,10 +161,10 @@
                     </div>
                   </td>
                   <td class="profile-value">
-                    {{ formatValue(row.key, row.boardValue) }}
+                    {{ formatRowValue(row, "boardValue") }}
                   </td>
                   <td class="profile-value">
-                    {{ formatValue(row.key, row.profileValue) }}
+                    {{ formatRowValue(row, "profileValue") }}
                   </td>
                   <td>
                     <v-chip :color="statusColor(row.status)" size="small">
@@ -174,13 +173,27 @@
                   </td>
                   <td>
                     <v-chip
-                      v-if="applyResults[row.key]"
-                      :color="resultColor(applyResults[row.key].status)"
+                      v-if="applyResultForRow(row)"
+                      :color="resultColor(applyResultForRow(row))"
                       size="small"
                       variant="tonal"
                     >
-                      {{ statusLabel(applyResults[row.key].status) }}
+                      {{ statusLabel(applyResultForRow(row)) }}
                     </v-chip>
+                    <span v-else class="text-medium-emphasis">—</span>
+                  </td>
+                  <td>
+                    <v-btn
+                      v-if="row.status === 'changed'"
+                      color="primary"
+                      size="small"
+                      variant="tonal"
+                      :disabled="!compatibility.canApply"
+                      :loading="applyRowLoading === row.key"
+                      @click="applyProfileRow(row)"
+                    >
+                      Apply to Board
+                    </v-btn>
                     <span v-else class="text-medium-emphasis">—</span>
                   </td>
                 </tr>
@@ -202,6 +215,47 @@ import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
 import { formatProfileValue } from "@/shared/configuration-profile.js";
 
+const TIMER_FIELD_ORDER = ["start", "duration", "trigger"];
+const STATUS_PRIORITY = ["unsupported", "missing", "changed", "same"];
+
+function groupProfileRows(rows) {
+  const grouped = [];
+  const timers = new Map();
+  for (const row of rows) {
+    const timer = row.key.match(/^timer(\d+)_(start|duration|trigger)$/);
+    if (!timer) {
+      grouped.push({ ...row, fields: [row] });
+      continue;
+    }
+    const key = `timer${timer[1]}`;
+    if (!timers.has(key)) {
+      const group = {
+        key,
+        section: "Timers",
+        label: `Timer ${timer[1]}`,
+        timer: true,
+        fields: [],
+      };
+      timers.set(key, group);
+      grouped.push(group);
+    }
+    timers.get(key).fields.push(row);
+  }
+
+  return grouped.map((row) => {
+    if (!row.timer) return row;
+    row.fields.sort(
+      (left, right) =>
+        TIMER_FIELD_ORDER.indexOf(left.key.split("_").at(-1)) -
+        TIMER_FIELD_ORDER.indexOf(right.key.split("_").at(-1)),
+    );
+    row.status = STATUS_PRIORITY.find((status) =>
+      row.fields.some((field) => field.status === status),
+    );
+    return row;
+  });
+}
+
 export default {
   name: "ProfilesView",
   data() {
@@ -220,6 +274,7 @@ export default {
       exportLoading: false,
       openLoading: false,
       applyLoading: false,
+      applyRowLoading: null,
     };
   },
   computed: {
@@ -228,7 +283,14 @@ export default {
       return this.currentBoardProfile?.profile ?? null;
     },
     currentRows() {
-      return this.currentBoardProfile?.rows ?? [];
+      return groupProfileRows(this.currentBoardProfile?.rows ?? []);
+    },
+    comparisonRows() {
+      return groupProfileRows(this.rows);
+    },
+    changedEntryCount() {
+      return this.comparisonRows.filter(({ status }) => status === "changed")
+        .length;
     },
     displayProfile() {
       return this.viewMode === "board" ? this.currentProfile : this.profile;
@@ -314,12 +376,86 @@ export default {
         this.applyLoading = false;
       }
     },
+    async applyProfileRow(row) {
+      const entries = row.fields
+        .filter(({ status }) => ["same", "changed"].includes(status))
+        .map(({ key, profileValue }) => ({ key, value: profileValue }));
+      if (!entries.length) return;
+
+      this.applyRowLoading = row.key;
+      try {
+        const result = await window.cats.board.applyConfig(entries);
+        this.applyResults = {
+          ...this.applyResults,
+          ...Object.fromEntries(
+            result.results.map((field) => [field.key, field]),
+          ),
+        };
+        if (result.ok) {
+          for (const field of result.results) {
+            const applied = this.rows.find(({ key }) => key === field.key);
+            if (!applied || field.status !== "verified") continue;
+            applied.boardValue = field.actual;
+            applied.status = "same";
+          }
+          this.compatibility = {
+            ...this.compatibility,
+            changedCount: this.rows.filter(({ status }) => status === "changed")
+              .length,
+          };
+          await this.loadCurrentProfile();
+          this.showSuccessSnackbar(`${row.label} applied and verified.`);
+        } else {
+          const failed = result.results.find(({ status }) =>
+            ["failed", "mismatch"].includes(status),
+          );
+          this.showErrorSnackbar(
+            `${row.label} was not fully applied. ${failed?.message || failed?.status || "The board did not verify every value."}`,
+          );
+        }
+      } catch (error) {
+        this.showErrorSnackbar(error.message);
+      } finally {
+        this.applyRowLoading = null;
+      }
+    },
     formatDate(value) {
       const date = new Date(value);
       return Number.isNaN(date.valueOf()) ? value : date.toLocaleString();
     },
     formatValue(key, value) {
       return formatProfileValue(key, value);
+    },
+    formatRowValue(row, source) {
+      if (!row.timer) return this.formatValue(row.key, row[source]);
+      const value = (field) =>
+        row.fields.find(({ key }) => key.endsWith(`_${field}`))?.[source] ??
+        "—";
+      const start = value("start");
+      const duration = value("duration");
+      const trigger = value("trigger");
+      return Number(duration) === 0
+        ? `Disabled · ${start} → ${trigger}`
+        : `${start} → ${trigger} · ${duration} ms`;
+    },
+    applyResultForRow(row) {
+      const results = row.fields
+        .map(({ key }) => this.applyResults[key])
+        .filter(Boolean);
+      if (!results.length) return null;
+      if (
+        results.some(({ status }) => ["failed", "mismatch"].includes(status))
+      ) {
+        return "failed";
+      }
+      if (
+        results.every(({ status }) =>
+          ["verified", "unchanged"].includes(status),
+        )
+      ) {
+        return "verified";
+      }
+      return "pending";
     },
     statusLabel(status) {
       return String(status).replaceAll("_", " ");

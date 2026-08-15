@@ -21,14 +21,12 @@ const routes = [
   {
     path: "/timer",
     name: "Timers",
-    meta: { requiresBoard: true },
-    component: () => import("../views/Timers.vue"),
+    redirect: "/events?section=timers",
   },
   {
     path: "/logging",
     name: "Logging",
-    meta: { requiresBoard: true },
-    component: () => import("../views/Logs.vue"),
+    redirect: "/config?section=logging",
   },
   {
     path: "/profiles",
