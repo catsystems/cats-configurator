@@ -66,6 +66,27 @@ describe("BoardCommandEngine", () => {
     vi.useRealTimers();
   });
 
+  it("waits for slow command output after receiving the command echo", async () => {
+    vi.useFakeTimers();
+    const { engine } = createHarness({ settleMs: 25 });
+    const result = engine.run("save");
+    let completed = false;
+    void result.then(() => {
+      completed = true;
+    });
+
+    engine.receive("^._.^:/> save");
+    await vi.advanceTimersByTimeAsync(50);
+    expect(completed).toBe(false);
+
+    engine.receive("Successfully written to flash");
+    await vi.advanceTimersByTimeAsync(25);
+    await expect(result).resolves.toMatchObject({
+      output: ["Successfully written to flash"],
+    });
+    vi.useRealTimers();
+  });
+
   it("accepts a warm-reconnect echo and splits batched response lines", async () => {
     vi.useFakeTimers();
     const { engine } = createHarness({ settleMs: 25 });

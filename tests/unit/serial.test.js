@@ -172,7 +172,7 @@ describe("serial board identification", () => {
     ).toBe(false);
   });
 
-  it("writes, saves, and verifies timer 4 as one transaction", async () => {
+  it("waits for a delayed flash save before verifying a transaction", async () => {
     serial.connect("COM4");
     const port = serialState.instances[0];
     await identify(port);
@@ -207,7 +207,14 @@ describe("serial board identification", () => {
           expect.any(Function),
         ),
       );
-      respond(command, output);
+      if (command === "save") {
+        serialState.parser.emit("data", `^._.^:/> ${command}`);
+        await vi.advanceTimersByTimeAsync(100);
+        output.forEach((line) => serialState.parser.emit("data", line));
+        await vi.advanceTimersByTimeAsync(75);
+      } else {
+        respond(command, output);
+      }
     }
 
     await expect(transaction).resolves.toMatchObject({
