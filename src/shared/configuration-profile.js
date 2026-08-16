@@ -13,7 +13,8 @@ import { parseConfiguredActions } from "./preflight.js";
 export const PROFILE_FORMAT = "cats-configurator-profile";
 export const PROFILE_SCHEMA_VERSION = 1;
 
-const knownKeys = new Set(PROFILE_BOARD_KEYS);
+const profileKeys = PROFILE_BOARD_KEYS.filter((key) => !LOG_KEYS.includes(key));
+const knownKeys = new Set(profileKeys);
 
 function assertRecord(value, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -101,9 +102,7 @@ export function createConfigurationProfile(
         ),
       ]),
     ),
-    logging: Object.fromEntries(
-      LOG_KEYS.filter((key) => key in values).map((key) => [key, values[key]]),
-    ),
+    logging: {},
   };
 }
 
@@ -148,7 +147,6 @@ export function flattenConfigurationProfile(profile) {
   const entries = [
     ...sectionEntries(profile.configuration, ""),
     ...sectionEntries(profile.events, ""),
-    ...sectionEntries(profile.logging, ""),
   ];
   for (const [timer, fields] of Object.entries(profile.timers)) {
     assertRecord(fields, `Profile timer ${timer}`);
@@ -240,7 +238,7 @@ export function compareConfigurationProfile(profile, snapshot) {
   const profileValues = new Map(
     profileEntries.map(({ key, value }) => [key, value]),
   );
-  const keys = [...new Set([...PROFILE_BOARD_KEYS, ...profileValues.keys()])];
+  const keys = [...new Set([...profileKeys, ...profileValues.keys()])];
   const rows = keys.map((key) => {
     const known = knownKeys.has(key);
     const hasProfile = profileValues.has(key);

@@ -7,7 +7,7 @@ test.skip(
 );
 
 test("connects to a real CATS Vega without modifying configuration", async ({}, testInfo) => {
-  test.setTimeout(60_000);
+  test.setTimeout(process.env.CATS_RUN_SIM === "1" ? 420_000 : 60_000);
   const executablePath = process.env.CATS_E2E_EXECUTABLE;
   const application = await electron.launch({
     ...(executablePath ? { executablePath } : {}),
@@ -37,6 +37,31 @@ test("connects to a real CATS Vega without modifying configuration", async ({}, 
     await expect(page.getByText("Board: CATS Vega")).toBeVisible();
     await expect(page).toHaveURL(/#\/config$/);
 
+    if (process.env.CATS_DELETE_ONBOARD_LOGS === "1") {
+      await page.evaluate(() => {
+        window.location.hash = "#/flight-logs";
+      });
+      await expect(
+        page.getByText("Onboard logs", { exact: true }),
+      ).toBeVisible();
+      const deleteButtons = page.locator(
+        '.onboard-actions button[aria-label^="Delete fl"]',
+      );
+      await expect.poll(() => deleteButtons.count()).toBeGreaterThan(0);
+      while ((await deleteButtons.count()) > 0) {
+        const before = await deleteButtons.count();
+        page.once("dialog", (dialog) => dialog.accept());
+        await deleteButtons.first().click();
+        await expect.poll(() => deleteButtons.count()).toBe(before - 1);
+      }
+      await expect(
+        page.getByText("The mounted CATS drive contains no flight logs."),
+      ).toBeVisible();
+      await page.evaluate(() => {
+        window.location.hash = "#/config";
+      });
+    }
+
     await page.getByRole("button", { name: "disconnect" }).click();
     await expect(page.getByText("Status: Disconnected")).toBeVisible();
     await page.waitForTimeout(2500);
@@ -60,13 +85,34 @@ test("connects to a real CATS Vega without modifying configuration", async ({}, 
       timeout: 10_000,
     });
 
+    if (process.env.CATS_RUN_SIM === "1") {
+      await commandInput.fill("sim");
+      await commandInput.press("Enter");
+      await expect(
+        page.getByText(/height:.*velocity:.*offset:/).last(),
+      ).toBeVisible({
+        timeout: 60_000,
+      });
+      await page.waitForTimeout(6000);
+      await expect(page.getByText(/Board command timed out: sim/)).toHaveCount(
+        0,
+      );
+      await expect(
+        page.getByText("Simulation Successful.", { exact: true }),
+      ).toBeVisible({ timeout: 360_000 });
+      await page.waitForTimeout(500);
+      await page.getByRole("button", { name: "disconnect" }).click();
+      await expect(page.getByText("Status: Disconnected")).toBeVisible();
+      return;
+    }
+
     await page.evaluate(() => {
       window.location.hash = "#/logging";
     });
-    await expect(page.getByText("Recording", { exact: true })).toBeVisible();
-    await expect(page.getByText(/Free space:\s*\d+(?:\.\d+)?%/)).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(page).toHaveURL(/#\/config$/);
+    await expect(
+      page.getByText("Main Altitude", { exact: true }),
+    ).toBeVisible();
 
     await page.evaluate(() => {
       window.location.hash = "#/preflight";

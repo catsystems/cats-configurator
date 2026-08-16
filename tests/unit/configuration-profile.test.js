@@ -49,7 +49,7 @@ describe("versioned configuration profiles", () => {
       "timer3",
       "timer4",
     ]);
-    expect(Object.keys(profile.logging)).toHaveLength(2);
+    expect(profile.logging).toEqual({});
   });
 
   it("shows changes and firmware compatibility warnings", () => {
@@ -115,13 +115,27 @@ describe("versioned configuration profiles", () => {
     const profile = createConfigurationProfile(snapshot(), {
       createdAt: "2026-08-12T08:00:00.000Z",
     });
-    profile.logging.main_altitude = 20;
+    profile.events.main_altitude = 20;
     expect(() => validateConfigurationProfile(profile)).toThrow(
       "duplicate field main_altitude",
     );
-    delete profile.logging.main_altitude;
+    delete profile.events.main_altitude;
     profile.configuration.main_altitude = "200\nsave";
     expect(() => validateConfigurationProfile(profile)).toThrow("single line");
+  });
+
+  it("ignores legacy logging values in profiles", () => {
+    const board = snapshot();
+    const profile = createConfigurationProfile(board, {
+      createdAt: "2026-08-12T08:00:00.000Z",
+    });
+    profile.logging = { rec_speed: "OFF", rec_elements: 0 };
+
+    const comparison = compareConfigurationProfile(profile, board);
+    expect(comparison.rows.some(({ section }) => section === "Logging")).toBe(
+      false,
+    );
+    expect(changedProfileEntries(comparison)).toEqual([]);
   });
 
   it("parses current and legacy firmware identity labels", () => {
