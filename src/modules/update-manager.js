@@ -254,6 +254,7 @@ export class UpdateManager {
     platform = process.platform,
     arch = process.arch,
     fetch,
+    resolveAssetUrl = (url) => url,
     revealFile,
     openExternal,
     enabled = true,
@@ -268,6 +269,7 @@ export class UpdateManager {
     this.platform = platform;
     this.arch = arch;
     this.fetch = fetch;
+    this.resolveAssetUrl = resolveAssetUrl;
     this.revealFile = revealFile;
     this.openExternal = openExternal;
     this.enabled = enabled;
@@ -688,71 +690,53 @@ export class UpdateManager {
   }
 
   async fetchAssetResponse(downloadUrl, signal) {
-    let currentUrl = downloadUrl;
-    for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
-      let headerTimer;
+    let headerTimer;
+    try {
+      headerTimer = setTimeout(
+        () =>
+          this.abortController?.abort(
+            updateError("The update download stalled.", "TIMEOUT"),
+          ),
+        this.downloadIdleTimeoutMs,
+      );
+      const headers = {
+        "User-Agent": `CATS-Configurator/${this.currentVersion}`,
+      };
+      let response;
       try {
-        headerTimer = setTimeout(
-          () =>
-            this.abortController?.abort(
-              updateError("The update download stalled.", "TIMEOUT"),
-            ),
-          this.downloadIdleTimeoutMs,
-        );
-        let response;
-        try {
-          response = await this.fetch(currentUrl, {
-            headers: {
-              "User-Agent": `CATS-Configurator/${this.currentVersion}`,
-            },
-            redirect: "manual",
-            signal,
-          });
-        } catch (error) {
-          throw networkFailure(
-            error,
-            signal,
-            "The update download could not reach GitHub.",
-          );
-        }
-        const responseUrl = response.url || currentUrl;
-        if (!isAllowedUpdateResponseUrl(responseUrl)) {
+        const resolvedUrl = await this.resolveAssetUrl(downloadUrl, {
+          headers,
+          signal,
+        });
+        if (!isAllowedUpdateResponseUrl(resolvedUrl)) {
           throw updateError(
             "The update download was redirected to an unsafe host.",
             "INVALID_URL",
           );
         }
-
-        if ([301, 302, 303, 307, 308].includes(response.status)) {
-          const location = response.headers.get("location");
-          let nextUrl;
-          try {
-            if (!location) throw new Error("Missing redirect location.");
-            nextUrl = new URL(location, responseUrl).href;
-          } catch {
-            throw updateError(
-              "The update download returned an invalid redirect.",
-              "INVALID_URL",
-            );
-          }
-          if (!isAllowedUpdateResponseUrl(nextUrl)) {
-            throw updateError(
-              "The update download was redirected to an unsafe host.",
-              "INVALID_URL",
-            );
-          }
-          currentUrl = nextUrl;
-          continue;
+        response = await this.fetch(resolvedUrl, {
+          headers,
+          redirect: "error",
+          signal,
+        });
+        if (!isAllowedUpdateResponseUrl(response.url || resolvedUrl)) {
+          throw updateError(
+            "The update download was redirected to an unsafe host.",
+            "INVALID_URL",
+          );
         }
-        return response;
-      } finally {
-        clearTimeout(headerTimer);
+      } catch (error) {
+        if (error?.code === "INVALID_URL") throw error;
+        throw networkFailure(
+          error,
+          signal,
+          "The update download could not reach GitHub.",
+        );
       }
+      return response;
+    } finally {
+      clearTimeout(headerTimer);
     }
-    throw updateError(
-      "The update download was redirected too many times.",
-      "INVALID_URL",
-    );
   }
 
   markReady(target, release, manual) {

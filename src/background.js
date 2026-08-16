@@ -10,6 +10,7 @@ import { setSerialWindow } from "./modules/serial.js";
 import { isAllowedExternalUrl } from "./modules/external-links.js";
 import {
   cleanupUpdates,
+  createElectronUpdateUrlResolver,
   createE2EUpdateFetch,
   initializeUpdates,
   setUpdateWindow,
@@ -133,6 +134,9 @@ async function startUpdates() {
     currentVersion: app.getVersion(),
     cacheRoot: path.join(app.getPath("userData"), "updates"),
     fetch: updateFetch,
+    resolveAssetUrl: fixturePath
+      ? undefined
+      : createElectronUpdateUrlResolver((options) => net.request(options)),
     revealFile: fixturePath
       ? () => {}
       : (filePath) => shell.showItemInFolder(filePath),

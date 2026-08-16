@@ -4,9 +4,12 @@ import path from "node:path";
 import { IPC_CHANNELS } from "../shared/ipc.js";
 import {
   expectedUpdateAssetName,
+  isAllowedUpdateResponseUrl,
   UPDATE_API_URL,
   UpdateManager,
 } from "./update-manager.js";
+
+const MAX_UPDATE_REDIRECTS = 5;
 
 let updateManager;
 let updateWindow;
@@ -51,6 +54,61 @@ export function openUpdateRelease() {
 
 export function cleanupUpdates() {
   updateManager?.stop();
+}
+
+export function createElectronUpdateUrlResolver(request) {
+  return (url, { headers = {}, signal } = {}) =>
+    new Promise((resolve, reject) => {
+      let currentUrl = url;
+      let redirectCount = 0;
+      let settled = false;
+      const clientRequest = request({
+        method: "GET",
+        url,
+        redirect: "manual",
+      });
+
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        signal?.removeEventListener("abort", onAbort);
+        callback(value);
+      };
+      const fail = (message, code = "INVALID_URL") => {
+        const error = message instanceof Error ? message : new Error(message);
+        if (code) error.code ??= code;
+        finish(reject, error);
+        clientRequest.abort();
+      };
+      const onAbort = () =>
+        fail(signal?.reason instanceof Error ? signal.reason : "Aborted", null);
+
+      Object.entries(headers).forEach(([name, value]) =>
+        clientRequest.setHeader(name, value),
+      );
+      clientRequest.on("redirect", (_statusCode, _method, redirectUrl) => {
+        redirectCount += 1;
+        if (redirectCount > MAX_UPDATE_REDIRECTS) {
+          fail("The update download was redirected too many times.");
+          return;
+        }
+        if (!isAllowedUpdateResponseUrl(redirectUrl)) {
+          fail("The update download was redirected to an unsafe host.");
+          return;
+        }
+        currentUrl = redirectUrl;
+        clientRequest.followRedirect();
+      });
+      clientRequest.on("response", (response) => {
+        response.on("error", () => undefined);
+        finish(resolve, currentUrl);
+        clientRequest.abort();
+      });
+      clientRequest.on("error", (error) => finish(reject, error));
+      if (signal?.aborted) onAbort();
+      else signal?.addEventListener("abort", onAbort, { once: true });
+      if (!settled) clientRequest.end();
+    });
 }
 
 export async function createE2EUpdateFetch(
