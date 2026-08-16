@@ -75,7 +75,7 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       name: "Check for updates",
     });
     await expect(statusLabel).toBeVisible();
-    await expect(appVersionButton).toContainText("App version: 1.4.1");
+    await expect(appVersionButton).toContainText("App version: 1.4.2");
     const [statusFontSize, appVersionFontSize] = await Promise.all([
       statusLabel.evaluate((element) => getComputedStyle(element).fontSize),
       appVersionButton.evaluate(

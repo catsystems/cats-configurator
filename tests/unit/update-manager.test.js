@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { EventEmitter } from "node:events";
 import {
   expectedUpdateAssetName,
   isAllowedUpdateResponseUrl,
@@ -14,6 +15,7 @@ import {
   UpdateManager,
   validateLatestRelease,
 } from "@/modules/update-manager.js";
+import { createElectronUpdateUrlResolver } from "@/modules/updates.js";
 
 const temporaryDirectories = [];
 
@@ -296,24 +298,62 @@ describe("verified update downloads", () => {
     }
   });
 
-  it("rejects an unsafe intermediate redirect before following it", async () => {
+  it("downloads only from an approved URL resolved by Electron", async () => {
     const bytes = Buffer.from("redirected installer");
     const payload = releasePayload({ bytes });
-    const fetch = vi.fn(async (url) => {
-      if (url === UPDATE_API_URL) return jsonResponse(payload);
-      return response(null, {
-        url: payload.assets[0].browser_download_url,
-        status: 302,
-        headers: { location: "https://updates.example.com/file.exe" },
-      });
+    const resolvedUrl = "https://release-assets.githubusercontent.com/file.exe";
+    const fetch = createFetch(payload, bytes, {
+      url: resolvedUrl,
     });
-    const manager = await createManager({ fetch });
+    const resolveAssetUrl = vi.fn(async () => resolvedUrl);
+    const manager = await createManager({ fetch, resolveAssetUrl });
 
     await expect(manager.check()).resolves.toMatchObject({
-      status: "error",
-      message: expect.stringContaining("unsafe host"),
+      status: "ready",
     });
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(resolveAssetUrl).toHaveBeenCalledWith(
+      payload.assets[0].browser_download_url,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      resolvedUrl,
+      expect.objectContaining({ redirect: "error" }),
+    );
+  });
+
+  it("validates every Electron redirect before following it", async () => {
+    const safeUrl = "https://release-assets.githubusercontent.com/file.exe";
+    const createRequest = (redirectUrl) => {
+      const request = new EventEmitter();
+      request.abort = vi.fn();
+      request.end = vi.fn(() => {
+        queueMicrotask(() => {
+          request.emit("redirect", 302, "GET", redirectUrl, {});
+          if (request.followRedirect.mock.calls.length) {
+            const response = new EventEmitter();
+            request.emit("response", response);
+          }
+        });
+      });
+      request.followRedirect = vi.fn();
+      request.setHeader = vi.fn();
+      return request;
+    };
+
+    const safeRequest = createRequest(safeUrl);
+    const safeResolver = createElectronUpdateUrlResolver(() => safeRequest);
+    await expect(safeResolver("https://github.com/file")).resolves.toBe(
+      safeUrl,
+    );
+    expect(safeRequest.followRedirect).toHaveBeenCalledOnce();
+
+    const unsafeRequest = createRequest("https://updates.example.com/file");
+    const unsafeResolver = createElectronUpdateUrlResolver(() => unsafeRequest);
+    await expect(unsafeResolver("https://github.com/file")).rejects.toThrow(
+      "unsafe host",
+    );
+    expect(unsafeRequest.followRedirect).not.toHaveBeenCalled();
   });
 
   it("rejects cache paths that could escape their version directory", async () => {
