@@ -87,6 +87,39 @@ describe("BoardCommandEngine", () => {
     vi.useRealTimers();
   });
 
+  it("streams long-running output and uses an activity timeout", async () => {
+    vi.useFakeTimers();
+    const onOutput = vi.fn();
+    const { engine } = createHarness({ settleMs: 25 });
+    const result = engine.run("sim", {
+      onOutput,
+      resetTimeoutOnOutput: true,
+      waitForPrompt: true,
+    });
+    let completed = false;
+    void result.then(() => {
+      completed = true;
+    });
+
+    engine.receive("^._.^:/> sim");
+    await vi.advanceTimersByTimeAsync(90);
+    engine.receive("[100]: height: 1, velocity: 2, offset: 0.1");
+    await vi.advanceTimersByTimeAsync(90);
+    engine.receive("[200]: height: 2, velocity: 3, offset: 0.2");
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(completed).toBe(false);
+    expect(onOutput).toHaveBeenCalledTimes(2);
+    engine.receive("^._.^:/> ");
+    await expect(result).resolves.toMatchObject({
+      output: [
+        "[100]: height: 1, velocity: 2, offset: 0.1",
+        "[200]: height: 2, velocity: 3, offset: 0.2",
+      ],
+    });
+    vi.useRealTimers();
+  });
+
   it("accepts a warm-reconnect echo and splits batched response lines", async () => {
     vi.useFakeTimers();
     const { engine } = createHarness({ settleMs: 25 });

@@ -25,8 +25,8 @@ const routes = [
   },
   {
     path: "/logging",
-    name: "Logging",
-    redirect: "/config?section=logging",
+    name: "LegacyLogging",
+    redirect: "/config",
   },
   {
     path: "/profiles",

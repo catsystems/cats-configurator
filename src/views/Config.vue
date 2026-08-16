@@ -310,29 +310,6 @@
           </v-card>
         </v-col>
       </v-row>
-      <v-row>
-        <v-col>
-          <v-expansion-panels v-model="openSections" multiple>
-            <v-expansion-panel value="logging">
-              <v-expansion-panel-title>
-                <span class="text-h6">Logging</span>
-                <v-chip
-                  v-if="loggingChanged"
-                  class="ml-3"
-                  color="warning"
-                  size="small"
-                  variant="tonal"
-                >
-                  Unsaved changes
-                </v-chip>
-              </v-expansion-panel-title>
-              <v-expansion-panel-text>
-                <Logs ref="logging" embedded @change="onLoggingChange" />
-              </v-expansion-panel-text>
-            </v-expansion-panel>
-          </v-expansion-panels>
-        </v-col>
-      </v-row>
     </v-container>
     <ActionsBar
       :saving="saveLoading"
@@ -347,9 +324,7 @@
 import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
 import { getConfigs, setConfigs } from "@/services/configService";
-import { getLogInfo } from "@/services/logService";
 import ActionsBar from "@/components/ActionsBar.vue";
-import Logs from "@/views/Logs.vue";
 import { getDisplayValue } from "@/utils/unitConversions";
 import {
   convertLengthToImperial,
@@ -416,7 +391,6 @@ export default {
   name: "ConfigView",
   components: {
     ActionsBar,
-    Logs,
   },
   data() {
     return {
@@ -426,8 +400,6 @@ export default {
       imperialData: null,
       lastSavedData: null,
       lastSavedImperialData: null,
-      loggingChanged: false,
-      openSections: [],
       subscriptions: [],
     };
   },
@@ -469,7 +441,7 @@ export default {
       return JSON.stringify(this.displayData) !== JSON.stringify(savedData);
     },
     changed() {
-      return this.configurationChanged || this.loggingChanged;
+      return this.configurationChanged;
     },
     processedStatus() {
       if (!this.status || !Array.isArray(this.status)) {
@@ -491,9 +463,6 @@ export default {
     },
   },
   mounted() {
-    if (this.$route?.query?.section === "logging") {
-      this.openSections = ["logging"];
-    }
     this.init();
     this.subscriptions.push(
       window.cats.serial.onDisconnected(() => clearInterval(this.timer)),
@@ -508,22 +477,13 @@ export default {
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
   },
   methods: {
-    ...mapActions(useAppStore, [
-      "setChangedTab",
-      "showSuccessSnackbar",
-      "showErrorSnackbar",
-    ]),
+    ...mapActions(useAppStore, ["setChangedTab", "showErrorSnackbar"]),
     init() {
       getConfigs();
-      getLogInfo();
       this.getInfo();
     },
     refreshAll() {
       this.init();
-    },
-    onLoggingChange(changed) {
-      this.loggingChanged = changed;
-      this.updateChangedState();
     },
     updateChangedState() {
       this.setChangedTab(this.changed ? "config" : null);
@@ -559,7 +519,6 @@ export default {
           }
           await setConfigs(metricData, this.lastSavedData);
         }
-        if (this.loggingChanged) await this.$refs.logging?.onSave();
       } catch (error) {
         this.showErrorSnackbar(error.message);
       } finally {

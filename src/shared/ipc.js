@@ -42,6 +42,7 @@ export const IPC_CHANNELS = Object.freeze({
   FLIGHT_LOG_REFRESH_ONBOARD: "flight-log:refresh-onboard",
   FLIGHT_LOG_CLEAR_ONBOARD: "flight-log:clear-onboard",
   FLIGHT_LOG_OPEN_ONBOARD: "flight-log:open-onboard",
+  FLIGHT_LOG_REMOVE_ONBOARD: "flight-log:remove-onboard",
   FLIGHT_LOG_SAVE_ORIGINAL: "flight-log:save-original",
   FLIGHT_LOG_OPEN_IN_FLIGHTS: "flight-log:open-in-flights",
   FLIGHT_LOG_CANCEL_HANDOFF: "flight-log:cancel-handoff",

@@ -25,6 +25,7 @@ import {
   getList,
   readBoardConfigurations,
   readBoardSnapshot,
+  removeBoardFlightLog,
   resetBoardConfiguration,
 } from "./serial.js";
 import {
@@ -296,6 +297,14 @@ export function subscribeListeners(openExternal) {
     return flightLogManager.openOnboard(
       assertOpaqueId(logId, "Onboard flight-log ID"),
     );
+  });
+  handle(IPC_CHANNELS.FLIGHT_LOG_REMOVE_ONBOARD, async (logId) => {
+    const id = assertOpaqueId(logId, "Onboard flight-log ID");
+    const log = flightLogManager.getOnboardLog(id);
+    const removal = await removeBoardFlightLog(log.name);
+    const result = flightLogManager.removeOnboard(id);
+    sendFlightLogEvent(IPC_CHANNELS.FLIGHT_LOG_ONBOARD_CHANGED, result);
+    return { ...result, removal };
   });
   handle(IPC_CHANNELS.FLIGHT_LOG_SAVE_ORIGINAL, saveOriginalFlightLog);
   handle(IPC_CHANNELS.FLIGHT_LOG_OPEN_IN_FLIGHTS, openFlightLogInFlights);
