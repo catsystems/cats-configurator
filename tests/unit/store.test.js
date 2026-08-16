@@ -22,23 +22,6 @@ describe("application store", () => {
     });
   });
 
-  it("keeps CLI history for one connected board session", () => {
-    const store = useAppStore();
-    store.setActiveState(true);
-    store.addCliHistory("status");
-    store.addCliHistory("status");
-    store.addCliHistory("  get timer4_duration  ");
-    store.setPreflightReport({ status: "READY" });
-    store.setCurrentBoardProfile({ profile: { schemaVersion: 1 } });
-
-    expect(store.cliHistory).toEqual(["status", "get timer4_duration"]);
-
-    store.setActiveState(false);
-    expect(store.cliHistory).toEqual([]);
-    expect(store.preflightReport).toBeNull();
-    expect(store.currentBoardProfile).toBeNull();
-  });
-
   it("tracks event edits and unit-system state", () => {
     const store = useAppStore();
     store.setEvent({

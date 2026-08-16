@@ -84,14 +84,41 @@
               </v-form>
             </v-card-text>
             <v-card-actions>
-              <v-btn
-                color="error"
-                variant="elevated"
-                block
-                @click="resetConfig"
-              >
-                Reset Config
-              </v-btn>
+              <v-row density="compact">
+                <v-col cols="6">
+                  <v-btn
+                    color="primary"
+                    variant="elevated"
+                    :disabled="changed"
+                    :loading="backupLoading"
+                    block
+                    @click="backupConfig"
+                  >
+                    Backup Config
+                  </v-btn>
+                </v-col>
+                <v-col cols="6">
+                  <v-btn
+                    color="primary"
+                    variant="elevated"
+                    block
+                    :loading="restoreLoading"
+                    @click="loadConfig"
+                  >
+                    Load Config
+                  </v-btn>
+                </v-col>
+                <v-col cols="12">
+                  <v-btn
+                    color="error"
+                    variant="elevated"
+                    block
+                    @click="resetConfig"
+                  >
+                    Reset Settings
+                  </v-btn>
+                </v-col>
+              </v-row>
             </v-card-actions>
           </v-card>
         </v-col>
@@ -110,7 +137,7 @@
                 v-text="item"
               ></div>
               <div
-                v-if="showFlightEstimate && processedStatus.length > 3"
+                v-if="processedStatus && processedStatus.length > 3"
                 class="mb-2"
                 v-text="processedStatus[3]"
               ></div>
@@ -311,12 +338,7 @@
         </v-col>
       </v-row>
     </v-container>
-    <ActionsBar
-      :saving="saveLoading"
-      :changed="changed"
-      @refresh="refreshAll"
-      @save="onSave"
-    />
+    <ActionsBar @refresh="init" @save="onSave" />
   </div>
 </template>
 
@@ -395,7 +417,8 @@ export default {
   data() {
     return {
       timer: null,
-      saveLoading: false,
+      backupLoading: false,
+      restoreLoading: false,
       data: null,
       imperialData: null,
       lastSavedData: null,
@@ -405,8 +428,18 @@ export default {
   },
   watch: {
     displayData: {
-      handler() {
-        this.updateChangedState();
+      handler(data) {
+        let changed;
+        if (this.useImperialUnits) {
+          changed =
+            JSON.stringify(data) !== JSON.stringify(this.lastSavedImperialData);
+        } else {
+          changed = JSON.stringify(data) !== JSON.stringify(this.lastSavedData);
+        }
+
+        if (this.changed !== changed) {
+          this.setChangedTab(changed ? "config" : null);
+        }
       },
       deep: true,
     },
@@ -432,16 +465,11 @@ export default {
     ...mapState(useAppStore, {
       config: "config",
       status: (store) => store.static.status,
+      changedTab: "changedTab",
       useImperialUnits: "useImperialUnits",
     }),
-    configurationChanged() {
-      const savedData = this.useImperialUnits
-        ? this.lastSavedImperialData
-        : this.lastSavedData;
-      return JSON.stringify(this.displayData) !== JSON.stringify(savedData);
-    },
     changed() {
-      return this.configurationChanged;
+      return this.changedTab === "config";
     },
     processedStatus() {
       if (!this.status || !Array.isArray(this.status)) {
@@ -454,10 +482,6 @@ export default {
         return line;
       });
     },
-    showFlightEstimate() {
-      const state = this.status?.find((line) => /^State:/i.test(line));
-      return !/^State:\s*(?:INVALID|TESTING)\b/i.test(state || "");
-    },
     displayData() {
       return this.useImperialUnits ? this.imperialData : this.data;
     },
@@ -465,6 +489,11 @@ export default {
   mounted() {
     this.init();
     this.subscriptions.push(
+      window.cats.board.onDumpComplete((result) => {
+        this.backupLoading = false;
+        if (result?.error) this.showErrorSnackbar(result.error);
+        else this.showSuccessSnackbar("Backup created!");
+      }),
       window.cats.serial.onDisconnected(() => clearInterval(this.timer)),
     );
     if (this.useImperialUnits && this.data !== null) {
@@ -477,52 +506,65 @@ export default {
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
   },
   methods: {
-    ...mapActions(useAppStore, ["setChangedTab", "showErrorSnackbar"]),
+    ...mapActions(useAppStore, [
+      "setChangedTab",
+      "showSuccessSnackbar",
+      "showErrorSnackbar",
+    ]),
     init() {
       getConfigs();
       this.getInfo();
-    },
-    refreshAll() {
-      this.init();
-    },
-    updateChangedState() {
-      this.setChangedTab(this.changed ? "config" : null);
     },
     getInfo() {
       window.cats.board.getInfo();
       if (this.timer) clearInterval(this.timer);
       this.timer = setInterval(() => {
         window.cats.board.getInfo();
-      }, 250);
+      }, 250); // every 250 ms
     },
     async onSave() {
-      if (this.configurationChanged) {
-        const forms = [
-          this.$refs.generalForm,
-          this.$refs.telemetryForm,
-          this.$refs.testingForm,
-        ].filter(Boolean);
-        const validation = await Promise.all(
-          forms.map((form) => form.validate()),
-        );
-        if (validation.some(({ valid }) => !valid)) return;
+      const forms = [
+        this.$refs.generalForm,
+        this.$refs.telemetryForm,
+        this.$refs.testingForm,
+      ].filter(Boolean);
+      const validation = await Promise.all(
+        forms.map((form) => form.validate()),
+      );
+      if (validation.some(({ valid }) => !valid)) return;
+
+      if (this.useImperialUnits) {
+        setConfigs(convertImperialDataToMetric(this.displayData));
+      } else {
+        setConfigs(this.displayData);
       }
 
-      this.saveLoading = true;
+      getConfigs();
+    },
+    async backupConfig() {
+      this.backupLoading = true;
       try {
-        if (this.configurationChanged) {
-          let metricData;
-          if (this.useImperialUnits) {
-            metricData = convertImperialDataToMetric(this.displayData);
-          } else {
-            metricData = this.displayData;
-          }
-          await setConfigs(metricData, this.lastSavedData);
-        }
+        await window.cats.board.dump();
       } catch (error) {
+        this.backupLoading = false;
         this.showErrorSnackbar(error.message);
-      } finally {
-        this.saveLoading = false;
+      }
+    },
+    async loadConfig() {
+      const confirmed = window.confirm(
+        "Configuration is about to be restored,\nwould you like to proceed?",
+      );
+
+      if (confirmed) {
+        this.restoreLoading = true;
+        try {
+          const result = await window.cats.board.restore();
+          if (!result.canceled) setTimeout(this.init, 100);
+        } catch (error) {
+          this.showErrorSnackbar(error.message);
+        } finally {
+          this.restoreLoading = false;
+        }
       }
     },
     async resetConfig() {
@@ -531,12 +573,8 @@ export default {
       );
 
       if (confirmed) {
-        try {
-          await window.cats.board.reset();
-          await getConfigs();
-        } catch (error) {
-          this.showErrorSnackbar(error.message);
-        }
+        await window.cats.board.reset();
+        this.init();
       }
     },
     convertStatusLine4(statusLine) {

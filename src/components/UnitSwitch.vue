@@ -7,8 +7,7 @@
           label="Use imperial units"
           hide-details
           inset
-          class="unit-switch mt-0 pt-0"
-          :class="{ 'unit-switch--active': useImperialUnitsState }"
+          class="mt-0 pt-0"
           color="primary"
         ></v-switch>
       </v-col>
@@ -51,6 +50,7 @@ export default {
 </script>
 
 <style scoped>
+/* These styles help align the switch better within its container */
 .v-input--switch.mt-0 {
   margin-top: 0 !important;
 }
@@ -59,22 +59,8 @@ export default {
   padding-top: 0 !important;
 }
 
+/* You can adjust margin-right if the label is too close to the switch thumb */
 .v-input--switch .v-label {
   margin-right: 8px;
-}
-
-.unit-switch :deep(.v-switch__track) {
-  opacity: 0.72;
-}
-
-.unit-switch--active :deep(.v-switch__track) {
-  background-color: rgb(var(--v-theme-primary)) !important;
-  opacity: 1;
-}
-
-.unit-switch :deep(.v-switch__thumb) {
-  color: white !important;
-  background-color: white !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.38);
 }
 </style>

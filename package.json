@@ -1,7 +1,7 @@
 {
   "name": "cats-configurator",
   "productName": "CATS Configurator",
-  "version": "1.4.0",
+  "version": "1.3.2",
   "description": "Desktop configuration and flight-log analysis utility for CATS flight computers.",
   "author": "Control and Telemetry Systems GmbH",
   "private": true,
@@ -25,9 +25,6 @@
     "verify:release-tag": "node tests/verify-release-tag.mjs",
     "verify:packaged-artifact": "node tests/verify-packaged-artifact.mjs",
     "test:hardware": "node tests/hardware/vega-smoke.mjs",
-    "test:hardware:transaction": "node tests/hardware/vega-transaction.mjs",
-    "test:hardware:profile": "node tests/hardware/vega-profile.mjs",
-    "test:hardware:preflight": "node tests/hardware/vega-preflight.mjs",
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {

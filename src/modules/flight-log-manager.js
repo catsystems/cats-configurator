@@ -137,17 +137,7 @@ export class FlightLogManager {
     this.volumeRoot = null;
     this.protectedVolumeRoots = new Set();
     this.onboard = new Map();
-    this.hiddenOnboardNames = new Set();
     this.session = null;
-  }
-
-  onboardResult() {
-    return {
-      status: "ready",
-      logs: [...this.onboard.values()].map(
-        ({ path: _path, ...summary }) => summary,
-      ),
-    };
   }
 
   publicSession() {
@@ -229,14 +219,14 @@ export class FlightLogManager {
 
   async selectVolume(rootPath) {
     const resolvedRoot = await validateCatsVolume(rootPath);
-    if (this.volumeRoot !== resolvedRoot) this.hiddenOnboardNames.clear();
     this.protectedVolumeRoots.add(resolvedRoot);
-    const logs = (await listVolumeLogs(resolvedRoot)).filter(
-      ({ name }) => !this.hiddenOnboardNames.has(name.toLowerCase()),
-    );
+    const logs = await listVolumeLogs(resolvedRoot);
     this.volumeRoot = resolvedRoot;
     this.onboard = new Map(logs.map((log) => [log.id, log]));
-    return this.onboardResult();
+    return {
+      status: "ready",
+      logs: logs.map(({ path: _path, ...summary }) => summary),
+    };
   }
 
   async discoverOnboard() {
@@ -254,7 +244,6 @@ export class FlightLogManager {
     if (matches.length === 1) return this.selectVolume(matches[0]);
     this.volumeRoot = null;
     this.onboard.clear();
-    this.hiddenOnboardNames.clear();
     return {
       status: matches.length > 1 ? "multiple" : "not-found",
       logs: [],
@@ -268,7 +257,6 @@ export class FlightLogManager {
     } catch {
       this.volumeRoot = null;
       this.onboard.clear();
-      this.hiddenOnboardNames.clear();
       return { status: "unavailable", logs: [] };
     }
   }
@@ -276,27 +264,7 @@ export class FlightLogManager {
   clearOnboard() {
     this.volumeRoot = null;
     this.onboard.clear();
-    this.hiddenOnboardNames.clear();
     return { status: "not-found", logs: [] };
-  }
-
-  getOnboardLog(logId) {
-    const log = this.onboard.get(logId);
-    if (!log || !this.volumeRoot) {
-      throw new Error("This onboard flight log is no longer available.");
-    }
-    const { id, logNumber, name, size } = log;
-    return { id, logNumber, name, size };
-  }
-
-  removeOnboard(logId) {
-    const log = this.onboard.get(logId);
-    if (!log || !this.volumeRoot) {
-      throw new Error("This onboard flight log is no longer available.");
-    }
-    this.hiddenOnboardNames.add(log.name.toLowerCase());
-    this.onboard.delete(logId);
-    return this.onboardResult();
   }
 
   async openOnboard(logId) {

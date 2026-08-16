@@ -76,88 +76,44 @@ export const CONFIG_SETTINGS = {
 };
 
 export const LOG_ELEMENTS = [
-  {
-    name: "IMU",
-    description: "Raw accelerometer and gyroscope samples from each IMU.",
-    dec: 16,
-    hex: 0x10,
-    size: 20,
-    bit: 4,
-  },
-  {
-    name: "Barometer",
-    description: "Raw pressure and temperature samples from each barometer.",
-    dec: 32,
-    hex: 0x20,
-    size: 16,
-    bit: 5,
-  },
-  {
-    name: "Flight Info",
-    description: "Estimated altitude, velocity, and acceleration.",
-    dec: 64,
-    hex: 0x40,
-    size: 20,
-    bit: 6,
-  },
-  {
-    name: "Orientation",
-    description: "The four-component estimated orientation.",
-    dec: 128,
-    hex: 0x80,
-    size: 16,
-    bit: 7,
-  },
-  {
-    name: "Filtered Data",
-    description: "Filtered altitude above ground and vertical acceleration.",
-    dec: 256,
-    hex: 0x100,
-    size: 16,
-    bit: 8,
-  },
-  {
-    name: "Flight State",
-    description: "The current flight phase, from calibration to touchdown.",
-    dec: 512,
-    hex: 0x200,
-    size: 12,
-    bit: 9,
-  },
-  {
-    name: "Event Info",
-    description: "Triggered flight events and their peripheral actions.",
-    dec: 1024,
-    hex: 0x400,
-    size: 16,
-    bit: 10,
-  },
-  {
-    name: "Error Info",
-    description: "Errors reported by the flight computer.",
-    dec: 2048,
-    hex: 0x800,
-    size: 12,
-    bit: 11,
-  },
-  {
-    name: "GNSS",
-    description: "GNSS latitude, longitude, and satellite count.",
-    dec: 4096,
-    hex: 0x1000,
-    size: 17,
-    bit: 12,
-  },
-  {
-    name: "Voltage",
-    description: "Measured board supply voltage.",
-    dec: 8192,
-    hex: 0x2000,
-    size: 10,
-    bit: 13,
-  },
+  { name: "IMU", dec: 32, hex: 0x20, size: 16, bit: 5 },
+  { name: "Barometer", dec: 64, hex: 0x40, size: 6, bit: 6 },
+  { name: "Magnetometer", dec: 128, hex: 0x80, size: 10, bit: 7 },
+  { name: "High G Accel", dec: 256, hex: 0x100, size: 7, bit: 8 },
+  { name: "Estimation", dec: 512, hex: 0x200, size: 16, bit: 9 },
+  { name: "Orientation", dec: 1024, hex: 0x400, size: 12, bit: 10 },
+  { name: "Filtered Data", dec: 2048, hex: 0x800, size: 12, bit: 11 },
+  { name: "Flight State", dec: 4096, hex: 0x1000, size: 0, bit: 12 },
+  { name: "Covariance", dec: 8192, hex: 0x2000, size: 8, bit: 13 },
+  { name: "Sensor Info", dec: 16384, hex: 0x4000, size: 0, bit: 14 },
+  { name: "Event Info", dec: 32768, hex: 0x8000, size: 0, bit: 15 },
+  { name: "Error Info", dec: 65536, hex: 0x10000, size: 0, bit: 16 },
 ];
 
+// KEYS:
+// TODO: setting timer 4 doesn't work because something interrupts the setting:
+// ^._.^:/> set timer1_start = MOVING
+// timer1_start set to MOVING
+// ^._.^:/> set timer1_duration = 0
+// timer1_duration set to 0
+// ^._.^:/> set timer1_trigger = MOVING
+// timer1_trigger set to MOVING
+// ^._.^:/> set timer2_start = MOVING
+// timer2_start set to MOVING
+// ^._.^:/> set timer2_duration = 0
+// timer2_duration set to 0
+// ^._.^:/> set timer2_trigger = MOVING
+// timer2_trigger set to MOVING
+// ^._.^:/> set timer3_start = MOVING
+// timer3_start set to MOVING
+// ^._.^:/> set timer3_duration = 0
+// timer3_duration set to 0
+// ^._.^:/> set timer3_trigger = MOVING
+// timer3_trigger set to MOVING
+// ^._.^:/> set timer4_sG                           <----- problem
+// ERROR IN set: INVALID NAME:
+// ^._.^:/> save
+// Successfully written to flash
 export const TIMER_KEYS = ["timer1", "timer2", "timer3", "timer4"];
 export const EVENT_KEYS = [
   "ev_liftoff",
@@ -169,15 +125,3 @@ export const EVENT_KEYS = [
   "ev_custom2",
 ];
 export const LOG_KEYS = ["rec_speed", "rec_elements"];
-
-export const CONFIG_KEYS = Object.keys(CONFIG_SETTINGS);
-export const TIMER_FIELDS = ["start", "duration", "trigger"];
-export const TIMER_CONFIG_KEYS = TIMER_KEYS.flatMap((timer) =>
-  TIMER_FIELDS.map((field) => `${timer}_${field}`),
-);
-export const PROFILE_BOARD_KEYS = [
-  ...CONFIG_KEYS,
-  ...EVENT_KEYS,
-  ...TIMER_CONFIG_KEYS,
-  ...LOG_KEYS,
-];
