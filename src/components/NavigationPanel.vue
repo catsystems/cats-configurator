@@ -89,11 +89,10 @@ export default {
       switch (this.changedTab) {
         case "config":
           getConfigs();
+          getLogData();
           break;
         case "events":
           getEvents();
-          break;
-        case "timers":
           getTimers();
           break;
         case "logs":

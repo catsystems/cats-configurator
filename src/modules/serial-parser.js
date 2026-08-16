@@ -1,16 +1,28 @@
 import { EVENT_SETTINGS } from "./settings.js";
 
 export function parseCommand(data) {
-  const commandParts = data.split(">");
-  if (commandParts.length < 2) return undefined;
-  commandParts.shift();
-
-  return commandParts
-    .join("")
+  const command = parsePromptCommand(data);
+  if (command === null) return undefined;
+  return command
     .toLowerCase()
     .trim()
     .replace(/[^\w \-_]/g, "")
     .replace(/ +/g, "_");
+}
+
+export function parsePromptCommand(data) {
+  if (typeof data !== "string" || !data.includes("^._.^")) return null;
+  const separator = data.lastIndexOf(">");
+  if (separator < 0) return "";
+  return data.slice(separator + 1).trim();
+}
+
+export function normalizeBoardCommand(command) {
+  return command
+    .trim()
+    .toLowerCase()
+    .replace(/\s*=\s*/g, "=")
+    .replace(/\s+/g, " ");
 }
 
 export function parseData(key, data) {
@@ -66,4 +78,62 @@ export function parseEventData(value, maxLength) {
   }
 
   return { values, actions };
+}
+
+export function parseConfigResponse(lines) {
+  const valueLine = lines.find((line) => line.includes(" = "));
+  if (!valueLine)
+    throw new Error("Board did not return a configuration value.");
+
+  let config = parseConfigValue(valueLine);
+  const allowedValues = lines.find((line) => line.includes("Allowed values:"));
+  const allowedRange = lines.find((line) => line.includes("Allowed range:"));
+  const stringLength = lines.find((line) => line.includes("String length:"));
+  const arrayLength = lines.find((line) => line.includes("Array length:"));
+
+  if (allowedValues) {
+    config.type = "SELECT";
+    config.allowedValues = parseAllowedValues(allowedValues);
+  } else if (allowedRange) {
+    config.type = "NUMBER";
+    config.value = Number(config.value);
+    config.allowedRange = parseAllowedRange(allowedRange);
+  } else if (stringLength) {
+    config.type = "STRING";
+    config.value = String(config.value);
+    config.allowedRange = parseAllowedRange(stringLength);
+  } else if (arrayLength) {
+    config.type = "EVENT";
+    config.arrayLength = parseAllowedLength(arrayLength);
+    Object.assign(config, parseEventData(config.value, config.arrayLength));
+  }
+
+  return config;
+}
+
+export function parseConfigResponses(lines) {
+  const responses = [];
+  let response = [];
+
+  for (const line of lines) {
+    if (/^[a-z0-9_]+\s+=\s+/i.test(line)) {
+      if (response.length) responses.push(response);
+      response = [line];
+    } else if (response.length && line.trim()) {
+      response.push(line);
+    }
+  }
+  if (response.length) responses.push(response);
+
+  const configs = responses.map(parseConfigResponse);
+  const keys = new Set();
+  for (const config of configs) {
+    if (keys.has(config.key)) {
+      throw new Error(
+        `Board returned duplicate configuration value: ${config.key}.`,
+      );
+    }
+    keys.add(config.key);
+  }
+  return configs;
 }

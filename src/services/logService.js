@@ -1,17 +1,17 @@
-import { LOG_KEYS } from "@/modules/settings.js";
+import { applyBoardValues } from "@/services/boardService.js";
 
 export function getLogInfo() {
   window.cats.board.getLogInfo();
 }
 
 export function getLogData() {
-  LOG_KEYS.forEach((key) => {
-    window.cats.board.getConfig(key);
-  });
+  return window.cats.board.getConfigs();
 }
 
-export function setLogData({ speed, elements }) {
-  window.cats.board.setConfig("rec_speed", speed);
-  window.cats.board.setConfig("rec_elements", elements);
-  window.cats.board.save();
+export function setLogData({ speed, elements }, original = {}) {
+  const entries = [
+    { key: "rec_speed", value: speed },
+    { key: "rec_elements", value: elements },
+  ].filter(({ key, value }) => value !== original[key]?.value);
+  return applyBoardValues(entries);
 }

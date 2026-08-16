@@ -5,6 +5,9 @@ export const useAppStore = defineStore("app", {
   state: () => ({
     serialPorts: [],
     active: false,
+    cliHistory: [],
+    preflightReport: null,
+    currentBoardProfile: null,
     changedTab: null,
     static: {},
     config: {},
@@ -52,6 +55,16 @@ export const useAppStore = defineStore("app", {
     },
     setActiveState(value) {
       this.active = Boolean(value);
+      if (!this.active) {
+        this.cliHistory = [];
+        this.preflightReport = null;
+        this.currentBoardProfile = null;
+      }
+    },
+    addCliHistory(command) {
+      const value = String(command).trim();
+      if (!value || this.cliHistory.at(-1) === value) return;
+      this.cliHistory.push(value);
     },
     setConfig(payload) {
       if (!payload.key) return;
@@ -82,6 +95,18 @@ export const useAppStore = defineStore("app", {
     },
     setChangedTab(tab) {
       this.changedTab = tab;
+    },
+    setPreflightReport(report) {
+      this.preflightReport = report;
+    },
+    clearPreflightReport() {
+      this.preflightReport = null;
+    },
+    setCurrentBoardProfile(profile) {
+      this.currentBoardProfile = profile;
+    },
+    clearCurrentBoardProfile() {
+      this.currentBoardProfile = null;
     },
     addEventAction({ key, action }) {
       this.events[key].actions.push(action);

@@ -7,7 +7,7 @@ export const UPDATE_API_URL =
   "https://api.github.com/repos/catsystems/cats-configurator/releases/latest";
 export const UPDATE_RELEASE_BASE_URL =
   "https://github.com/catsystems/cats-configurator/releases";
-export const UPDATE_INITIAL_DELAY_MS = 30_000;
+export const UPDATE_INITIAL_DELAY_MS = 5_000;
 export const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 export const UPDATE_REQUEST_TIMEOUT_MS = 15_000;
 export const UPDATE_DOWNLOAD_IDLE_TIMEOUT_MS = 30_000;

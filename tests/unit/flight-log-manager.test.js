@@ -102,6 +102,23 @@ describe("mounted CATS drive flight logs", () => {
     });
   });
 
+  it("keeps a board-deleted log hidden while the mounted listing is stale", async () => {
+    const root = await createCatsDrive(["fl7.cfl"]);
+    const manager = new FlightLogManager({ candidates: async () => [root] });
+    const discovered = await manager.discoverOnboard();
+    const log = manager.getOnboardLog(discovered.logs[0].id);
+
+    expect(log).toMatchObject({ name: "fl7.cfl", logNumber: 7 });
+    expect(manager.removeOnboard(log.id)).toEqual({
+      status: "ready",
+      logs: [],
+    });
+    await expect(manager.refreshOnboard()).resolves.toEqual({
+      status: "ready",
+      logs: [],
+    });
+  });
+
   it("rejects unsigned roots, traversal, empty files, and non-CFL files", async () => {
     const unsigned = await fs.mkdtemp(path.join(os.tmpdir(), "not-cats-"));
     temporaryDirectories.push(unsigned);

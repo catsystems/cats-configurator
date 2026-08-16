@@ -71,7 +71,7 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       });
     await expect(page).toHaveTitle("CATS Configurator");
     await expect(page.getByText("Status: Disconnected")).toBeVisible();
-    await expect(page.getByText("App version: 1.3.2")).toBeVisible();
+    await expect(page.getByText("App version: 1.4.0")).toBeVisible();
     await expect(page.getByText("CATS", { exact: true })).toBeVisible();
     await expect(page.getByText("Configurator", { exact: true })).toBeVisible();
     await expect(
@@ -92,6 +92,15 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       name: "Configuration",
       exact: true,
     });
+    await expect(
+      page.getByRole("link", { name: "Events & Timers", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Timers", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Logging", exact: true }),
+    ).toHaveCount(0);
     const flightLogsLink = page.getByRole("link", {
       name: "Flight Logs",
       exact: true,
@@ -269,6 +278,13 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await expect(page.getByText("Current log", { exact: true })).toBeVisible();
     await expect(page.getByText("fl7.cfl", { exact: true })).toHaveCount(2);
 
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "Delete fl7.cfl" }).click();
+    await expect(
+      page.getByText("The mounted CATS drive contains no flight logs."),
+    ).toBeVisible();
+    await expect(page.getByText("fl7.cfl", { exact: true })).toHaveCount(1);
+
     await page.locator('input[type="file"]').setInputFiles(localLog);
     await expect(
       page.getByText("local-flight.cfl", { exact: true }),
@@ -308,7 +324,7 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await page.evaluate(() => {
       window.location.hash = "#/events";
     });
-    await expect(page.getByText(/^liftoff$/i)).toBeVisible();
+    await expect(page.getByText(/^liftoff$/i).first()).toBeVisible();
     await expect(page.getByText(/^recorder$/i)).toBeVisible();
     await expect(page.getByText(/^log$/i)).toBeVisible();
 
@@ -333,6 +349,70 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
       "rgb(255, 167, 38)",
     );
 
+    const lastTimerCard = page.locator(".timer-card").last();
+    await lastTimerCard.scrollIntoViewIfNeeded();
+    const [lastTimerBounds, actionsBarBounds] = await Promise.all([
+      lastTimerCard.boundingBox(),
+      page.locator(".actions-bar").boundingBox(),
+    ]);
+    expect(lastTimerBounds.y + lastTimerBounds.height).toBeLessThanOrEqual(
+      actionsBarBounds.y,
+    );
+
+    const timerDuration = page.locator('input[type="number"]').first();
+    await timerDuration.fill("1200");
+    await expect(configurationLink).toHaveAttribute("aria-disabled", "true");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(timerDuration).toHaveValue("1200");
+    await expect(configurationLink).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
+    await page.evaluate(() => {
+      window.location.hash = "#/profiles";
+    });
+    await expect(
+      page.getByText("Configuration Profiles", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Export Board Profile" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Open Profile" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/settings read from the connected board/),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Current board value", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("656 ft", { exact: true })).toBeVisible();
+
+    await page.evaluate(() => {
+      window.location.hash = "#/preflight";
+    });
+    await expect(
+      page.getByText("Preflight Check", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("Event & Timer Simulator")).toBeVisible();
+    await expect(page.getByText("Flight Event Sequence")).toBeVisible();
+    await expect(page.getByText("Timer Chains", { exact: true })).toBeVisible();
+    await expect(page.getByText("WARNING", { exact: true })).toBeVisible();
+    await expect(page.getByText("Checks performed")).toHaveCount(0);
+    await expect(page.getByText("Liftoff detection: 115 ft/s²")).toBeVisible();
+    await expect(page.getByText("Deployment altitude: 656 ft")).toBeVisible();
+
+    await page.evaluate(() => {
+      window.location.hash = "#/logging";
+    });
+    await expect(page).toHaveURL(/#\/config$/);
+    await expect(page.getByText("Logging", { exact: true })).toHaveCount(0);
+    await expect(configurationLink).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
     for (const route of ["/cli", "/config", "/cli"]) {
       await page.evaluate((path) => {
         window.location.hash = `#${path}`;
@@ -345,11 +425,61 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await page.evaluate(() => {
       window.location.hash = "#/cli";
     });
-    const commandInput = page.getByPlaceholder("Write your command here");
+    const commandInput = page.getByPlaceholder(/Write your command here/);
+    await expect(commandInput).toHaveAttribute(
+      "placeholder",
+      /Up: previous, Ctrl\+R: history/,
+    );
     await commandInput.fill("status");
     await commandInput.press("Enter");
     await expect(page.getByText("test> status")).toBeVisible();
     await expect(page.getByText("test> status")).toHaveCount(1);
+
+    await commandInput.fill("get timer4_duration");
+    await commandInput.press("Enter");
+    await expect(page.getByText("test> get timer4_duration")).toBeVisible();
+    await commandInput.press("ArrowUp");
+    await expect(commandInput).toHaveValue("get timer4_duration");
+    await commandInput.press("ArrowUp");
+    await expect(commandInput).toHaveValue("status");
+    await commandInput.press("ArrowDown");
+    await expect(commandInput).toHaveValue("get timer4_duration");
+    await commandInput.press("ArrowDown");
+    await expect(commandInput).toHaveValue("");
+
+    await commandInput.press("Control+r");
+    await expect(
+      page.getByText("Command history", { exact: true }),
+    ).toBeVisible();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await expect(commandInput).toHaveValue("status");
+
+    await page.evaluate(() => {
+      window.location.hash = "#/config";
+    });
+    await expect(page).toHaveURL(/#\/config$/);
+    await page.evaluate(() => {
+      window.location.hash = "#/cli";
+    });
+    const restoredCommandInput = page.getByPlaceholder(
+      /Write your command here/,
+    );
+    await restoredCommandInput.press("ArrowUp");
+    await expect(restoredCommandInput).toHaveValue("get timer4_duration");
+
+    await restoredCommandInput.fill("sim");
+    await restoredCommandInput.press("Enter");
+    await expect(page.getByText("test> sim", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(
+        "[100]: height: 1.000000, velocity: 2.000000, offset: 0.100000",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Simulation Successful.", { exact: true }),
+    ).toBeVisible();
 
     expect(pageErrors).toEqual([]);
     expect(consoleErrors).toEqual([]);

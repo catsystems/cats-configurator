@@ -1,17 +1,14 @@
 import { CONFIG_SETTINGS } from "@/modules/settings.js";
+import { applyBoardValues } from "@/services/boardService.js";
 
 export function getConfigs() {
-  Object.keys(CONFIG_SETTINGS).forEach((key) =>
-    window.cats.board.getConfig(key),
-  );
+  return window.cats.board.getConfigs();
 }
 
-export function setConfigs(data) {
-  Object.keys(CONFIG_SETTINGS).forEach((key) => {
-    if (key in data) {
-      window.cats.board.setConfig(key, data[key].value);
-    }
-  });
-
-  window.cats.board.save();
+export function setConfigs(data, original = {}) {
+  const entries = Object.keys(CONFIG_SETTINGS)
+    .filter((key) => key in data)
+    .filter((key) => data[key].value !== original[key]?.value)
+    .map((key) => ({ key, value: data[key].value }));
+  return applyBoardValues(entries);
 }

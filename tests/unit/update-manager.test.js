@@ -407,6 +407,7 @@ describe("verified update downloads", () => {
 
   it("schedules startup and six-hour checks and disposes timers", async () => {
     vi.useFakeTimers();
+    expect(UPDATE_INITIAL_DELAY_MS).toBe(5_000);
     const manager = await createManager();
     const check = vi
       .spyOn(manager, "check")

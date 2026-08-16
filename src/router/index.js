@@ -21,8 +21,24 @@ const routes = [
   {
     path: "/timer",
     name: "Timers",
+    redirect: "/events?section=timers",
+  },
+  {
+    path: "/logging",
+    name: "LegacyLogging",
+    redirect: "/config",
+  },
+  {
+    path: "/profiles",
+    name: "Profiles",
     meta: { requiresBoard: true },
-    component: () => import("../views/Timers.vue"),
+    component: () => import("../views/Profiles.vue"),
+  },
+  {
+    path: "/preflight",
+    name: "Preflight",
+    meta: { requiresBoard: true },
+    component: () => import("../views/Preflight.vue"),
   },
   {
     path: "/flight-logs",
