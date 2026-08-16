@@ -70,8 +70,19 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
         title: "CATS Configurator",
       });
     await expect(page).toHaveTitle("CATS Configurator");
-    await expect(page.getByText("Status: Disconnected")).toBeVisible();
-    await expect(page.getByText("App version: 1.4.0")).toBeVisible();
+    const statusLabel = page.getByText("Status: Disconnected");
+    const appVersionButton = page.getByRole("button", {
+      name: "Check for updates",
+    });
+    await expect(statusLabel).toBeVisible();
+    await expect(appVersionButton).toContainText("App version: 1.4.1");
+    const [statusFontSize, appVersionFontSize] = await Promise.all([
+      statusLabel.evaluate((element) => getComputedStyle(element).fontSize),
+      appVersionButton.evaluate(
+        (element) => getComputedStyle(element).fontSize,
+      ),
+    ]);
+    expect(appVersionFontSize).toBe(statusFontSize);
     await expect(page.getByText("CATS", { exact: true })).toBeVisible();
     await expect(page.getByText("Configurator", { exact: true })).toBeVisible();
     await expect(

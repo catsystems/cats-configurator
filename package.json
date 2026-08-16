@@ -1,7 +1,7 @@
 {
   "name": "cats-configurator",
   "productName": "CATS Configurator",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Desktop configuration and flight-log analysis utility for CATS flight computers.",
   "author": "Control and Telemetry Systems GmbH",
   "private": true,

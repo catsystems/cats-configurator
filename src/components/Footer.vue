@@ -79,6 +79,7 @@ export default {
 }
 
 .update-footer__version {
+  font-size: inherit;
   min-width: 0;
   padding-inline: 4px;
   text-transform: none;
