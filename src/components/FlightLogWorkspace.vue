@@ -38,7 +38,6 @@
                     size="small"
                     color="primary"
                     :loading="busyLogId === log.id"
-                    :disabled="Boolean(deletingLogId)"
                     @click="viewOnboard(log)"
                   >
                     View locally
@@ -46,7 +45,7 @@
                   <v-btn
                     size="small"
                     variant="outlined"
-                    :disabled="Boolean(busyLogId || deletingLogId)"
+                    :disabled="Boolean(busyLogId)"
                     @click="openOnboardInFlights(log)"
                   >
                     Open in Flights &nearr;
@@ -54,21 +53,10 @@
                   <v-btn
                     size="small"
                     variant="outlined"
-                    :disabled="Boolean(busyLogId || deletingLogId)"
+                    :disabled="Boolean(busyLogId)"
                     @click="saveOnboard(log)"
                   >
                     Save a copy
-                  </v-btn>
-                  <v-btn
-                    size="small"
-                    color="error"
-                    variant="tonal"
-                    :loading="deletingLogId === log.id"
-                    :disabled="Boolean(busyLogId)"
-                    :aria-label="`Delete ${log.name}`"
-                    @click="removeOnboard(log)"
-                  >
-                    Delete
                   </v-btn>
                 </div>
               </template>
@@ -191,7 +179,6 @@ export default {
       onboardLogs: [],
       onboardStatus: "Looking for the mounted CATS drive...",
       busyLogId: null,
-      deletingLogId: null,
       handoffDialog: false,
       handoffState: {
         status: "waiting",
@@ -335,27 +322,6 @@ export default {
         this.showErrorSnackbar(error.message);
       } finally {
         this.busyLogId = null;
-      }
-    },
-    async removeOnboard(log) {
-      const confirmed = window.confirm(
-        `Permanently delete ${log.name} and its associated stats and configuration files from the Vega?\n\nThis cannot be undone.`,
-      );
-      if (!confirmed) return;
-
-      this.deletingLogId = log.id;
-      try {
-        const result = await window.cats.flightLog.removeOnboard(log.id);
-        this.applyOnboardResult(result);
-        this.showSuccessSnackbar(
-          result.removal?.alreadyMissing
-            ? `${log.name} was already removed from the Vega. Its stale drive entry has been hidden.`
-            : `${log.name} and its associated stats and configuration files were removed from the Vega.`,
-        );
-      } catch (error) {
-        this.showErrorSnackbar(error.message);
-      } finally {
-        this.deletingLogId = null;
       }
     },
     async saveCurrent() {

@@ -1,6 +1,6 @@
 <template>
   <div>
-    <v-container fluid :class="{ 'pa-0': embedded }">
+    <v-container fluid>
       <v-form ref="form">
         <v-row v-if="data && Object.keys(data).length >= timerKeys.length * 3">
           <v-col sm="12" md="6" xxl="3" v-for="key in timerKeys" :key="key">
@@ -96,13 +96,7 @@
         </v-row>
       </v-form>
     </v-container>
-    <ActionsBar
-      v-if="!embedded"
-      :saving="saveLoading"
-      :changed="updated"
-      @refresh="init"
-      @save="onSave"
-    />
+    <ActionsBar @refresh="init" @save="onSave" />
   </div>
 </template>
 
@@ -115,10 +109,6 @@ import { TIMER_KEYS } from "@/modules/settings";
 
 export default {
   name: "TimerView",
-  props: {
-    embedded: Boolean,
-  },
-  emits: ["change"],
   components: {
     ActionsBar,
   },
@@ -126,16 +116,18 @@ export default {
     return {
       timerKeys: TIMER_KEYS,
       data: {},
-      saveLoading: false,
     };
   },
   watch: {
-    updated: {
-      handler(changed) {
-        if (this.embedded) this.$emit("change", changed);
-        else this.setChangedTab(changed ? "timers" : null);
+    data: {
+      handler(data) {
+        let changed = JSON.stringify(data) !== JSON.stringify(this.timers);
+
+        if (this.changed !== changed) {
+          this.setChangedTab(changed ? "timers" : null);
+        }
       },
-      immediate: true,
+      deep: true,
     },
     timers: {
       handler(timers) {
@@ -146,16 +138,13 @@ export default {
     },
   },
   computed: {
-    ...mapState(useAppStore, ["timers"]),
-    updated() {
-      return JSON.stringify(this.data) !== JSON.stringify(this.timers);
-    },
+    ...mapState(useAppStore, ["timers", "changedTab"]),
   },
   mounted() {
-    if (!this.embedded) this.init();
+    this.init();
   },
   methods: {
-    ...mapActions(useAppStore, ["setChangedTab", "showErrorSnackbar"]),
+    ...mapActions(useAppStore, ["setChangedTab"]),
     init() {
       getTimers();
     },
@@ -172,16 +161,14 @@ export default {
     async onSave() {
       const { valid } = await this.$refs.form.validate();
       if (!valid) return;
-      this.saveLoading = true;
-      try {
-        const dataCopy = JSON.parse(JSON.stringify(this.data));
-        for (const key of this.timerKeys) delete dataCopy[`${key}_active`];
-        await setTimers(dataCopy, this.timers);
-      } catch (error) {
-        this.showErrorSnackbar(error.message);
-      } finally {
-        this.saveLoading = false;
-      }
+      // TODO fix this later
+      const dataCopy = structuredClone(this.data);
+      for (const key of this.timerKeys) delete dataCopy[`${key}_active`];
+      setTimers(dataCopy);
+
+      setTimeout(function () {
+        getTimers();
+      }, 100);
     },
     getEventName(key) {
       let name = key.split("");

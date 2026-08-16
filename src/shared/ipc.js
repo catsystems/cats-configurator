@@ -18,21 +18,17 @@ export const IPC_CHANNELS = Object.freeze({
   BOARD_STATIC_DATA: "board:static-data",
   BOARD_CONFIG_DATA: "board:config-data",
   BOARD_CONFIG_SAVED: "board:config-saved",
-  BOARD_GET_CONFIGS: "board:get-configs",
+  BOARD_DUMP_COMPLETE: "board:dump-complete",
   BOARD_GET_CONFIG: "board:get-config",
   BOARD_SET_CONFIG: "board:set-config",
-  BOARD_APPLY_CONFIG: "board:apply-config",
   BOARD_GET_EVENTS: "board:get-events",
   BOARD_GET_TIMERS: "board:get-timers",
   BOARD_GET_INFO: "board:get-info",
   BOARD_GET_LOG_INFO: "board:get-log-info",
+  BOARD_DUMP: "board:dump",
+  BOARD_RESTORE: "board:restore",
   BOARD_RESET: "board:reset",
   BOARD_SAVE: "board:save",
-  PROFILE_CURRENT: "profile:current",
-  PROFILE_EXPORT: "profile:export",
-  PROFILE_OPEN: "profile:open",
-  PROFILE_APPLY: "profile:apply",
-  PREFLIGHT_RUN: "preflight:run",
   FLIGHT_LOG_LOAD: "flight-log:load",
   FLIGHT_LOG_CURRENT: "flight-log:current",
   FLIGHT_LOG_EXPORT_CSV: "flight-log:export-csv",
@@ -42,7 +38,6 @@ export const IPC_CHANNELS = Object.freeze({
   FLIGHT_LOG_REFRESH_ONBOARD: "flight-log:refresh-onboard",
   FLIGHT_LOG_CLEAR_ONBOARD: "flight-log:clear-onboard",
   FLIGHT_LOG_OPEN_ONBOARD: "flight-log:open-onboard",
-  FLIGHT_LOG_REMOVE_ONBOARD: "flight-log:remove-onboard",
   FLIGHT_LOG_SAVE_ORIGINAL: "flight-log:save-original",
   FLIGHT_LOG_OPEN_IN_FLIGHTS: "flight-log:open-in-flights",
   FLIGHT_LOG_CANCEL_HANDOFF: "flight-log:cancel-handoff",
@@ -73,30 +68,10 @@ export function assertBoardValue(value) {
   if (!["string", "number", "boolean"].includes(typeof value)) {
     throw new TypeError("Board value must be a string, number, or boolean.");
   }
-  if (typeof value === "number" && !Number.isFinite(value)) {
-    throw new TypeError("Board number must be finite.");
-  }
-  if (typeof value === "string") {
-    if (!value.length || value.length > 512 || /[\r\n#]/.test(value)) {
-      throw new TypeError(
-        "Board value must be a non-empty single line without # characters.",
-      );
-    }
+  if (typeof value === "string" && /[\r\n]/.test(value)) {
+    throw new TypeError("Board value must fit on one line.");
   }
   return value;
-}
-
-export function assertBoardEntries(value) {
-  if (!Array.isArray(value) || value.length === 0 || value.length > 128) {
-    throw new TypeError("Board transaction must contain 1 to 128 values.");
-  }
-  return value.map((entry) => {
-    assertRecord(entry, "Board transaction value");
-    return {
-      key: assertBoardKey(entry.key),
-      value: assertBoardValue(entry.value),
-    };
-  });
 }
 
 export function assertRecord(value, label) {

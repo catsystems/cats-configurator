@@ -1,13 +1,15 @@
-import { applyBoardValues } from "@/services/boardService.js";
+import { TIMER_KEYS } from "@/modules/settings.js";
 
 export function getTimers() {
-  return window.cats.board.getConfigs();
+  TIMER_KEYS.forEach((key) => window.cats.board.getTimers(key));
 }
 
-export function setTimers(data, original = {}) {
-  return applyBoardValues(
-    Object.keys(data)
-      .filter((key) => data[key].value !== original[key]?.value)
-      .map((key) => ({ key, value: data[key].value })),
-  );
+export function setTimers(data) {
+  // console.log("SETTING TIMERS");
+  Object.keys(data).forEach((key) => {
+    // console.log("SETTING TIMER " + key);
+    window.cats.board.setConfig(key, data[key].value);
+  });
+
+  window.cats.board.save();
 }

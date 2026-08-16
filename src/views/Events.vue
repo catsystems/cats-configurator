@@ -1,7 +1,6 @@
 <template>
   <div>
-    <v-container fluid class="events-content">
-      <div class="text-h5 mb-3">Flight Events</div>
+    <v-container fluid>
       <v-slide-group show-arrows>
         <v-slide-group-item v-for="key in Object.keys(events)" :key="key">
           <v-card class="event-column-card" variant="flat" max-height="100%">
@@ -38,18 +37,8 @@
           </v-card>
         </v-slide-group-item>
       </v-slide-group>
-      <v-divider class="my-6" />
-      <section ref="timersSection">
-        <div class="text-h5 mb-3">Timers</div>
-        <Timers ref="timers" embedded @change="onTimersChange" />
-      </section>
     </v-container>
-    <ActionsBar
-      :saving="saveLoading"
-      :changed="changed"
-      @refresh="refreshAll"
-      @save="saveData"
-    />
+    <ActionsBar @refresh="init" @save="saveData" />
     <v-dialog v-model="addActionDialog" width="500">
       <AddEventActionDialog
         v-if="addActionDialog"
@@ -79,7 +68,6 @@ import ActionsBar from "@/components/ActionsBar.vue";
 import EventAction from "@/components/EventAction.vue";
 import AddEventActionDialog from "@/components/AddEventActionDialog.vue";
 import EditEventActionDialog from "@/components/EditEventActionDialog.vue";
-import Timers from "@/views/Timers.vue";
 
 export default {
   name: "EventsView",
@@ -88,7 +76,6 @@ export default {
     EventAction,
     AddEventActionDialog,
     EditEventActionDialog,
-    Timers,
   },
   data() {
     return {
@@ -97,14 +84,12 @@ export default {
       currentKey: null,
       currentAction: null,
       currentActionIndex: null,
-      saveLoading: false,
-      timersChanged: false,
     };
   },
   computed: {
-    ...mapState(useAppStore, ["events", "isEventsChanged"]),
+    ...mapState(useAppStore, ["changedTab", "events", "isEventsChanged"]),
     changed() {
-      return this.isEventsChanged || this.timersChanged;
+      return this.changedTab === "events";
     },
     currentEvent() {
       const event = this.events[this.currentKey];
@@ -117,14 +102,11 @@ export default {
   },
   watch: {
     isEventsChanged(changed) {
-      this.updateChangedState(changed, this.timersChanged);
+      this.setChangedTab(changed ? "events" : null);
     },
   },
   mounted() {
     this.init();
-    if (this.$route?.query?.section === "timers") {
-      this.$nextTick(() => this.$refs.timersSection?.scrollIntoView());
-    }
   },
   methods: {
     ...mapActions(useAppStore, [
@@ -132,33 +114,15 @@ export default {
       "editEventAction",
       "removeEventAction",
       "addEventAction",
-      "showErrorSnackbar",
     ]),
     init() {
       getEvents();
     },
-    refreshAll() {
-      this.init();
-    },
-    onTimersChange(changed) {
-      this.timersChanged = changed;
-      this.updateChangedState(this.isEventsChanged, changed);
-    },
-    updateChangedState(eventsChanged, timersChanged) {
-      this.setChangedTab(eventsChanged || timersChanged ? "events" : null);
-    },
-    async saveData() {
-      this.saveLoading = true;
-      try {
-        if (this.isEventsChanged) {
-          await setEvents(this.events);
-        }
-        if (this.timersChanged) await this.$refs.timers?.onSave();
-      } catch (error) {
-        this.showErrorSnackbar(error.message);
-      } finally {
-        this.saveLoading = false;
-      }
+    saveData() {
+      setEvents(this.events);
+      setTimeout(function () {
+        getEvents();
+      }, 200);
     },
     isActionsFilled(event) {
       return event.actions.length >= Math.floor(event.arrayLength / 2);
@@ -190,10 +154,6 @@ export default {
 </script>
 
 <style scoped>
-.events-content {
-  padding-bottom: 76px;
-}
-
 .event-action {
   max-height: calc(100vh - 290px);
   overflow: scroll;

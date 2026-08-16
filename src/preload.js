@@ -91,16 +91,15 @@ const cats = {
     onData: (callback) => subscribe(IPC_CHANNELS.SERIAL_DATA, callback),
   },
   board: {
-    getConfigs: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_CONFIGS),
     getConfig: (key) => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_CONFIG, key),
     setConfig: (key, value) =>
       ipcRenderer.invoke(IPC_CHANNELS.BOARD_SET_CONFIG, { key, value }),
-    applyConfig: (entries) =>
-      ipcRenderer.invoke(IPC_CHANNELS.BOARD_APPLY_CONFIG, entries),
     getEvents: (key) => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_EVENTS, key),
     getTimers: (key) => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_TIMERS, key),
     getInfo: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_INFO),
     getLogInfo: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_GET_LOG_INFO),
+    dump: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_DUMP),
+    restore: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_RESTORE),
     reset: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_RESET),
     save: () => ipcRenderer.invoke(IPC_CHANNELS.BOARD_SAVE),
     onActive: (callback) => subscribe(IPC_CHANNELS.BOARD_ACTIVE, callback),
@@ -109,15 +108,8 @@ const cats = {
     onConfig: (callback) => subscribe(IPC_CHANNELS.BOARD_CONFIG_DATA, callback),
     onConfigSaved: (callback) =>
       subscribe(IPC_CHANNELS.BOARD_CONFIG_SAVED, callback),
-  },
-  profiles: {
-    current: () => ipcRenderer.invoke(IPC_CHANNELS.PROFILE_CURRENT),
-    export: () => ipcRenderer.invoke(IPC_CHANNELS.PROFILE_EXPORT),
-    open: () => ipcRenderer.invoke(IPC_CHANNELS.PROFILE_OPEN),
-    apply: (profile) => ipcRenderer.invoke(IPC_CHANNELS.PROFILE_APPLY, profile),
-  },
-  preflight: {
-    run: () => ipcRenderer.invoke(IPC_CHANNELS.PREFLIGHT_RUN),
+    onDumpComplete: (callback) =>
+      subscribe(IPC_CHANNELS.BOARD_DUMP_COMPLETE, callback),
   },
   flightLog: {
     pathForDroppedFile: (file) => webUtils.getPathForFile(file),
@@ -141,8 +133,6 @@ const cats = {
       ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_CLEAR_ONBOARD),
     openOnboard: (logId) =>
       ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_OPEN_ONBOARD, logId),
-    removeOnboard: (logId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_REMOVE_ONBOARD, logId),
     saveOriginal: (sessionId) =>
       ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_SAVE_ORIGINAL, sessionId),
     openInFlights: (sessionId) =>

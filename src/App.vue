@@ -34,18 +34,9 @@ export default {
     return {
       subscriptions: [],
       navItems: [
-        {
-          title: "Configuration",
-          link: "/config",
-          requiresBoard: true,
-        },
-        {
-          title: "Events & Timers",
-          link: "/events",
-          requiresBoard: true,
-        },
-        { title: "Profiles", link: "/profiles", requiresBoard: true },
-        { title: "Preflight", link: "/preflight", requiresBoard: true },
+        { title: "Configuration", link: "/config", requiresBoard: true },
+        { title: "Events", link: "/events", requiresBoard: true },
+        { title: "Timers", link: "/timer", requiresBoard: true },
         { title: "CLI", link: "/cli", requiresBoard: true },
         { title: "Flight Logs", link: "/flight-logs", requiresBoard: false },
       ],
@@ -64,23 +55,17 @@ export default {
         if (value && !wasActive) {
           if (this.$route.name !== "Config") this.$router.push("/config");
         } else if (!value && wasActive) {
-          this.setChangedTab(null);
           void window.cats.flightLog.clearOnboard();
           if (this.$route.meta.requiresBoard) this.$router.push("/");
         }
       }),
-      window.cats.board.onConfig((payload) => {
-        const configs = Array.isArray(payload) ? payload : [payload];
-        configs.forEach((config) => {
-          if (config.type === "EVENT") this.setEvent(config);
-          else if (config.key.includes("timer")) this.setTimer(config);
-          else if (config.key.includes("rec_")) this.setLog(config);
-          else this.setConfig(config);
-        });
+      window.cats.board.onConfig((config) => {
+        if (config.type === "EVENT") this.setEvent(config);
+        else if (config.key.includes("timer")) this.setTimer(config);
+        else if (config.key.includes("rec_")) this.setLog(config);
+        else this.setConfig(config);
       }),
       window.cats.board.onConfigSaved(() => {
-        this.clearPreflightReport();
-        this.clearCurrentBoardProfile();
         this.showSuccessSnackbar("Values saved successfully!");
       }),
     );
@@ -99,13 +84,10 @@ export default {
     ...mapActions(useAppStore, [
       "setStaticData",
       "setActiveState",
-      "setChangedTab",
       "setConfig",
       "setEvent",
       "setTimer",
       "setLog",
-      "clearPreflightReport",
-      "clearCurrentBoardProfile",
       "showSuccessSnackbar",
       "showErrorSnackbar",
       "setUpdateState",
