@@ -161,6 +161,10 @@ function coerceFakeValue(config, value) {
 }
 
 function fakeOutputForCommand(boardCommand) {
+  if (boardCommand === "ls /flights") return ["file flight_00007"];
+  if (boardCommand.startsWith("rm ")) {
+    return [`File '${boardCommand.slice(3)}' removed!`];
+  }
   if (/^get\s*$/i.test(boardCommand)) {
     return PROFILE_BOARD_KEYS.flatMap((key) => [
       ...fakeConfigLines(fakeConfigForKey(key)),
@@ -195,6 +199,12 @@ function fakeOutputForCommand(boardCommand) {
   }
   if (boardCommand === "rec_info") {
     return ["Flash usage: 1024 / 1048576 bytes"];
+  }
+  if (/^sim(?:\s|$)/i.test(boardCommand)) {
+    return [
+      "[100]: height: 1.000000, velocity: 2.000000, offset: 0.100000",
+      "Simulation Successful.",
+    ];
   }
   if (boardCommand === "save") return ["Successfully written to flash"];
   if (boardCommand === "defaults") return ["Reset to default values"];
@@ -349,7 +359,7 @@ function connect(serialPath) {
     writeSerialCommand(candidatePort, boardCommand),
   );
   parser = candidatePort.pipe(
-    new ReadlineParser({ delimiter: "\r\n", encoding: "utf8" }),
+    new ReadlineParser({ delimiter: "\n", encoding: "utf8" }),
   );
   parser.on("data", onData);
 
@@ -428,9 +438,10 @@ function disconnect() {
 }
 
 function onData(data) {
-  writeCommunicationLog("RX", data);
-  if (commandEngine?.receive(data)) return;
-  if (data.includes("CATS is now ready")) void identifyBoard();
+  const line = data.endsWith("\r") ? data.slice(0, -1) : data;
+  writeCommunicationLog("RX", line);
+  if (commandEngine?.receive(line)) return;
+  if (line.includes("CATS is now ready")) void identifyBoard();
 }
 
 function requireCommandEngine() {
@@ -531,26 +542,39 @@ async function command(boardCommand, { poll = false } = {}) {
 }
 
 async function cliCommand(boardCommand) {
+  const normalizedCommand = normalizeBoardCommand(boardCommand);
+  const isSimulation =
+    normalizedCommand === "sim" || normalizedCommand.startsWith("sim ");
+  if (useFakeSerial && isSimulation) {
+    sendToRenderer(IPC_CHANNELS.SERIAL_DATA, `test> ${boardCommand}`);
+  }
   let response;
   try {
     response = await requireCommandEngine().run(boardCommand, {
-      timeoutMs: 5000,
+      timeoutMs: isSimulation ? 5 * 60_000 : 5000,
       retries: 0,
+      waitForPrompt: isSimulation,
+      resetTimeoutOnOutput: isSimulation,
+      onOutput: isSimulation
+        ? (line) => sendToRenderer(IPC_CHANNELS.SERIAL_DATA, line)
+        : undefined,
     });
   } catch (error) {
     const expectedRebootDisconnect =
-      normalizeBoardCommand(boardCommand) === "reboot" &&
+      normalizedCommand === "reboot" &&
       error instanceof BoardCommandError &&
       error.message === "Board connection closed.";
     if (expectedRebootDisconnect) return [];
     throw error;
   }
-  if (useFakeSerial) {
+  if (useFakeSerial && !isSimulation) {
     sendToRenderer(IPC_CHANNELS.SERIAL_DATA, `test> ${boardCommand}`);
   }
-  response.output.forEach((line) =>
-    sendToRenderer(IPC_CHANNELS.SERIAL_DATA, line),
-  );
+  if (!isSimulation) {
+    response.output.forEach((line) =>
+      sendToRenderer(IPC_CHANNELS.SERIAL_DATA, line),
+    );
+  }
   return response.output;
 }
 
@@ -663,6 +687,83 @@ async function resetBoardConfiguration() {
   return result;
 }
 
+function parseMountedFlightLogName(name) {
+  const match = /^fl(\d{1,3})\.cfl$/i.exec(name);
+  if (!match) {
+    throw new Error("The selected onboard file is not a Vega flight log.");
+  }
+  const aliasNumber = Number.parseInt(match[1], 10);
+  if (aliasNumber > 255) {
+    throw new Error("The selected Vega flight-log number is invalid.");
+  }
+  return aliasNumber;
+}
+
+function confirmRemoval(output, filePath, { allowMissing = false } = {}) {
+  const text = output.join("\n");
+  if (/Removal of file .* failed/i.test(text)) {
+    throw new Error(`The Vega could not remove ${filePath}.`);
+  }
+  if (/Cannot remove .*not a file/i.test(text)) {
+    if (allowMissing) return;
+    throw new Error(`${filePath} is no longer present on the Vega.`);
+  }
+  if (!/File '.*' removed!/i.test(text)) {
+    throw new Error(`The Vega did not confirm removal of ${filePath}.`);
+  }
+}
+
+async function removeBoardFlightLog(name) {
+  const aliasNumber = parseMountedFlightLogName(name);
+  return requireCommandEngine().transaction(async (execute) => {
+    const listing = await execute("ls /flights");
+    const internalNumbers = listing.output.flatMap((line) =>
+      [...line.matchAll(/flight_(\d{5})/g)].map((match) => match[1]),
+    );
+    const matches = [
+      ...new Set(
+        internalNumbers.filter(
+          (number) => (Number.parseInt(number, 10) & 0xff) === aliasNumber,
+        ),
+      ),
+    ];
+    if (matches.length === 0) {
+      return {
+        ok: true,
+        alreadyMissing: true,
+        flightPath: null,
+        statsPath: null,
+        configPath: null,
+        statsName: `st${String(aliasNumber).padStart(3, "0")}.txt`,
+      };
+    }
+    if (matches.length > 1) {
+      throw new Error(
+        `The mounted name ${name} matches more than one Vega flight. Reboot the Vega and try again.`,
+      );
+    }
+
+    const internalNumber = matches[0];
+    const flightPath = `/flights/flight_${internalNumber}`;
+    const statsPath = `/stats/stats_${internalNumber}.txt`;
+    const configPath = `/configs/flight_${internalNumber}.cfg`;
+    const statsRemoval = await execute(`rm ${statsPath}`);
+    confirmRemoval(statsRemoval.output, statsPath, { allowMissing: true });
+    const configRemoval = await execute(`rm ${configPath}`);
+    confirmRemoval(configRemoval.output, configPath, { allowMissing: true });
+    const flightRemoval = await execute(`rm ${flightPath}`);
+    confirmRemoval(flightRemoval.output, flightPath);
+
+    return {
+      ok: true,
+      flightPath,
+      statsPath,
+      configPath,
+      statsName: `st${String(aliasNumber).padStart(3, "0")}.txt`,
+    };
+  });
+}
+
 async function readBoardSnapshot() {
   return requireCommandEngine().transaction(async (execute) => {
     const version = await execute("version");
@@ -747,6 +848,7 @@ export {
   getList,
   readBoardConfigurations,
   readBoardSnapshot,
+  removeBoardFlightLog,
   resetBoardConfiguration,
   setSerialWindow,
 };

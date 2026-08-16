@@ -25,7 +25,12 @@ vi.mock("electron", () => ({
 vi.mock("serialport", async () => {
   const { EventEmitter } = await vi.importActual("node:events");
 
-  class MockReadlineParser extends EventEmitter {}
+  class MockReadlineParser extends EventEmitter {
+    constructor(options) {
+      super();
+      this.options = options;
+    }
+  }
 
   class MockSerialPort extends EventEmitter {
     constructor(options, callback) {
@@ -192,6 +197,119 @@ describe("serial board identification", () => {
     ).toHaveLength(1);
   });
 
+  it("removes a Vega flight log and its matching stats file", async () => {
+    serial.connect("COM4");
+    const port = serialState.instances[0];
+    await identify(port);
+
+    const removal = serial.removeBoardFlightLog("fl7.cfl");
+    for (const [command, output] of [
+      ["ls /flights", ["file 22 flight_00007"]],
+      ["rm /stats/stats_00007.txt", ["File '/stats/stats_00007.txt' removed!"]],
+      [
+        "rm /configs/flight_00007.cfg",
+        ["File '/configs/flight_00007.cfg' removed!"],
+      ],
+      ["rm /flights/flight_00007", ["File '/flights/flight_00007' removed!"]],
+    ]) {
+      await vi.waitFor(() =>
+        expect(port.write).toHaveBeenCalledWith(
+          `${command}\n`,
+          expect.any(Function),
+        ),
+      );
+      respond(command, output);
+    }
+
+    await expect(removal).resolves.toEqual({
+      ok: true,
+      flightPath: "/flights/flight_00007",
+      statsPath: "/stats/stats_00007.txt",
+      configPath: "/configs/flight_00007.cfg",
+      statsName: "st007.txt",
+    });
+  });
+
+  it("refuses an ambiguous wrapped Vega flight-log alias", async () => {
+    serial.connect("COM4");
+    const port = serialState.instances[0];
+    await identify(port);
+
+    const removal = serial.removeBoardFlightLog("fl1.cfl");
+    await vi.waitFor(() =>
+      expect(port.write).toHaveBeenCalledWith(
+        "ls /flights\n",
+        expect.any(Function),
+      ),
+    );
+    respond("ls /flights", ["flight_00001", "flight_00257"]);
+
+    await expect(removal).rejects.toThrow(/more than one Vega flight/i);
+    expect(
+      port.write.mock.calls.some(([command]) => command.startsWith("rm ")),
+    ).toBe(false);
+  });
+
+  it("treats a stale mounted alias as already removed", async () => {
+    serial.connect("COM4");
+    const port = serialState.instances[0];
+    await identify(port);
+
+    const removal = serial.removeBoardFlightLog("fl10.cfl");
+    await vi.waitFor(() =>
+      expect(port.write).toHaveBeenCalledWith(
+        "ls /flights\n",
+        expect.any(Function),
+      ),
+    );
+    respond("ls /flights", ["dir .", "dir .."]);
+
+    await expect(removal).resolves.toEqual({
+      ok: true,
+      alreadyMissing: true,
+      flightPath: null,
+      statsPath: null,
+      configPath: null,
+      statsName: "st010.txt",
+    });
+    expect(
+      port.write.mock.calls.some(([command]) => command.startsWith("rm ")),
+    ).toBe(false);
+  });
+
+  it("does not trust the Vega's success line after a removal failure", async () => {
+    serial.connect("COM4");
+    const port = serialState.instances[0];
+    await identify(port);
+
+    const removal = serial.removeBoardFlightLog("fl7.cfl");
+    for (const [command, output] of [
+      ["ls /flights", ["flight_00007"]],
+      [
+        "rm /stats/stats_00007.txt",
+        [
+          "Removal of file '/stats/stats_00007.txt' failed with -5",
+          "File '/stats/stats_00007.txt' removed!",
+        ],
+      ],
+    ]) {
+      await vi.waitFor(() =>
+        expect(port.write).toHaveBeenCalledWith(
+          `${command}\n`,
+          expect.any(Function),
+        ),
+      );
+      respond(command, output);
+    }
+
+    await expect(removal).rejects.toThrow(/could not remove/i);
+    expect(
+      port.write.mock.calls.some(
+        ([command]) => command === "rm /flights/flight_00007\n",
+      ),
+    ).toBe(false);
+  });
+
   it("rejects and closes a responsive non-CATS device", async () => {
     serial.connect("COM4");
     const port = serialState.instances[0];
@@ -242,6 +360,48 @@ describe("serial board identification", () => {
 
     await expect(reboot).resolves.toEqual([]);
     expect(sent).toContainEqual([IPC_CHANNELS.SERIAL_DISCONNECTED, undefined]);
+  });
+
+  it("streams simulation output and allows up to five minutes of inactivity", async () => {
+    serial.connect("COM4");
+    const port = serialState.instances[0];
+    await identify(port);
+
+    const simulation = serial.cliCommand("sim");
+    await vi.waitFor(() =>
+      expect(port.write).toHaveBeenCalledWith("sim\n", expect.any(Function)),
+    );
+    expect(serialState.parser.options.delimiter).toBe("\n");
+    serialState.parser.emit("data", "^._.^:/> sim\r");
+    serialState.parser.emit(
+      "data",
+      "[100]: height: 1.000000, velocity: 2.000000, offset: 0.100000\r",
+    );
+
+    expect(sent).toContainEqual([
+      IPC_CHANNELS.SERIAL_DATA,
+      "[100]: height: 1.000000, velocity: 2.000000, offset: 0.100000",
+    ]);
+    await vi.advanceTimersByTimeAsync(5 * 60_000 - 1);
+    serialState.parser.emit(
+      "data",
+      "[200]: height: 2.000000, velocity: 3.000000, offset: 0.200000",
+    );
+    serialState.parser.emit("data", "^._.^:/> \r");
+
+    await expect(simulation).resolves.toHaveLength(2);
+    expect(
+      sent.filter(([channel]) => channel === IPC_CHANNELS.SERIAL_DATA),
+    ).toEqual([
+      [
+        IPC_CHANNELS.SERIAL_DATA,
+        "[100]: height: 1.000000, velocity: 2.000000, offset: 0.100000",
+      ],
+      [
+        IPC_CHANNELS.SERIAL_DATA,
+        "[200]: height: 2.000000, velocity: 3.000000, offset: 0.200000",
+      ],
+    ]);
   });
 
   it("waits for a delayed flash save before verifying a transaction", async () => {

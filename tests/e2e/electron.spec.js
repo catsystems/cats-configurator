@@ -278,6 +278,13 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await expect(page.getByText("Current log", { exact: true })).toBeVisible();
     await expect(page.getByText("fl7.cfl", { exact: true })).toHaveCount(2);
 
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "Delete fl7.cfl" }).click();
+    await expect(
+      page.getByText("The mounted CATS drive contains no flight logs."),
+    ).toBeVisible();
+    await expect(page.getByText("fl7.cfl", { exact: true })).toHaveCount(1);
+
     await page.locator('input[type="file"]').setInputFiles(localLog);
     await expect(
       page.getByText("local-flight.cfl", { exact: true }),
@@ -399,14 +406,8 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     await page.evaluate(() => {
       window.location.hash = "#/logging";
     });
-    await expect(page.getByText("Recording", { exact: true })).toBeVisible();
-    await expect(page.getByText("Elements", { exact: true })).toBeVisible();
-    await expect(page.getByText(/Free space:\s*99\.90%/)).toBeVisible();
-    await expect(page.getByText(/Estimated logging time:/)).toBeVisible();
-    await page.getByText("IMU", { exact: true }).hover();
-    await expect(
-      page.getByText("Raw accelerometer and gyroscope samples from each IMU."),
-    ).toBeVisible();
+    await expect(page).toHaveURL(/#\/config$/);
+    await expect(page.getByText("Logging", { exact: true })).toHaveCount(0);
     await expect(configurationLink).not.toHaveAttribute(
       "aria-disabled",
       "true",
@@ -466,6 +467,19 @@ test("launches the packaged renderer and exercises the secure bridge", async ({}
     );
     await restoredCommandInput.press("ArrowUp");
     await expect(restoredCommandInput).toHaveValue("get timer4_duration");
+
+    await restoredCommandInput.fill("sim");
+    await restoredCommandInput.press("Enter");
+    await expect(page.getByText("test> sim", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(
+        "[100]: height: 1.000000, velocity: 2.000000, offset: 0.100000",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Simulation Successful.", { exact: true }),
+    ).toBeVisible();
 
     expect(pageErrors).toEqual([]);
     expect(consoleErrors).toEqual([]);

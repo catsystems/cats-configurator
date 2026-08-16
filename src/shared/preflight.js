@@ -305,9 +305,7 @@ export function buildPreflightReport(snapshot) {
         ...loggingEvents.map(({ key }) => key),
         "ev_touchdown",
       ],
-      recordingDisabled
-        ? { label: "Review Logging", route: "/config?section=logging" }
-        : { label: "Review Events", route: "/events" },
+      recordingDisabled ? null : { label: "Review Events", route: "/events" },
     ),
   );
 

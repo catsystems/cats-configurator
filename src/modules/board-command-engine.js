@@ -92,7 +92,9 @@ export class BoardCommandEngine {
 
     if (attempt.acknowledged) {
       attempt.output.push(line);
-      this.#scheduleSettle();
+      attempt.onOutput?.(line);
+      if (attempt.resetTimeoutOnOutput) this.#scheduleTimeout();
+      if (!attempt.waitForPrompt) this.#scheduleSettle();
     }
     return attempt.acknowledged;
   }
@@ -138,7 +140,7 @@ export class BoardCommandEngine {
 
     for (let attempt = 0; attempt <= retries; attempt += 1) {
       try {
-        const output = await this.#attempt(command, timeoutMs);
+        const output = await this.#attempt(command, timeoutMs, options);
         const protocolError = output.find((line) =>
           /^error\b/i.test(line.trim()),
         );
@@ -157,27 +159,22 @@ export class BoardCommandEngine {
     throw lastError;
   }
 
-  #attempt(command, timeoutMs) {
+  #attempt(command, timeoutMs, options) {
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        if (this.activeAttempt?.command !== command) return;
-        this.#finishAttempt(
-          new BoardCommandError(`Board command timed out: ${command}`, {
-            command,
-            output: [...this.activeAttempt.output],
-          }),
-        );
-      }, timeoutMs);
-
       this.activeAttempt = {
         command,
         acknowledged: false,
         output: [],
         resolve,
         reject,
-        timer,
+        timer: null,
         settleTimer: null,
+        timeoutMs,
+        onOutput: options.onOutput,
+        resetTimeoutOnOutput: options.resetTimeoutOnOutput === true,
+        waitForPrompt: options.waitForPrompt === true,
       };
+      this.#scheduleTimeout();
 
       Promise.resolve(this.write(command)).catch((cause) => {
         if (this.activeAttempt?.command !== command) return;
@@ -190,6 +187,21 @@ export class BoardCommandEngine {
         );
       });
     });
+  }
+
+  #scheduleTimeout() {
+    const attempt = this.activeAttempt;
+    if (!attempt) return;
+    clearTimeout(attempt.timer);
+    attempt.timer = setTimeout(() => {
+      if (this.activeAttempt !== attempt) return;
+      this.#finishAttempt(
+        new BoardCommandError(`Board command timed out: ${attempt.command}`, {
+          command: attempt.command,
+          output: [...attempt.output],
+        }),
+      );
+    }, attempt.timeoutMs);
   }
 
   #scheduleSettle() {

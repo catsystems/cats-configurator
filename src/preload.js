@@ -141,6 +141,8 @@ const cats = {
       ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_CLEAR_ONBOARD),
     openOnboard: (logId) =>
       ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_OPEN_ONBOARD, logId),
+    removeOnboard: (logId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_REMOVE_ONBOARD, logId),
     saveOriginal: (sessionId) =>
       ipcRenderer.invoke(IPC_CHANNELS.FLIGHT_LOG_SAVE_ORIGINAL, sessionId),
     openInFlights: (sessionId) =>
