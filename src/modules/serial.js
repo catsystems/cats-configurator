@@ -24,11 +24,13 @@ import { assertBoardEntries, IPC_CHANNELS } from "../shared/ipc.js";
 
 const CONFIG = { baudRate: 115200 };
 const BOARD_IDENTIFICATION_TIMEOUT_MS = 5000;
+const TELEMETRY_VERSION_REFRESH_DELAY_MS = 5000;
 
 let mainWindow;
 let port;
 let parser;
 let commandEngine;
+let telemetryVersionRefreshTimer;
 let currentNotification;
 let communicationLogStream;
 
@@ -297,6 +299,35 @@ function setSerialWindow(window) {
   mainWindow = window;
 }
 
+function clearTelemetryVersionRefresh() {
+  clearTimeout(telemetryVersionRefreshTimer);
+  telemetryVersionRefreshTimer = undefined;
+}
+
+function scheduleTelemetryVersionRefresh(output) {
+  clearTelemetryVersionRefresh();
+  if (parseBoardIdentity(output).telemetryFirmwareVersion) return;
+
+  const engine = commandEngine;
+  telemetryVersionRefreshTimer = setTimeout(() => {
+    telemetryVersionRefreshTimer = undefined;
+    if (commandEngine !== engine) return;
+
+    void engine
+      .run("version", { retries: 0 })
+      .then((response) => {
+        if (commandEngine !== engine) return;
+        sendToRenderer(
+          IPC_CHANNELS.BOARD_STATIC_DATA,
+          parseData("version", response.output.join("\n")),
+        );
+      })
+      .catch(() => {
+        // The board was already identified, so a failed refresh is non-fatal.
+      });
+  }, TELEMETRY_VERSION_REFRESH_DELAY_MS);
+}
+
 async function getList() {
   if (useFakeSerial) {
     if (Date.now() - fakeSerialStartedAt < fakeSerialAppearAfterMs) return [];
@@ -318,6 +349,7 @@ async function getList() {
 
 function connect(serialPath) {
   if (useFakeSerial) {
+    clearTelemetryVersionRefresh();
     startCommunicationLog(serialPath);
     commandEngine?.cancel("Board connection replaced.");
     commandEngine = createCommandEngine(feedFakeCommand);
@@ -340,6 +372,7 @@ function connect(serialPath) {
     return;
   }
 
+  clearTelemetryVersionRefresh();
   startCommunicationLog(serialPath);
 
   const candidatePort = new SerialPort(
@@ -347,6 +380,7 @@ function connect(serialPath) {
     (error) => {
       if (!error) return;
       if (port === candidatePort) port = null;
+      clearTelemetryVersionRefresh();
       commandEngine?.cancel(error);
       commandEngine = null;
       writeCommunicationLog("ERROR", error.message);
@@ -384,6 +418,7 @@ function connect(serialPath) {
   });
   candidatePort.on("close", () => {
     if (port === candidatePort) port = null;
+    clearTelemetryVersionRefresh();
     parser = null;
     commandEngine?.cancel();
     commandEngine = null;
@@ -412,6 +447,7 @@ async function identifyBoard() {
       body: response.output.join("\n"),
     });
     sendToRenderer(IPC_CHANNELS.BOARD_ACTIVE, true);
+    scheduleTelemetryVersionRefresh(response.output);
   } catch (error) {
     const message =
       error instanceof BoardCommandError && /timed out/i.test(error.message)
@@ -424,6 +460,7 @@ async function identifyBoard() {
 
 function disconnect() {
   writeCommunicationLog("SESSION", "Disconnect requested");
+  clearTelemetryVersionRefresh();
   commandEngine?.cancel();
   if (useFakeSerial) {
     commandEngine = null;

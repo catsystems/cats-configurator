@@ -116,9 +116,16 @@ describe("serial board identification", () => {
     return [`${key} = 0`, "Allowed range: 0 - 4294967295"];
   }
 
-  async function identify(port) {
+  async function identify(
+    port,
+    output = [
+      "Board: CATS Vega",
+      "Firmware: test",
+      "Telemetry Code version: 1.1.3",
+    ],
+  ) {
     port.openSuccessfully();
-    respond("version", ["Board: CATS Vega", "Firmware: test"]);
+    respond("version", output);
     await vi.waitFor(() =>
       expect(sent).toContainEqual([IPC_CHANNELS.BOARD_ACTIVE, true]),
     );
@@ -148,6 +155,9 @@ describe("serial board identification", () => {
 
     expect(sent).toContainEqual([IPC_CHANNELS.BOARD_ACTIVE, true]);
     expect(
+      port.write.mock.calls.filter(([command]) => command === "version\n"),
+    ).toHaveLength(1);
+    expect(
       sent.some(
         ([channel, message]) =>
           channel === IPC_CHANNELS.SERIAL_ERROR &&
@@ -156,6 +166,50 @@ describe("serial board identification", () => {
     ).toBe(false);
     expect(port.isOpen).toBe(true);
     serial.disconnect();
+  });
+
+  it("refreshes a telemetry version that was unavailable during identification", async () => {
+    serial.connect("COM4");
+    const port = serialState.instances[0];
+    await identify(port, [
+      "Board: CATS Vega",
+      "Code version: 3.0.2-dev",
+      "Telemetry Code version:",
+    ]);
+
+    expect(
+      port.write.mock.calls.filter(([command]) => command === "version\n"),
+    ).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await vi.waitFor(() =>
+      expect(
+        port.write.mock.calls.filter(([command]) => command === "version\n"),
+      ).toHaveLength(2),
+    );
+    respond("version", [
+      "Board: CATS Vega",
+      "Code version: 3.0.2-dev",
+      "Telemetry Code version: 1.1.3",
+    ]);
+
+    await vi.waitFor(() =>
+      expect(sent).toContainEqual([
+        IPC_CHANNELS.BOARD_STATIC_DATA,
+        {
+          key: "version",
+          value: [
+            "Board: CATS Vega",
+            "Code version: 3.0.2-dev",
+            "Telemetry Code version: 1.1.3",
+          ],
+        },
+      ]),
+    );
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(
+      port.write.mock.calls.filter(([command]) => command === "version\n"),
+    ).toHaveLength(2);
   });
 
   it("loads all settings with one bulk get and falls back only for a missing key", async () => {
