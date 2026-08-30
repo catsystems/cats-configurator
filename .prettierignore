@@ -1,5 +1,6 @@
-builds
-dist
 node_modules
-out
+dist
+src-tauri/target
+src-tauri/gen
 package-lock.json
+tmp

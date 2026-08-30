@@ -3,6 +3,7 @@ import "@fontsource-variable/inter/wght.css";
 import "@fontsource-variable/space-grotesk/wght.css";
 import "vuetify/styles";
 import "@/assets/style/main.scss";
+import "@/host.js";
 import { createPinia } from "pinia";
 import { createApp } from "vue";
 import App from "./App.vue";

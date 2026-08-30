@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Replace the Electron application with the Rust/Tauri implementation at the
+  repository root, retaining the Vue interface and CATS Configurator identity.
+- Build Windows, macOS (Intel and Apple Silicon), and Linux packages from one
+  workflow, with renderer/component tests and native Rust checks.
+- Keep version 2.0.0-alpha.1 unsigned on Windows and ad-hoc signed on macOS;
+  automatic updates remain disabled during alpha validation.
+
 ## [1.3.2] - 11-08-2026
 
 - Use a GitHub-safe Windows installer filename so the automatic updater can

@@ -6,6 +6,7 @@ import vue from "@vitejs/plugin-vue";
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  root: projectRoot,
   plugins: [vue()],
   resolve: {
     alias: {

@@ -8,6 +8,11 @@ build configuration in this repository under the
 
 ## Signed releases
 
+The current Tauri 2.0 alpha builds are not production-signed. Windows packages
+are unsigned, macOS CI packages use ad-hoc signing without notarization, and
+automatic updates are disabled. The official signing process below must be
+validated for the new packages before a production release.
+
 - Signing is limited to official CATS Configurator release artifacts produced
   by the repository's GitHub Actions workflow from a version tag.
 - SignPath signing under this policy applies to the official Windows NSIS
@@ -46,13 +51,10 @@ crash-reporting services. Device configuration, application settings, and
 flight-log processing are performed locally unless the user explicitly opens
 an external service.
 
-Packaged versions automatically query the GitHub Releases API shortly after
-startup and every six hours to check for updates. When a newer stable release
-is available, the application downloads the matching release artifact from
-GitHub into its local update cache, verifies its size and GitHub-provided
-SHA-256 digest, and asks the user before installation. The application never
-executes a downloaded installer automatically. These requests are governed by
-the [GitHub General Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+The Tauri alpha does not check for or download updates automatically. Users
+install new versions manually. Serial diagnostics are written to a local
+`vega-communication.log` in the operating system's per-user application log
+directory; the application does not upload this transcript.
 
 External documentation, release pages, and CATS Flights are opened only after
 a user action. Choosing to analyze a flight log with CATS Flights opens
@@ -67,6 +69,8 @@ flight logs, or serial data to networked systems.
 The Windows NSIS installer installs CATS Configurator, registers it in the
 Windows installed-apps list, and provides an uninstaller. It does not install
 drivers or browser extensions and does not change security settings.
+If WebView2 is missing, the installer downloads and installs Microsoft's
+WebView2 runtime, which is required by the Windows application.
 
 To uninstall:
 
@@ -75,7 +79,9 @@ To uninstall:
 - macOS: quit CATS Configurator and move it from **Applications** to the Trash.
 - Linux AppImage: quit CATS Configurator and delete the AppImage file and any
   launcher entry created by the user.
+- Linux Debian package: remove `cats-configurator` using the system package
+  manager.
 
-Application settings and downloaded-update files are stored in the operating
-system's per-user application-data directory. Users may remove that directory
-separately if they also want to delete their local settings and update cache.
+Application data and logs are stored in the operating system's per-user
+application-data and log directories. Users may remove those directories
+separately if they also want to delete local data and serial diagnostics.

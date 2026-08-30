@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const outputRoot = path.resolve("out");
+const outputRoot = path.resolve("dist");
 const productionOrigin = "https://flights.catsystems.io";
 
 async function sourceFiles(directory) {
