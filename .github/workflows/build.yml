@@ -138,6 +138,31 @@ jobs:
           if [[ '${{ matrix.artifact }}' == 'cats-configurator-macos-x64' ]]; then expected=x86_64; fi
           test "$(lipo -archs "${apps[0]}/Contents/MacOS/cats-configurator")" = "$expected"
 
+      - name: Launch installed Mac app
+        if: startsWith(matrix.os, 'macos-')
+        shell: bash
+        run: |
+          shopt -s nullglob
+          images=(src-tauri/target/*/release/bundle/dmg/*.dmg)
+          mount="$RUNNER_TEMP/cats-installer"
+          installed="$RUNNER_TEMP/CATS Configurator.app"
+          mkdir -p "$mount"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "${images[0]}"
+          trap 'hdiutil detach "$mount" || true' EXIT
+          ditto "$mount/CATS Configurator.app" "$installed"
+          codesign --verify --deep --strict "$installed"
+          hdiutil detach "$mount"
+          trap - EXIT
+          "$installed/Contents/MacOS/cats-configurator" > "$RUNNER_TEMP/mac-app.log" 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          sleep 10
+          if ! kill -0 "$app_pid" 2>/dev/null; then
+            cat "$RUNNER_TEMP/mac-app.log"
+            echo "The installed Mac app exited during startup."
+            exit 1
+          fi
+
       - name: Verify CATS Flights production origin
         run: npm run verify:production-target
 
