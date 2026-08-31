@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc, Mutex as StdMutex, OnceLock,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -111,15 +111,32 @@ impl Default for CommandOptions {
     }
 }
 
+// The queued request owns this count, not the caller waiting for its reply.
+// Cancelling a caller must neither leak the count nor unlock a running command.
+struct PendingCommand(Arc<AtomicUsize>);
+impl PendingCommand {
+    fn new(counter: Arc<AtomicUsize>) -> Self {
+        counter.fetch_add(1, Ordering::SeqCst);
+        Self(counter)
+    }
+}
+impl Drop for PendingCommand {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
 enum Request {
     Execute {
         command: String,
         options: CommandOptions,
         reply: oneshot::Sender<Result<Vec<String>, HostError>>,
+        pending: PendingCommand,
     },
 }
 
 struct Session {
+    port_path: String,
     requests: mpsc::Sender<Request>,
     task: JoinHandle<()>,
 }
@@ -129,7 +146,8 @@ pub struct SerialManager {
     transcript: Arc<SerialTranscript>,
     session: Mutex<Option<Session>>,
     pub transaction: Mutex<()>,
-    pending: AtomicUsize,
+    pending: Arc<AtomicUsize>,
+    pub firmware_active: Arc<AtomicBool>,
 }
 
 impl SerialManager {
@@ -139,7 +157,8 @@ impl SerialManager {
             transcript: Arc::new(SerialTranscript::default()),
             session: Mutex::new(None),
             transaction: Mutex::new(()),
-            pending: AtomicUsize::new(0),
+            pending: Arc::new(AtomicUsize::new(0)),
+            firmware_active: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -185,6 +204,9 @@ impl SerialManager {
             .map_err(|error| HostError::new("serial_list_failed", error.to_string()))?;
         Ok(ports
             .into_iter()
+            // macOS exposes callout and dial-in names for the same endpoint.
+            // Use callout devices so one GS is not treated as two candidates.
+            .filter(|port| serial_path_for_platform(std::env::consts::OS, &port.port_name))
             .map(|port| {
                 let (vendor_id, product_id, serial_number, manufacturer, product) =
                     match port.port_type {
@@ -211,6 +233,49 @@ impl SerialManager {
     }
 
     pub async fn connect(&self, port_path: String) -> Result<bool, HostError> {
+        let _transaction = self.transaction.lock().await;
+        self.ensure_available()?;
+        self.connect_for_firmware(port_path).await
+    }
+
+    pub fn ensure_available(&self) -> Result<(), HostError> {
+        if self.firmware_active.load(Ordering::SeqCst) {
+            return Err(HostError::new(
+                "firmware_busy",
+                "A firmware operation owns the device connection.",
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn reserve_firmware(&self) -> Result<(), HostError> {
+        let _transaction = self.transaction.try_lock().map_err(|_| {
+            HostError::new(
+                "serial_busy",
+                "Wait for the current board operation to finish.",
+            )
+        })?;
+        if self.pending.load(Ordering::SeqCst) > 0
+            || self.firmware_active.swap(true, Ordering::SeqCst)
+        {
+            return Err(HostError::new(
+                "firmware_busy",
+                "A device operation is already active.",
+            ));
+        }
+        Ok(())
+    }
+
+    pub async fn connected_path(&self) -> Option<String> {
+        self.session
+            .lock()
+            .await
+            .as_ref()
+            .filter(|s| !s.requests.is_closed())
+            .map(|s| s.port_path.clone())
+    }
+
+    pub async fn connect_for_firmware(&self, port_path: String) -> Result<bool, HostError> {
         if port_path.is_empty() || port_path.len() > 512 || port_path.contains(['\r', '\n']) {
             return Err(HostError::new(
                 "invalid_serial_path",
@@ -261,14 +326,19 @@ impl SerialManager {
                 receiver,
                 events,
                 Arc::clone(&self.transcript),
+                Arc::clone(&self.firmware_active),
             ))
         };
-        *session = Some(Session { requests, task });
+        *session = Some(Session {
+            port_path,
+            requests,
+            task,
+        });
         drop(session);
 
         self.events.send("serial:connected", Value::Null);
         let version = match self
-            .execute_unlocked(
+            .execute_for_firmware(
                 "version".into(),
                 CommandOptions {
                     timeout: Duration::from_secs(5),
@@ -286,7 +356,7 @@ impl SerialManager {
                     error.message.clone()
                 };
                 self.events.send("serial:error", json!(message));
-                self.disconnect().await;
+                self.disconnect_for_firmware().await;
                 return Err(error);
             }
         };
@@ -303,18 +373,24 @@ impl SerialManager {
                 "The selected serial device is not a CATS flight computer.",
             );
             self.events.send("serial:error", json!(error.message));
-            self.disconnect().await;
+            self.disconnect_for_firmware().await;
             return Err(error);
         }
         self.events.send("board:active", json!(true));
-        if !has_telemetry_version(&version) {
+        if !has_telemetry_version(&version) && !self.firmware_active.load(Ordering::SeqCst) {
             let requests = {
                 let session = self.session.lock().await;
                 session.as_ref().map(|session| session.requests.clone())
             };
             let events = Arc::clone(&self.events);
+            let firmware_active = Arc::clone(&self.firmware_active);
+            let pending = Arc::clone(&self.pending);
             tokio::spawn(async move {
                 tokio::time::sleep(TELEMETRY_VERSION_REFRESH_DELAY).await;
+                let pending = PendingCommand::new(pending);
+                if firmware_active.load(Ordering::SeqCst) {
+                    return;
+                }
                 let Some(requests) = requests.filter(|requests| !requests.is_closed()) else {
                     return;
                 };
@@ -327,6 +403,7 @@ impl SerialManager {
                             ..Default::default()
                         },
                         reply,
+                        pending,
                     })
                     .await
                     .is_ok()
@@ -341,6 +418,14 @@ impl SerialManager {
     }
 
     pub async fn disconnect(&self) -> bool {
+        let _transaction = self.transaction.lock().await;
+        if self.ensure_available().is_err() {
+            return false;
+        }
+        self.disconnect_for_firmware().await
+    }
+
+    pub async fn disconnect_for_firmware(&self) -> bool {
         if let Some(session) = self.session.lock().await.take() {
             session.task.abort();
             let _ = session.task.await;
@@ -369,6 +454,15 @@ impl SerialManager {
         command: String,
         options: CommandOptions,
     ) -> Result<Vec<String>, HostError> {
+        self.ensure_available()?;
+        self.execute_for_firmware(command, options).await
+    }
+
+    pub async fn execute_for_firmware(
+        &self,
+        command: String,
+        options: CommandOptions,
+    ) -> Result<Vec<String>, HostError> {
         if command.trim().is_empty() || command.len() > 1024 || command.contains(['\r', '\n']) {
             return Err(HostError::new(
                 "invalid_board_command",
@@ -386,16 +480,15 @@ impl SerialManager {
                 })?
         };
         let (reply, response) = oneshot::channel();
-        self.pending.fetch_add(1, Ordering::SeqCst);
         let send_result = requests
             .send(Request::Execute {
                 command,
                 options,
                 reply,
+                pending: PendingCommand::new(Arc::clone(&self.pending)),
             })
             .await;
         if send_result.is_err() {
-            self.pending.fetch_sub(1, Ordering::SeqCst);
             return Err(HostError::new(
                 "serial_disconnected",
                 "Serial port is not connected.",
@@ -404,9 +497,12 @@ impl SerialManager {
         let result = response
             .await
             .map_err(|_| HostError::new("serial_disconnected", "Board connection closed."));
-        self.pending.fetch_sub(1, Ordering::SeqCst);
         result?
     }
+}
+
+fn serial_path_for_platform(platform: &str, path: &str) -> bool {
+    platform != "macos" || !path.starts_with("/dev/tty.")
 }
 
 async fn run_real(
@@ -414,19 +510,21 @@ async fn run_real(
     mut requests: mpsc::Receiver<Request>,
     events: Arc<EventBus>,
     transcript: Arc<SerialTranscript>,
+    firmware_active: Arc<AtomicBool>,
 ) {
     let mut reader = BufReader::new(port);
     loop {
         let mut unsolicited = Vec::new();
         tokio::select! {
             request = requests.recv() => {
-                let Some(Request::Execute { command, options, reply }) = request else {
+                let Some(Request::Execute { command, options, reply, pending }) = request else {
                     break;
                 };
                 let result = execute_with_retry(&mut reader, &events, &transcript, &command, options).await;
                 let connection_error = result.as_ref().err().filter(|error| {
                     matches!(error.code, "serial_read_failed" | "serial_write_failed")
                 }).cloned();
+                drop(pending);
                 let _ = reply.send(result);
                 if let Some(error) = connection_error {
                     transcript.write("ERROR", &error.message);
@@ -441,7 +539,7 @@ async fn run_real(
                     Ok(_) => {
                         let line = String::from_utf8_lossy(&unsolicited);
                         transcript.write("RX", line.trim_end_matches(['\r', '\n']));
-                        if line.contains("CATS is now ready") {
+                        if line.contains("CATS is now ready") && !firmware_active.load(Ordering::SeqCst) {
                             match execute_with_retry(
                                 &mut reader,
                                 &events,
@@ -626,6 +724,7 @@ async fn run_fake(
         command,
         options,
         reply,
+        pending,
     }) = requests.recv().await
     {
         transcript.write("TX", &command);
@@ -638,6 +737,7 @@ async fn run_fake(
                 events.send("serial:data", json!(line));
             }
         }
+        drop(pending);
         let _ = reply.send(Ok(output));
     }
 }
@@ -763,6 +863,61 @@ fn fake_config(key: &str) -> Option<(&'static str, &'static str)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn cancelled_caller_does_not_leak_or_prematurely_release_the_device_lock() {
+        let serial = Arc::new(SerialManager::new(Arc::new(EventBus::default())));
+        let (requests, mut receiver) = mpsc::channel(1);
+        let (started, waiting) = oneshot::channel();
+        let (release, finish) = oneshot::channel();
+        let task = tokio::spawn(async move {
+            let request = receiver.recv().await.unwrap();
+            started.send(()).unwrap();
+            finish.await.unwrap();
+            drop(request);
+        });
+        *serial.session.lock().await = Some(Session {
+            port_path: "test-only".into(),
+            requests,
+            task,
+        });
+        let caller_serial = serial.clone();
+        let caller = tokio::spawn(async move {
+            caller_serial
+                .execute_for_firmware("version".into(), CommandOptions::default())
+                .await
+        });
+        waiting.await.unwrap();
+        caller.abort();
+        assert!(caller.await.unwrap_err().is_cancelled());
+        assert_eq!(serial.pending.load(Ordering::SeqCst), 1);
+        assert!(serial.reserve_firmware().is_err());
+        release.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while serial.pending.load(Ordering::SeqCst) != 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        serial.reserve_firmware().unwrap();
+        serial.firmware_active.store(false, Ordering::SeqCst);
+        serial.disconnect().await;
+    }
+
+    #[test]
+    fn macos_enumerates_one_callout_path_per_usb_serial_endpoint() {
+        let paths = ["/dev/cu.usbmodem123", "/dev/tty.usbmodem123"];
+        assert_eq!(
+            paths
+                .into_iter()
+                .filter(|p| serial_path_for_platform("macos", p))
+                .collect::<Vec<_>>(),
+            ["/dev/cu.usbmodem123"]
+        );
+        assert!(serial_path_for_platform("linux", "/dev/ttyACM0"));
+        assert!(serial_path_for_platform("windows", "COM4"));
+    }
 
     #[tokio::test]
     async fn fake_serial_identifies_and_streams_status() {

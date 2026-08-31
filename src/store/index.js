@@ -9,6 +9,7 @@ export const useAppStore = defineStore("app", {
     preflightReport: null,
     currentBoardProfile: null,
     changedTab: null,
+    firmware: null,
     static: {},
     config: {},
     events: {},
@@ -26,6 +27,7 @@ export const useAppStore = defineStore("app", {
     useImperialUnits: false,
   }),
   getters: {
+    firmwareBusy: (state) => Boolean(state.firmware?.busy),
     isEventsChanged(state) {
       return Object.values(state.events).some((event) => {
         const values = event.actions.flatMap((action) => [
@@ -38,6 +40,10 @@ export const useAppStore = defineStore("app", {
     snackbarState: (state) => state.snackbar,
   },
   actions: {
+    setFirmwareSnapshot(snapshot) {
+      if (snapshot?.revision < this.firmware?.revision) return;
+      this.firmware = snapshot;
+    },
     setSerialPorts(ports) {
       this.serialPorts = ports;
     },

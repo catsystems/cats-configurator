@@ -1,5 +1,6 @@
 mod error;
 mod events;
+mod firmware;
 mod flight_log;
 mod handoff;
 mod preflight;
@@ -27,15 +28,21 @@ struct AppState {
     flight_logs: Arc<FlightLogManager>,
     handoff: Arc<HandoffManager>,
     serial: Arc<SerialManager>,
+    firmware: Arc<firmware::FirmwareManager>,
 }
 
 impl Default for AppState {
     fn default() -> Self {
         let events = Arc::new(EventBus::default());
+        let serial = Arc::new(SerialManager::new(Arc::clone(&events)));
         Self {
             flight_logs: Arc::new(FlightLogManager::default()),
             handoff: Arc::new(HandoffManager::default()),
-            serial: Arc::new(SerialManager::new(Arc::clone(&events))),
+            firmware: Arc::new(firmware::FirmwareManager::new(
+                Arc::clone(&events),
+                Arc::clone(&serial),
+            )),
+            serial,
             events,
         }
     }
@@ -990,6 +997,37 @@ async fn flight_log_cancel_handoff(state: State<'_, AppState>) -> Result<bool, H
     Ok(state.handoff.cancel(&state.events).await)
 }
 
+#[tauri::command]
+fn firmware_current(state: State<'_, AppState>) -> firmware::Snapshot {
+    state.firmware.current()
+}
+#[tauri::command]
+fn firmware_check(state: State<'_, AppState>) -> Result<firmware::Snapshot, HostError> {
+    state.firmware.check()
+}
+#[tauri::command]
+fn firmware_start(
+    request: firmware::StartRequest,
+    state: State<'_, AppState>,
+) -> Result<firmware::Snapshot, HostError> {
+    state.firmware.start(request)
+}
+#[tauri::command]
+fn firmware_retry(state: State<'_, AppState>) -> Result<firmware::Snapshot, HostError> {
+    state.firmware.retry()
+}
+#[tauri::command]
+fn firmware_cancel(state: State<'_, AppState>) -> Result<firmware::Snapshot, HostError> {
+    state.firmware.cancel()
+}
+
+fn command_allowed_during_firmware(command: &str) -> bool {
+    matches!(
+        command,
+        "initialize_host" | "firmware_current" | "firmware_cancel"
+    )
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -999,9 +1037,29 @@ pub fn run() {
         .setup(|app| {
             let directory = app.path().app_log_dir()?;
             app.state::<AppState>().serial.set_log_directory(directory);
+            app.state::<AppState>().firmware.set_cache(app.path().app_cache_dir()?);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.state::<AppState>().firmware.busy() {
+                    api.prevent_close();
+                    window.state::<AppState>().events.send("app:alert", json!("A firmware operation is active. Cancel preparation or wait for the device operation to finish before closing."));
+                }
+            }
+        })
+        .invoke_handler(|invoke| {
+            if invoke.message.webview().state::<AppState>().firmware.busy()
+                && !command_allowed_during_firmware(invoke.message.command()) {
+                invoke.resolver.reject(HostError::new("firmware_busy", "A firmware operation is active. Wait until it finishes."));
+                return true;
+            }
+            let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+            firmware_current,
+            firmware_check,
+            firmware_start,
+            firmware_retry,
+            firmware_cancel,
             initialize_host,
             app_open_external,
             serial_list,
@@ -1037,13 +1095,39 @@ pub fn run() {
             flight_log_save_original,
             flight_log_open_in_flights,
             flight_log_cancel_handoff,
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running CATS Configurator");
+        ];
+            handler(invoke)
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building CATS Configurator")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                if app.state::<AppState>().firmware.busy() { api.prevent_exit(); }
+            }
+        });
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn firmware_lock_excludes_all_conflicting_host_commands() {
+        for command in [
+            "serial_connect",
+            "serial_disconnect",
+            "serial_send",
+            "board_save",
+            "profile_apply",
+            "flight_log_remove_onboard",
+            "firmware_start",
+            "firmware_check",
+            "firmware_retry",
+        ] {
+            assert!(!super::command_allowed_during_firmware(command));
+        }
+        for command in ["firmware_current", "firmware_cancel", "initialize_host"] {
+            assert!(super::command_allowed_during_firmware(command));
+        }
+    }
     #[test]
     fn application_version_is_alpha() {
         assert!(env!("CARGO_PKG_VERSION").starts_with("2.0.0-alpha"));

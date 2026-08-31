@@ -1,6 +1,12 @@
 import { createRouter, createWebHashHistory } from "vue-router";
+import { useAppStore } from "@/store";
 
 const routes = [
+  {
+    path: "/firmware",
+    name: "Firmware Updates",
+    component: () => import("../views/FirmwareUpdates.vue"),
+  },
   {
     path: "/",
     name: "Home",
@@ -53,7 +59,13 @@ const routes = [
   },
 ];
 
-export default createRouter({
+const router = createRouter({
   history: createWebHashHistory(),
   routes,
 });
+
+router.beforeEach((to, from) => {
+  if (useAppStore().firmwareBusy && to.fullPath !== from.fullPath) return false;
+});
+
+export default router;

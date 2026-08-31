@@ -38,6 +38,14 @@ async function call(command, arguments_ = {}) {
 }
 
 window.cats = {
+  firmware: {
+    current: () => call("firmware_current"),
+    check: () => call("firmware_check"),
+    start: (request) => call("firmware_start", { request }),
+    retry: () => call("firmware_retry"),
+    cancel: () => call("firmware_cancel"),
+    onState: (callback) => subscribe("firmware:state", callback),
+  },
   app: {
     openExternal: (url) => call("app_open_external", { url }),
     onAlert: (callback) => subscribe("app:alert", callback),

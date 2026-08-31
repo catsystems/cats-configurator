@@ -45,6 +45,7 @@ export default {
         { title: "Preflight", link: "/preflight", requiresBoard: true },
         { title: "CLI", link: "/cli", requiresBoard: true },
         { title: "Flight Logs", link: "/flight-logs", requiresBoard: false },
+        { title: "Firmware Updates", link: "/firmware", requiresBoard: false },
       ],
     };
   },
@@ -52,11 +53,15 @@ export default {
     if (this.$route.path !== "/") this.$router.push("/");
 
     this.subscriptions.push(
+      window.cats.firmware.onState((snapshot) =>
+        this.setFirmwareSnapshot(snapshot),
+      ),
       window.cats.app.onAlert((text) => window.alert(text)),
       window.cats.board.onStaticData((data) => this.setStaticData(data)),
       window.cats.board.onActive((value) => {
         const wasActive = this.active;
         this.setActiveState(value);
+        if (this.firmwareBusy) return;
         if (value && !wasActive) {
           if (this.$route.name !== "Config") this.$router.push("/config");
         } else if (!value && wasActive) {
@@ -80,15 +85,20 @@ export default {
         this.showSuccessSnackbar("Values saved successfully!");
       }),
     );
+    void window.cats.firmware
+      .current()
+      .then(this.setFirmwareSnapshot)
+      .catch((error) => this.showErrorSnackbar(error.message));
   },
   beforeUnmount() {
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
   },
   computed: {
-    ...mapState(useAppStore, ["active"]),
+    ...mapState(useAppStore, ["active", "firmwareBusy"]),
   },
   methods: {
     ...mapActions(useAppStore, [
+      "setFirmwareSnapshot",
       "setStaticData",
       "setActiveState",
       "setChangedTab",
