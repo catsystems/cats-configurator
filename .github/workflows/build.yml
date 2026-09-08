@@ -164,6 +164,22 @@ jobs:
       - name: Verify CATS Flights production origin
         run: npm run verify:production-target
 
+      - name: Use release filenames recognized by CATS Configurator 1.4.2
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          case '${{ matrix.artifact }}' in
+            cats-configurator-windows-x64) filename="cats-configurator-Setup-$version.exe" ;;
+            cats-configurator-linux-x64-appimage) filename="cats-configurator-$version.AppImage" ;;
+            cats-configurator-macos-arm64) filename="cats-configurator-$version-arm64.dmg" ;;
+            cats-configurator-macos-x64) filename="cats-configurator-$version-x64.dmg" ;;
+            *) echo "Unknown release artifact: ${{ matrix.artifact }}"; exit 1 ;;
+          esac
+          shopt -s nullglob
+          packages=(${{ matrix.artifact_path }})
+          test "${#packages[@]}" -eq 1
+          mv -- "${packages[0]}" "$(dirname "${packages[0]}")/$filename"
+
       - name: Upload native package
         uses: actions/upload-artifact@v7
         with:

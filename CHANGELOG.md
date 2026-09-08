@@ -12,6 +12,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   host for device communication and local file handling.
 - Build Windows, macOS (Intel and Apple Silicon), and Linux packages from one
   workflow, with renderer/component tests and native Rust checks.
+- Keep release filenames compatible with the 1.4.2 update downloader and have
+  the Windows installer replace the previous Electron installation without
+  deleting its application data.
 - Keep Windows packages unsigned and macOS packages ad-hoc signed; automatic
   Configurator self-updates remain disabled in version 2.0.0.
 
