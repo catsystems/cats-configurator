@@ -11,11 +11,9 @@ flight computers and inspecting `.cfl` flight logs. It uses a Vue/Vuetify
 renderer and a Rust/Tauri host for serial communication, configuration,
 profiles, preflight, local files, and CATS Flights handoff.
 
-The Tauri implementation now lives at the repository root and replaces the
-Electron implementation on this branch. The testing version is
-`2.0.0`; automatic Configurator self-updates remain disabled. Windows test packages
-are unsigned, and macOS test packages are ad-hoc signed but not notarized.
-Upgrading an existing Electron installation has not yet been validated.
+The current version is `2.0.0`. Automatic Configurator self-updates remain
+disabled. Windows packages are unsigned, and macOS packages are ad-hoc signed
+but not notarized.
 
 ## Requirements
 
@@ -98,9 +96,7 @@ tags containing a prerelease suffix create GitHub prereleases. Pushing a branch
 does not publish a release. Native macOS/Linux device acceptance is still
 required.
 
-See the [migration parity record](docs/tauri-migration/PARITY.md), the
-[historical comparison](docs/tauri-migration/COMPARISON.md), and the
-[code signing policy](CODE_SIGNING_POLICY.md).
+See the [release policy](RELEASE-POLICY.md).
 
 ## Open source
 

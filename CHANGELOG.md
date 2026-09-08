@@ -6,12 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-- Replace the Electron application with the Rust/Tauri implementation at the
-  repository root, retaining the Vue interface and CATS Configurator identity.
+## [2.0.0] - 08-09-2026
+
+- Deliver CATS Configurator 2.0.0 with its Vue interface and Rust/Tauri native
+  host for device communication and local file handling.
 - Build Windows, macOS (Intel and Apple Silicon), and Linux packages from one
   workflow, with renderer/component tests and native Rust checks.
-- Keep version 2.0.0-alpha.1 unsigned on Windows and ad-hoc signed on macOS;
-  automatic updates remain disabled during alpha validation.
+- Keep Windows packages unsigned and macOS packages ad-hoc signed; automatic
+  Configurator self-updates remain disabled in version 2.0.0.
 
 ## [1.3.2] - 11-08-2026
 

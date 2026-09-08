@@ -12,7 +12,16 @@ use uuid::Uuid;
 
 use crate::{error::HostError, events::EventBus, flight_log::FlightLogSession};
 
-const ORIGIN: &str = "https://flights.catsystems.io";
+const ORIGIN: &str = "https://catsystems.io";
+
+fn browser_url(port: u16, token: &str) -> String {
+    let fragment = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("cats-import", "v1")
+        .append_pair("port", &port.to_string())
+        .append_pair("token", token)
+        .finish();
+    format!("{ORIGIN}/flights/analyze#{fragment}")
+}
 
 struct ActiveHandoff {
     cancel: oneshot::Sender<()>,
@@ -183,12 +192,7 @@ impl HandoffManager {
             .map_err(|error| HostError::new("handoff_random_failed", error.to_string()))?;
         let token = URL_SAFE_NO_PAD.encode(secret);
         let expected_path = format!("/v1/flight-log/{token}");
-        let fragment = url::form_urlencoded::Serializer::new(String::new())
-            .append_pair("cats-import", "v1")
-            .append_pair("port", &port.to_string())
-            .append_pair("token", &token)
-            .finish();
-        let url = format!("{ORIGIN}/analyze#{fragment}");
+        let url = browser_url(port, &token);
         let (cancel, mut cancelled) = oneshot::channel();
         *self.active.lock().await = Some(ActiveHandoff { cancel });
         let task_events = Arc::clone(&events);
@@ -262,6 +266,152 @@ impl HandoffManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::io::AsyncReadExt;
+
+    const TEST_PATH: &str = "/v1/flight-log/test-token";
+    const TEST_BYTES: &[u8] = b"flight-log\0\x01\xfe\xff";
+
+    async fn request(
+        method: &str,
+        origin: &str,
+        path: &str,
+        consumed: &mut bool,
+    ) -> (bool, Vec<u8>) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let session = FlightLogSession {
+            id: Uuid::new_v4(),
+            source: "local".into(),
+            name: "flight.cfl".into(),
+            bytes: TEST_BYTES.to_vec(),
+            flight_log: json!({}),
+        };
+        let events = EventBus::default();
+        let server = async {
+            let (stream, _) = listener.accept().await.unwrap();
+            handle_connection(stream, TEST_PATH, &session, consumed, &events, session.id)
+                .await
+                .unwrap()
+        };
+        let client = async {
+            let mut stream = TcpStream::connect(address).await.unwrap();
+            let preflight = if method == "OPTIONS" {
+                "Access-Control-Request-Method: GET\r\nAccess-Control-Request-Private-Network: true\r\n"
+            } else {
+                ""
+            };
+            stream
+                .write_all(
+                    format!("{method} {path} HTTP/1.1\r\nHost: {address}\r\nOrigin: {origin}\r\n{preflight}\r\n")
+                        .as_bytes(),
+                )
+                .await
+                .unwrap();
+            let mut response = Vec::new();
+            stream.read_to_end(&mut response).await.unwrap();
+            response
+        };
+        tokio::time::timeout(Duration::from_secs(5), async {
+            tokio::join!(server, client)
+        })
+        .await
+        .unwrap()
+    }
+
+    #[test]
+    fn browser_url_opens_canonical_analyzer_with_private_fragment() {
+        let token = "A".repeat(43);
+        let url = url::Url::parse(&browser_url(49152, &token)).unwrap();
+        assert_eq!(url.origin().ascii_serialization(), "https://catsystems.io");
+        assert_eq!(url.path(), "/flights/analyze");
+        assert_eq!(url.query(), None);
+        let fragment = url::form_urlencoded::parse(url.fragment().unwrap().as_bytes())
+            .into_owned()
+            .collect::<Vec<_>>();
+        assert_eq!(
+            fragment,
+            vec![
+                ("cats-import".into(), "v1".into()),
+                ("port".into(), "49152".into()),
+                ("token".into(), token),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn canonical_origin_can_preflight_and_receive_log_once() {
+        let mut consumed = false;
+        let (complete, response) =
+            request("OPTIONS", "https://catsystems.io", TEST_PATH, &mut consumed).await;
+        let headers = String::from_utf8(response).unwrap();
+        assert!(headers.starts_with("HTTP/1.1 204 No Content\r\n"));
+        assert!(headers.contains("access-control-allow-origin: https://catsystems.io\r\n"));
+        assert!(headers.contains("access-control-allow-methods: GET, OPTIONS\r\n"));
+        assert!(headers.contains("access-control-allow-private-network: true\r\n"));
+        assert!(!complete);
+        assert!(!consumed);
+
+        let (complete, response) =
+            request("GET", "https://catsystems.io", TEST_PATH, &mut consumed).await;
+        let split = response
+            .windows(4)
+            .position(|bytes| bytes == b"\r\n\r\n")
+            .unwrap();
+        let headers = std::str::from_utf8(&response[..split]).unwrap();
+        assert!(headers.starts_with("HTTP/1.1 200 OK\r\n"));
+        assert!(headers.contains("access-control-allow-origin: https://catsystems.io\r\n"));
+        assert!(headers.contains("content-type: application/octet-stream\r\n"));
+        assert!(headers.contains("x-cats-log-name: flight.cfl\r\n"));
+        assert_eq!(&response[split + 4..], TEST_BYTES);
+        assert!(complete);
+        assert!(consumed);
+
+        let (complete, response) =
+            request("GET", "https://catsystems.io", TEST_PATH, &mut consumed).await;
+        assert!(response.starts_with(b"HTTP/1.1 410 Gone\r\n"));
+        assert!(!complete);
+    }
+
+    #[tokio::test]
+    async fn other_origins_cannot_preflight_or_consume_log() {
+        let mut consumed = false;
+        for origin in [
+            "https://flights.catsystems.io",
+            "http://catsystems.io",
+            "https://catsystems.io:8443",
+            "https://catsystems.io.evil.example",
+            "https://catsystems.io/flights",
+            "null",
+            "",
+        ] {
+            for method in ["OPTIONS", "GET"] {
+                let (complete, response) = request(method, origin, TEST_PATH, &mut consumed).await;
+                let response = String::from_utf8(response).unwrap();
+                assert!(
+                    response.starts_with("HTTP/1.1 403 Forbidden\r\n"),
+                    "{origin}"
+                );
+                assert!(!response.contains("access-control-allow-origin"));
+                assert!(!complete);
+                assert!(!consumed);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn wrong_token_does_not_consume_log() {
+        let mut consumed = false;
+        let (complete, response) = request(
+            "GET",
+            "https://catsystems.io",
+            "/v1/flight-log/wrong-token",
+            &mut consumed,
+        )
+        .await;
+        assert!(response.starts_with(b"HTTP/1.1 404 Not Found\r\n"));
+        assert!(!complete);
+        assert!(!consumed);
+    }
 
     #[test]
     fn filename_header_is_ascii_and_bounded() {

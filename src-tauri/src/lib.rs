@@ -62,17 +62,16 @@ fn initialize_host(
     state.events.initialize(events)
 }
 
-#[tauri::command]
-fn app_open_external(app: tauri::AppHandle, url: String) -> Result<(), HostError> {
-    let parsed = url::Url::parse(&url)
-        .map_err(|_| HostError::new("invalid_url", "The external URL is invalid."))?;
+fn is_allowed_external_url(parsed: &url::Url) -> bool {
     let safe_origin = parsed.scheme() == "https"
         && parsed.port().is_none()
         && parsed.username().is_empty()
         && parsed.password().is_none();
-    let allowed = safe_origin
+    safe_origin
         && match parsed.host_str() {
-            Some("flights.catsystems.io") => parsed.scheme() == "https",
+            Some("catsystems.io") => {
+                parsed.path() == "/flights" || parsed.path().starts_with("/flights/")
+            }
             Some("github.com") => {
                 parsed
                     .path_segments()
@@ -80,8 +79,14 @@ fn app_open_external(app: tauri::AppHandle, url: String) -> Result<(), HostError
                     == Some("catsystems")
             }
             _ => false,
-        };
-    if !allowed {
+        }
+}
+
+#[tauri::command]
+fn app_open_external(app: tauri::AppHandle, url: String) -> Result<(), HostError> {
+    let parsed = url::Url::parse(&url)
+        .map_err(|_| HostError::new("invalid_url", "The external URL is invalid."))?;
+    if !is_allowed_external_url(&parsed) {
         return Err(HostError::new(
             "external_url_denied",
             "The external URL is not approved by Configurator.",
@@ -1109,6 +1114,37 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn external_links_allow_canonical_flights_and_cats_github_only() {
+        for link in [
+            "https://catsystems.io/flights",
+            "https://catsystems.io/flights/",
+            "https://catsystems.io/flights/analyze",
+            "https://github.com/catsystems/cats-configurator/releases",
+        ] {
+            assert!(
+                super::is_allowed_external_url(&url::Url::parse(link).unwrap()),
+                "{link}"
+            );
+        }
+        for link in [
+            "https://flights.catsystems.io/analyze",
+            "http://catsystems.io/flights",
+            "https://catsystems.io:8443/flights",
+            "https://user:password@catsystems.io/flights",
+            "https://catsystems.io.evil.example/flights",
+            "https://catsystems.io/",
+            "https://catsystems.io/flights-other",
+            "https://catsystems.io/flights/../shop",
+            "https://github.com/other/cats-configurator",
+        ] {
+            assert!(
+                !super::is_allowed_external_url(&url::Url::parse(link).unwrap()),
+                "{link}"
+            );
+        }
+    }
+
     #[test]
     fn firmware_lock_excludes_all_conflicting_host_commands() {
         for command in [

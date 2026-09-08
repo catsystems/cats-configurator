@@ -193,6 +193,18 @@ pub fn parse_flight_log(bytes: &[u8]) -> Value {
                     break;
                 };
                 index += 8;
+                // Vega firmware has used both 1,000 and 10,000 for quaternion encoding.
+                // Normalize to a unit quaternion while preserving zero placeholders.
+                let norm = values
+                    .iter()
+                    .map(|value| f64::from(*value).powi(2))
+                    .sum::<f64>()
+                    .sqrt()
+                    .max(1.0);
+                let values = values
+                    .iter()
+                    .map(|value| f64::from(*value) / norm)
+                    .collect::<Vec<_>>();
                 (
                     "orientationInfo",
                     json!({ "ts": ts, "q0_estimated": values[0], "q1_estimated": values[1], "q2_estimated": values[2], "q3_estimated": values[3] }),
@@ -292,17 +304,7 @@ pub fn parse_flight_log(bytes: &[u8]) -> Value {
         ],
     );
     scale_section(&mut log, "baro", zero, &[("T", 100.0)]);
-    scale_section(
-        &mut log,
-        "orientationInfo",
-        zero,
-        &[
-            ("q0_estimated", 1000.0),
-            ("q1_estimated", 1000.0),
-            ("q2_estimated", 1000.0),
-            ("q3_estimated", 1000.0),
-        ],
-    );
+    scale_section(&mut log, "orientationInfo", zero, &[]);
     scale_section(&mut log, "voltageInfo", zero, &[("voltage", 1000.0)]);
     for section in [
         "flightInfo",
@@ -799,6 +801,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn orientation_records_support_both_firmware_scales() {
+        for (component, expected) in [(0_i16, 0.0), (500_i16, 0.5), (5000_i16, 0.5)] {
+            let mut bytes = b"3.1.0\0".to_vec();
+            bytes.extend_from_slice(&1000_u32.to_le_bytes());
+            bytes.extend_from_slice(&0x80_u32.to_le_bytes());
+            for value in [component, -component, component, -component] {
+                bytes.extend_from_slice(&value.to_le_bytes());
+            }
+            let log = parse_flight_log(&bytes);
+            let orientation = &log["orientationInfo"][0];
+            assert_eq!(orientation["q0_estimated"], expected);
+            assert_eq!(orientation["q1_estimated"], -expected);
+            assert_eq!(orientation["q2_estimated"], expected);
+            assert_eq!(orientation["q3_estimated"], -expected);
+            assert_eq!(orientation["ts"], 0.0);
+        }
+    }
+
+    #[test]
     fn parses_and_scales_a_flight_record() {
         let mut bytes = b"3.1.0\0".to_vec();
         bytes.extend_from_slice(&1000_u32.to_le_bytes());
@@ -870,6 +891,19 @@ mod tests {
         assert!(!bytes.is_empty());
         assert!(log["byteCount"].as_u64().unwrap_or_default() > 0);
         assert!(record_count > 0);
+        for row in log["orientationInfo"].as_array().unwrap() {
+            let norm = [
+                "q0_estimated",
+                "q1_estimated",
+                "q2_estimated",
+                "q3_estimated",
+            ]
+            .into_iter()
+            .map(|key| row[key].as_f64().unwrap().powi(2))
+            .sum::<f64>()
+            .sqrt();
+            assert!(norm == 0.0 || (norm - 1.0).abs() < 1e-9);
+        }
         eprintln!(
             "Parsed {} bytes into {} records ({:.3}s to {:.3}s).",
             log["byteCount"], record_count, log["firstTs"], log["lastTs"]

@@ -526,7 +526,7 @@ mod tests {
     #[test]
     fn profile_round_trip_and_comparison_match_v1_shape() {
         let board = snapshot();
-        let mut profile = create_profile(&board, "2.0.0-alpha.1").unwrap();
+        let mut profile = create_profile(&board, "2.0.0").unwrap();
         validate_profile(&profile).unwrap();
         assert_eq!(
             compare_profile(&profile, &board).unwrap()["compatibility"]["changedCount"],
@@ -541,7 +541,7 @@ mod tests {
     #[test]
     fn rejects_duplicate_and_multiline_fields() {
         let board = snapshot();
-        let mut profile = create_profile(&board, "2.0.0-alpha.1").unwrap();
+        let mut profile = create_profile(&board, "2.0.0").unwrap();
         profile["events"]["main_altitude"] = json!(20);
         assert!(
             validate_profile(&profile)
@@ -560,7 +560,7 @@ mod tests {
     #[test]
     fn comparison_matches_v1_numeric_and_empty_identity_semantics() {
         let board = snapshot();
-        let mut profile = create_profile(&board, "2.0.0-alpha.1").unwrap();
+        let mut profile = create_profile(&board, "2.0.0").unwrap();
         profile["configuration"]["main_altitude"] = json!("0");
         assert_eq!(
             compare_profile(&profile, &board).unwrap()["rows"]
@@ -608,7 +608,7 @@ mod tests {
                 started_at.elapsed().as_secs_f64() * 1000.0
             );
         }
-        let profile = create_profile(&snapshot, "2.0.0-alpha.1").unwrap();
+        let profile = create_profile(&snapshot, "2.0.0").unwrap();
         let comparison = compare_profile(&profile, &snapshot).unwrap();
         assert_eq!(comparison["compatibility"]["changedCount"], 0);
         let report = preflight::build_report(&snapshot).unwrap();

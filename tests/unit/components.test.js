@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { isProxy, nextTick, reactive } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +7,7 @@ import AppBar from "@/components/AppBar.vue";
 import EditEventActionDialog from "@/components/EditEventActionDialog.vue";
 import AppFooter from "@/components/Footer.vue";
 import FlightLogWorkspace from "@/components/FlightLogWorkspace.vue";
+import NavigationPanel from "@/components/NavigationPanel.vue";
 import Profiles from "@/views/Profiles.vue";
 import Preflight from "@/views/Preflight.vue";
 import Logs from "@/views/Logs.vue";
@@ -23,8 +24,41 @@ describe("renderer state components", () => {
   beforeEach(() => {
     pinia = createPinia();
     setActivePinia(pinia);
-    globalThis.__APP_VERSION__ = "2.0.0-alpha.1";
+    globalThis.__APP_VERSION__ = "2.0.0";
     window.cats = {};
+  });
+
+  it("opens the sidebar Flights link through the native host and reports failures", async () => {
+    window.cats = {
+      app: { openExternal: vi.fn().mockResolvedValue(undefined) },
+    };
+    const wrapper = mount(NavigationPanel, {
+      global: {
+        plugins: [pinia, vuetify],
+        stubs: {
+          VNavigationDrawer: { template: "<aside><slot /></aside>" },
+          UnitSwitch: true,
+        },
+      },
+    });
+    const link = wrapper.get("a.flights-link");
+    expect(link.attributes("href")).toBe("https://catsystems.io/flights");
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    link.element.dispatchEvent(click);
+    await flushPromises();
+    expect(click.defaultPrevented).toBe(true);
+    expect(window.cats.app.openExternal).toHaveBeenCalledExactlyOnceWith(
+      "https://catsystems.io/flights",
+    );
+
+    window.cats.app.openExternal.mockRejectedValue(
+      new Error("Browser could not be opened"),
+    );
+    await link.trigger("click");
+    await flushPromises();
+    expect(useAppStore().snackbar.isVisible).toBe(true);
+    expect(useAppStore().snackbar.message).toBe("Browser could not be opened");
+    wrapper.unmount();
   });
 
   it("toggles the shared unit system through UnitSwitch", async () => {
@@ -67,16 +101,26 @@ describe("renderer state components", () => {
     });
     const store = useAppStore();
 
-    expect(wrapper.text()).toContain("App version: 2.0.0-alpha.1");
+    expect(wrapper.text()).toContain("App version: 2.0.0");
     expect(wrapper.text()).toContain("Disconnected");
     store.setActiveState(true);
     store.setStaticData({
       key: "version",
-      value: ["Board: CATS Vega", "Code version: 3.1.0"],
+      value: [
+        "Board: CATS Vega",
+        "Code version: 3.1.0",
+        "Telemetry Code version: 1.2.3",
+        "Bundled Telemetry Code version: 1.2.3",
+      ],
     });
     await nextTick();
     expect(wrapper.text()).toContain("Connected");
     expect(wrapper.text()).toContain("Code version: 3.1.0");
+    expect(wrapper.text()).toContain("Telemetry Code version: 1.2.3");
+    expect(wrapper.text()).not.toContain("Bundled Telemetry");
+    expect(store.static.version).toContain(
+      "Bundled Telemetry Code version: 1.2.3",
+    );
     expect(wrapper.text()).not.toContain("Preview");
     wrapper.unmount();
   });

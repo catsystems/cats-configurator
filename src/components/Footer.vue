@@ -29,7 +29,10 @@ export default {
   },
   computed: {
     ...mapState(useAppStore, {
-      version: (store) => store.static.version,
+      version: (store) =>
+        (store.static.version ?? []).filter(
+          (line) => !line.startsWith("Bundled Telemetry Code version:"),
+        ),
       active: "active",
     }),
   },
