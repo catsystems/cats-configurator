@@ -2,13 +2,9 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-    time::{Instant, sleep, timeout},
-};
-use tokio_serial::{ClearBuffer, SerialPort, SerialPortBuilderExt};
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 
-use super::assets::{gs_version, hash};
+use super::assets::hash;
 use crate::{error::HostError, serial::SerialPortSummary};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -69,87 +65,91 @@ pub async fn recovery_drives() -> Result<Vec<RecoveryDrive>, HostError> {
         .collect())
 }
 
-pub async fn file_versions() -> Result<Vec<String>, HostError> {
-    Ok(super::volumes::mounted()
-        .await?
+pub async fn read_gs_file() -> Result<Option<String>, HostError> {
+    let count = crate::serial::SerialManager::list()?
         .iter()
-        .filter_map(|volume| {
-            small_file(&volume.root.join("version.txt")).and_then(|text| gs_version(&text))
-        })
-        .collect())
+        .filter(|port| gs_port(port))
+        .count();
+    let versions: Vec<_> = super::telemetry::drives()
+        .await?
+        .into_iter()
+        .map(|drive| drive.versions.ground_station)
+        .collect();
+    select_gs_version(versions, count)
 }
 
-pub async fn read_gs(path: &str) -> Result<Option<String>, HostError> {
-    let mut port = tokio_serial::new(path, 115_200)
-        .open_native_async()
-        .map_err(|e| {
-            HostError::new(
-                "gs_serial",
-                format!("Cannot open Ground Station console: {e}"),
-            )
-        })?;
-    // Drop RTS first to avoid the ESP32 CDC bootloader line-state sequence.
-    // Let the 10 Hz console task observe a closed interface, then discard old
-    // input before requesting a fresh banner. CDC activation requires DTR + RTS.
-    port.write_request_to_send(false)
-        .map_err(|e| HostError::new("gs_serial", e.to_string()))?;
-    port.write_data_terminal_ready(false)
-        .map_err(|e| HostError::new("gs_serial", e.to_string()))?;
-    sleep(Duration::from_millis(250)).await;
-    port.clear(ClearBuffer::Input)
-        .map_err(|e| HostError::new("gs_serial", e.to_string()))?;
-    port.write_data_terminal_ready(true)
-        .map_err(|e| HostError::new("gs_serial", e.to_string()))?;
-    port.write_request_to_send(true)
-        .map_err(|e| HostError::new("gs_serial", e.to_string()))?;
-    read_gs_version(&mut port, Duration::from_secs(12)).await
-}
-
-async fn read_gs_version(
-    port: &mut (impl AsyncRead + Unpin),
-    duration: Duration,
+fn select_gs_version(
+    mut versions: Vec<String>,
+    gs_count: usize,
 ) -> Result<Option<String>, HostError> {
-    let end = Instant::now() + duration;
-    let mut pending = Vec::new();
-    let mut chunk = [0; 512];
-    while Instant::now() < end {
-        match timeout(
-            end.saturating_duration_since(Instant::now()),
-            port.read(&mut chunk),
-        )
-        .await
-        {
-            Ok(Ok(0)) => sleep(Duration::from_millis(25)).await,
-            Ok(Ok(count)) => {
-                pending.extend_from_slice(&chunk[..count]);
-                while let Some(index) = pending.iter().position(|b| *b == b'\n') {
-                    let line: Vec<_> = pending.drain(..=index).collect();
-                    if let Some(version) = gs_version(&String::from_utf8_lossy(&line)) {
-                        return Ok(Some(version));
-                    }
-                }
-                if pending.len() > 4096 {
-                    pending.clear();
-                }
-            }
-            Ok(Err(e)) => return Err(HostError::new("gs_serial", e.to_string())),
-            Err(_) => break,
-        }
+    if gs_count > 1 || versions.len() > 1 {
+        return Err(HostError::new(
+            "firmware_ambiguous",
+            "Connect only the intended Ground Station and its USB drive to check version.json.",
+        ));
     }
-    Ok(None)
+    Ok(if gs_count == 1 { versions.pop() } else { None })
 }
 
-pub async fn enter_gs(path: &str) -> Result<(), HostError> {
-    let mut port = tokio_serial::new(path, 1200)
-        .open_native_async()
-        .map_err(|e| HostError::new("gs_bootloader", e.to_string()))?;
-    // The pinned ESP32 CDC implementation resets on the 1200-baud line-coding/DTR transition.
-    port.write_data_terminal_ready(true)
-        .map_err(|e| HostError::new("gs_bootloader", e.to_string()))?;
-    sleep(Duration::from_millis(100)).await;
-    port.write_data_terminal_ready(false)
-        .map_err(|e| HostError::new("gs_bootloader", e.to_string()))?;
-    drop(port);
+fn bootloader_error(cause: impl std::fmt::Display) -> HostError {
+    HostError::new(
+        "gs_bootloader",
+        format!(
+            "Cannot access Ground Station runtime DFU: {cause}. Open Settings → Update Firmware → Ground Station on the device to enter TinyUF2, then check devices again. The 1200-baud reset enters ESP32 ROM mode and is not used."
+        ),
+    )
+}
+
+pub async fn enter_gs(port: &SerialPortSummary) -> Result<(), HostError> {
+    use nusb::transfer::{ControlOut, ControlType, Recipient, TransferError};
+    let serial = port
+        .serial_number
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| bootloader_error("USB serial identity is missing"))?;
+    let matches: Vec<_> = nusb::list_devices()
+        .await
+        .map_err(bootloader_error)?
+        .filter(|d| {
+            d.vendor_id() == 0x239a && d.product_id() == 0x80ab && d.serial_number() == Some(serial)
+        })
+        .collect();
+    if matches.len() != 1 {
+        return Err(bootloader_error("USB identity is missing or ambiguous"));
+    }
+    let device = matches[0].open().await.map_err(bootloader_error)?;
+    let config = device.active_configuration().map_err(bootloader_error)?;
+    let interfaces: Vec<_> = config
+        .interface_alt_settings()
+        .filter(|alt| (alt.class(), alt.subclass(), alt.protocol()) == (0xfe, 1, 1))
+        .map(|alt| alt.interface_number())
+        .collect();
+    if interfaces.len() != 1 {
+        return Err(bootloader_error("no unique runtime DFU interface"));
+    }
+    let interface = device
+        .claim_interface(interfaces[0])
+        .await
+        .map_err(bootloader_error)?;
+    let result = interface
+        .control_out(
+            ControlOut {
+                control_type: ControlType::Class,
+                recipient: Recipient::Interface,
+                request: 0, // DFU_DETACH invokes the GS 0x11F2 TinyUF2 reset hint.
+                value: 700,
+                index: interfaces[0].into(),
+                data: &[],
+            },
+            Duration::from_secs(5),
+        )
+        .await;
+    match result {
+        Ok(()) | Err(TransferError::Disconnected) => {}
+        Err(e) => return Err(bootloader_error(e)),
+    }
+    // A detach is only a transition request. The caller still requires one new
+    // pinned TinyUF2 drive before copying and fresh version.json afterwards.
     Ok(())
 }
 
@@ -191,17 +191,40 @@ pub async fn copy_uf2(drive: &RecoveryDrive, bytes: &[u8]) -> Result<(), HostErr
         ));
     }
     output.set_len(0).await.map_err(copy_error)?;
-    write_and_flush(&mut output, bytes).await?;
-    output.sync_all().await.map_err(copy_error)?;
+    if write_and_flush(&mut output, bytes).await? == Uf2Finalization::Flushed {
+        uf2_finalization(output.sync_all().await)?;
+    }
     drop(output);
+    // Even a clean flush is not installation proof. The caller must observe
+    // recovery disconnect, application reconnect, and the selected version.json.
     Ok(())
 }
+
+#[derive(Debug, PartialEq, Eq)]
+enum Uf2Finalization {
+    Flushed,
+    Disconnected,
+}
+
 async fn write_and_flush(
     output: &mut (impl AsyncWrite + Unpin),
     bytes: &[u8],
-) -> Result<(), HostError> {
+) -> Result<Uf2Finalization, HostError> {
     output.write_all(bytes).await.map_err(copy_error)?;
-    output.flush().await.map_err(copy_error)
+    uf2_finalization(output.flush().await)
+}
+
+fn uf2_finalization(result: std::io::Result<()>) -> Result<Uf2Finalization, HostError> {
+    match result {
+        Ok(()) => Ok(Uf2Finalization::Flushed),
+        // TinyUF2 completes after receiving all blocks, potentially removing
+        // its drive before Windows finishes flush/sync. Only after write_all
+        // accepted the entire image may these errors proceed to verification.
+        Err(error) if cfg!(windows) && matches!(error.raw_os_error(), Some(433 | 1167)) => {
+            Ok(Uf2Finalization::Disconnected)
+        }
+        Err(error) => Err(copy_error(error)),
+    }
 }
 fn copy_error(e: std::io::Error) -> HostError {
     HostError::new(
@@ -221,11 +244,40 @@ mod tests {
         task::{Context, Poll},
     };
 
+    #[test]
+    fn version_json_requires_one_ground_station_and_one_metadata_volume() {
+        assert_eq!(
+            select_gs_version(vec!["1.3.0".into()], 1)
+                .unwrap()
+                .as_deref(),
+            Some("1.3.0")
+        );
+        assert!(
+            select_gs_version(vec!["1.3.0".into()], 0)
+                .unwrap()
+                .is_none()
+        );
+        assert!(select_gs_version(vec![], 1).unwrap().is_none());
+        assert!(select_gs_version(vec!["1.3.0".into()], 2).is_err());
+        assert!(select_gs_version(vec!["1.3.0".into(), "1.2.0".into()], 1).is_err());
+    }
+
+    #[tokio::test]
+    #[ignore = "read-only Ground Station version.json check; requires connected GS USB drive"]
+    async fn gs_version_json_read_only() {
+        for attempt in 1..=3 {
+            let version = read_gs_file().await.unwrap();
+            assert!(version.is_some(), "Mount the Ground Station USB drive");
+            println!("GS version.json check {attempt}: {version:?}");
+        }
+    }
+
     struct CopySink {
         bytes: Vec<u8>,
         fail_write: bool,
         fail_flush: bool,
         flushed: bool,
+        error_code: Option<i32>,
     }
     impl AsyncWrite for CopySink {
         fn poll_write(
@@ -234,7 +286,10 @@ mod tests {
             bytes: &[u8],
         ) -> Poll<io::Result<usize>> {
             if self.fail_write && !self.bytes.is_empty() {
-                return Poll::Ready(Err(io::Error::other("device disconnected")));
+                return Poll::Ready(Err(self
+                    .error_code
+                    .map(io::Error::from_raw_os_error)
+                    .unwrap_or_else(|| io::Error::other("device disconnected"))));
             }
             let count = bytes.len().min(19); // Exercise short successful writes too.
             self.bytes.extend_from_slice(&bytes[..count]);
@@ -243,7 +298,10 @@ mod tests {
         fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
             self.flushed = true;
             Poll::Ready(if self.fail_flush {
-                Err(io::Error::other("flush failed"))
+                Err(self
+                    .error_code
+                    .map(io::Error::from_raw_os_error)
+                    .unwrap_or_else(|| io::Error::other("flush failed")))
             } else {
                 Ok(())
             })
@@ -261,12 +319,13 @@ mod tests {
                 fail_write,
                 fail_flush,
                 flushed: false,
+                error_code: None,
             };
             let result = write_and_flush(&mut sink, &bytes).await;
             if fail_write || fail_flush {
                 assert_eq!(result.unwrap_err().code, "gs_copy");
             } else {
-                result.unwrap();
+                assert_eq!(result.unwrap(), Uf2Finalization::Flushed);
             }
             assert_eq!(sink.flushed, !fail_write);
             if !fail_write {
@@ -276,44 +335,57 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn gs_banner_can_be_delayed_and_split_across_reads() {
-        let (mut reader, mut writer) = tokio::io::duplex(512);
-        tokio::spawn(async move {
-            writer
-                .write_all(b"TinyUF2 version=9.0.0\nlegacy console\n")
-                .await
-                .unwrap();
-            sleep(Duration::from_millis(20)).await;
-            writer
-                .write_all(b"CATS-FW target=ground-station ver")
-                .await
-                .unwrap();
-            sleep(Duration::from_millis(20)).await;
-            writer.write_all(b"sion=1.2.3\r\n").await.unwrap();
-        });
-        assert_eq!(
-            read_gs_version(&mut reader, Duration::from_secs(1))
-                .await
-                .unwrap()
-                .as_deref(),
-            Some("1.2.3")
-        );
+    async fn uf2_disconnect_during_partial_write_is_always_a_copy_failure() {
+        for code in [433, 1167] {
+            let mut sink = CopySink {
+                bytes: Vec::new(),
+                fail_write: true,
+                fail_flush: false,
+                flushed: false,
+                error_code: Some(code),
+            };
+            let error = write_and_flush(&mut sink, &[0xa5; 512]).await.unwrap_err();
+            assert_eq!(error.code, "gs_copy");
+            assert_eq!(sink.bytes.len(), 19);
+            assert!(!sink.flushed);
+        }
     }
 
     #[tokio::test]
-    async fn legacy_or_malformed_console_does_not_establish_a_version() {
-        let (mut reader, mut writer) = tokio::io::duplex(512);
-        writer
-            .write_all(b"CATS-FW target=ground-station version=unknown\nFirmware 1.2.3\n")
-            .await
-            .unwrap();
-        assert!(
-            read_gs_version(&mut reader, Duration::from_millis(30))
-                .await
-                .unwrap()
-                .is_none()
-        );
+    async fn uf2_windows_disconnect_after_full_write_can_proceed_to_verification() {
+        let bytes = [0xa5; 512];
+        for code in [433, 1167] {
+            let mut sink = CopySink {
+                bytes: Vec::new(),
+                fail_write: false,
+                fail_flush: true,
+                flushed: false,
+                error_code: Some(code),
+            };
+            let result = write_and_flush(&mut sink, &bytes).await;
+            assert_eq!(sink.bytes, bytes);
+            assert!(sink.flushed);
+            if cfg!(windows) {
+                assert_eq!(result.unwrap(), Uf2Finalization::Disconnected);
+            } else {
+                assert_eq!(result.unwrap_err().code, "gs_copy");
+            }
+        }
     }
+
+    #[test]
+    fn uf2_sync_only_allows_windows_device_disappearance() {
+        assert_eq!(uf2_finalization(Ok(())).unwrap(), Uf2Finalization::Flushed);
+        for code in [5, 28, 112, 433, 995, 1167] {
+            let result = uf2_finalization(Err(io::Error::from_raw_os_error(code)));
+            if cfg!(windows) && matches!(code, 433 | 1167) {
+                assert_eq!(result.unwrap(), Uf2Finalization::Disconnected);
+            } else {
+                assert_eq!(result.unwrap_err().code, "gs_copy");
+            }
+        }
+    }
+
     #[test]
     fn bootloader_info_is_not_firmware_metadata() {
         assert!(recovery_info(
@@ -332,6 +404,5 @@ mod tests {
         assert!(!recovery_info(
             "TinyUF2 Bootloader\nBoard-ID: ESP32S2-Saola1M-v1.2-extra"
         ));
-        assert!(gs_version("TinyUF2 Bootloader 0.35.0").is_none());
     }
 }

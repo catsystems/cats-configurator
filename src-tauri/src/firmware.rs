@@ -1,6 +1,7 @@
 pub mod assets;
 mod dfu;
 mod hardware;
+mod telemetry;
 mod volumes;
 
 #[cfg(test)]
@@ -47,6 +48,9 @@ pub struct Device {
     port: Option<SerialPortSummary>,
     #[serde(skip)]
     drive: Option<RecoveryDrive>,
+    #[serde(skip)]
+    telemetry_drive: Option<telemetry::Drive>,
+    pub telemetry_versions: Option<[Option<String>; 2]>,
 }
 
 #[derive(Clone, Serialize)]
@@ -190,12 +194,14 @@ impl FirmwareManager {
             state.progress = None;
             match result {
                 Ok(()) => {
-                    state.stage = "succeeded".into();
+                    if state.stage != "prepared" {
+                        state.stage = "succeeded".into();
+                    }
                 }
                 Err(error) if error.code == "firmware_cancelled" => {
                     state.stage = "cancelled".into();
                     state.message =
-                        "Cancelled before entering the bootloader. No firmware was written.".into();
+                        "Cancelled before the device transition or file copy. No firmware was written.".into();
                 }
                 Err(error) => {
                     if error.code == "firmware_verification" {
@@ -292,8 +298,6 @@ impl FirmwareManager {
         let connected = self.serial.connected_path().await;
         let mut devices = Vec::new();
         let mut telemetry = None;
-        let files = hardware::file_versions().await?;
-        let gs_count = ports.iter().filter(|p| hardware::gs_port(p)).count();
         for port in ports
             .into_iter()
             .filter(|p| hardware::vega_port(p) || hardware::gs_port(p))
@@ -322,6 +326,8 @@ impl FirmwareManager {
                 notice: None,
                 port: Some(port.clone()),
                 drive: None,
+                telemetry_drive: None,
+                telemetry_versions: None,
             };
             if target == Target::Vega && connected.as_deref() == Some(&port.path) {
                 match self.vega_versions().await {
@@ -333,20 +339,16 @@ impl FirmwareManager {
                     Err(error) => device.notice = Some(error.message),
                 }
             } else if target == Target::GroundStation {
-                match hardware::read_gs(&port.path).await {
+                match hardware::read_gs_file().await {
                     Ok(Some(version)) => {
                         device.version = Some(version);
-                        device.version_source = "serial".into();
+                        device.version_source = "version-json".into();
                     }
                     Ok(None) => {
                         device.notice =
-                            Some("Older firmware did not report a serial version.".into())
+                            Some("Mount the Ground Station USB drive to read version.json.".into())
                     }
                     Err(error) => device.notice = Some(error.message),
-                }
-                if device.version.is_none() && gs_count == 1 && files.len() == 1 {
-                    device.version = Some(files[0].clone());
-                    device.version_source = "file-unverified".into();
                 }
             }
             devices.push(device);
@@ -362,6 +364,23 @@ impl FirmwareManager {
                 notice: Some("TinyUF2 recovery: installed application version is unknown.".into()),
                 port: None,
                 drive: Some(drive),
+                telemetry_drive: None,
+                telemetry_versions: None,
+            });
+        }
+        for drive in telemetry::drives().await? {
+            devices.push(Device {
+                id: Uuid::new_v4().to_string(),
+                target: Target::Telemetry,
+                label: format!("GS radio firmware destination ({})", drive.volume.root.display()),
+                mode: "storage".into(),
+                version: None,
+                version_source: "file-unverified".into(),
+                notice: Some("Confirm this is your Ground Station drive. Radio versions are cached in version.json; final installation is confirmed on the Ground Station.".into()),
+                port: None,
+                drive: None,
+                telemetry_versions: Some([drive.versions.telemetry_1.clone(), drive.versions.telemetry_2.clone()]),
+                telemetry_drive: Some(drive),
             });
         }
         Ok((devices, telemetry))
@@ -489,6 +508,17 @@ impl FirmwareManager {
     async fn prepare(&self, job: &mut Job) -> Result<Vec<u8>, HostError> {
         self.check_cancelled()?;
         validate_confirmations(&job.request, job.device.target)?;
+        if job.device.target == Target::Telemetry {
+            let drive = job.device.telemetry_drive.as_ref().ok_or_else(|| {
+                HostError::new(
+                    "telemetry_staging",
+                    "Check devices and select the Ground Station drive.",
+                )
+            })?;
+            telemetry::check_drive(drive).await?;
+            telemetry_version_policy(&drive.versions, &job.asset.version, &job.request)?;
+            return self.download(&job.asset).await;
+        }
         if job.dfu.is_none() && job.device.mode != "recovery" {
             let original = job.device.port.as_ref().ok_or_else(|| {
                 HostError::new("firmware_device", "Application device identity is missing.")
@@ -507,11 +537,15 @@ impl FirmwareManager {
                 safe_vega_status(&status)?;
                 version
             } else {
-                hardware::read_gs(&port.path).await?
+                hardware::read_gs_file().await?
             };
             job.device.version = installed;
             job.device.version_source = if job.device.version.is_some() {
-                "serial"
+                if job.device.target == Target::GroundStation {
+                    "version-json"
+                } else {
+                    "serial"
+                }
             } else {
                 "unknown"
             }
@@ -530,13 +564,14 @@ impl FirmwareManager {
                 &job.request,
             )?;
         } else if job.dfu.is_none() {
-            // Retain the fresh serial version established before a failed GS
-            // copy. Entering recovery does not revoke that retry approval.
-            let installed = job
-                .device
-                .version
-                .as_deref()
-                .filter(|_| job.device.version_source == "serial");
+            // Retain the checked version established before a failed GS copy.
+            // Entering recovery does not revoke that retry approval.
+            let installed = job.device.version.as_deref().filter(|_| {
+                matches!(
+                    job.device.version_source.as_str(),
+                    "serial" | "version-json"
+                )
+            });
             version_policy(installed, &job.asset.version, &job.request)?;
         }
         self.download(&job.asset).await
@@ -654,10 +689,18 @@ impl FirmwareManager {
         match job.device.target {
             Target::Vega => self.update_vega(job, &bytes).await,
             Target::GroundStation => self.update_gs(job, &bytes).await,
-            Target::Telemetry => Err(HostError::new(
-                "telemetry_disabled",
-                "Telemetry updating is disabled.",
-            )),
+            Target::Telemetry => {
+                self.stage("staging-telemetry", "Copying, flushing and reading back the telemetry image on the Ground Station drive…", false);
+                let drive = job.device.telemetry_drive.as_ref().ok_or_else(|| {
+                    HostError::new("telemetry_staging", "Ground Station drive is missing.")
+                })?;
+                telemetry::stage(drive, &job.asset, &bytes).await?;
+                self.stage("prepared", &format!(
+                    "{} is ready in telemetry_firmware. Safely eject the Ground Station drive, then open Settings → Update Firmware → Radio Receivers on the Ground Station and select this file. Both radios are updated there; check the result on its screen. Firmware has not been installed by Configurator.",
+                    job.asset.name
+                ), false);
+                Ok(())
+            }
         }
     }
     async fn update_vega(&self, job: &mut Job, bytes: &[u8]) -> Result<(), HostError> {
@@ -770,8 +813,8 @@ impl FirmwareManager {
             Target::Vega => self.reconnect_vega(job).await,
             Target::GroundStation => self.reconnect_gs(job).await,
             Target::Telemetry => Err(HostError::new(
-                "telemetry_disabled",
-                "Telemetry updating is disabled.",
+                "telemetry_on_device",
+                "Confirm both radio update results on the Ground Station. Configurator only prepares the firmware file.",
             )),
         }
     }
@@ -835,7 +878,7 @@ impl FirmwareManager {
                 ));
             }
             let before = hardware::recovery_drives().await?;
-            hardware::enter_gs(&port.path).await?;
+            hardware::enter_gs(&port).await?;
             let deadline = Instant::now() + Duration::from_secs(30);
             loop {
                 let found: Vec<_> = hardware::recovery_drives()
@@ -869,6 +912,8 @@ impl FirmwareManager {
             false,
         );
         hardware::copy_uf2(&drive, bytes).await?;
+        // Includes a Windows device-disappeared error at final flush/sync after
+        // the full image was submitted. Neither case is success until verified.
         job.awaiting_reconnect = true;
         self.reconnect(job).await
     }
@@ -876,7 +921,7 @@ impl FirmwareManager {
     async fn reconnect_gs(&self, job: &mut Job) -> Result<(), HostError> {
         self.stage(
             "reconnecting",
-            "Waiting for Ground Station to restart and report its running version…",
+            "Waiting for Ground Station to restart and expose its refreshed version.json…",
             false,
         );
         let deadline = Instant::now() + Duration::from_secs(45);
@@ -887,7 +932,7 @@ impl FirmwareManager {
             if Instant::now() >= deadline {
                 return Err(HostError::new(
                     "gs_recovery_timeout",
-                    "UF2 copy completed but the recovery drive did not disconnect. Installation is not verified.",
+                    "UF2 image was submitted but the recovery drive did not disconnect. Installation is not verified.",
                 ));
             }
             sleep(Duration::from_millis(300)).await;
@@ -914,7 +959,7 @@ impl FirmwareManager {
                     "Multiple Ground Stations appeared after the update; installation is not verified.",
                 )?;
                 job.device.port = Some(port.clone());
-                match hardware::read_gs(&port.path).await {
+                match hardware::read_gs_file().await {
                     Ok(Some(installed)) => {
                         verify_running_version(Some(&installed), &job.asset.version)?;
                         self.complete_device(job, Some(installed));
@@ -928,7 +973,7 @@ impl FirmwareManager {
             if Instant::now() >= deadline {
                 return Err(HostError::new(
                     "firmware_reconnect",
-                    "Ground Station did not reconnect. Check USB and recovery mode; installation is not verified.",
+                    "Ground Station did not expose a refreshed version.json. Mount its USB drive and retry the connection check; installation is not verified.",
                 ));
             }
             sleep(Duration::from_millis(500)).await;
@@ -936,7 +981,12 @@ impl FirmwareManager {
     }
     fn complete_device(&self, job: &mut Job, version: Option<String>) {
         job.device.version = version;
-        job.device.version_source = "serial".into();
+        job.device.version_source = if job.device.target == Target::GroundStation {
+            "version-json"
+        } else {
+            "serial"
+        }
+        .into();
         job.device.notice = None;
         let mut state = self.snapshot.lock().unwrap();
         if let Some(device) = state.devices.iter_mut().find(|d| d.id == job.device.id) {
@@ -989,18 +1039,25 @@ fn safe_vega_status(lines: &[String]) -> Result<(), HostError> {
         ))
     }
 }
-fn validate_confirmations(request: &StartRequest, target: Target) -> Result<(), HostError> {
-    if target == Target::Telemetry {
-        return Err(HostError::new(
-            "telemetry_disabled",
-            "Telemetry updating is disabled.",
-        ));
-    }
+fn validate_confirmations(request: &StartRequest, _target: Target) -> Result<(), HostError> {
     if !request.no_unsaved_changes || !request.safety_confirmed {
         return Err(HostError::new(
             "firmware_confirmation",
             "Save/discard configurator changes and confirm that deployment charges are disconnected, or that Ground Station tracking/recording has stopped and its files are closed.",
         ));
+    }
+    Ok(())
+}
+fn telemetry_version_policy(
+    versions: &telemetry::Versions,
+    available: &str,
+    request: &StartRequest,
+) -> Result<(), HostError> {
+    // File metadata cannot establish a verified running version. Require that
+    // acknowledgement and confirmation of a reinstall reported by either radio.
+    version_policy(None, available, request)?;
+    for installed in [&versions.telemetry_1, &versions.telemetry_2] {
+        version_policy(installed.as_deref(), available, request)?;
     }
     Ok(())
 }
@@ -1012,10 +1069,6 @@ fn version_policy(
     let available = Version::parse(available)
         .map_err(|_| assets::error("Invalid release firmware version."))?;
     match installed.and_then(|v| Version::parse(v).ok()) {
-        Some(version) if version.cmp_precedence(&available).is_gt() => Err(HostError::new(
-            "firmware_downgrade",
-            "Firmware downgrades are blocked.",
-        )),
         Some(version)
             if version.cmp_precedence(&available).is_eq() && !request.reinstall_confirmed =>
         {
@@ -1026,7 +1079,7 @@ fn version_policy(
         }
         None if !request.unknown_version_confirmed => Err(HostError::new(
             "firmware_unknown_confirmation",
-            "Installed version is unknown. Confirm that downgrade protection is unavailable.",
+            "Installed version is unknown. Confirm continuing without a verified installed version.",
         )),
         _ => Ok(()),
     }
@@ -1046,6 +1099,9 @@ fn verify_running_version(installed: Option<&str>, expected: &str) -> Result<(),
 }
 fn recovery_message(stage: &str) -> &'static str {
     match stage {
+        "staging-telemetry" => {
+            "Telemetry preparation failed. Keep the Ground Station drive connected and retry. Do not select a partial file on the device."
+        }
         "opening-dfu" | "erasing" | "programming" | "verifying" => {
             "Keep Vega in DFU. Retry the validated firmware; do not reset an unverified image."
         }
@@ -1102,6 +1158,8 @@ mod tests {
                 notice: None,
                 port: None,
                 drive: None,
+                telemetry_drive: None,
+                telemetry_versions: None,
             },
             asset: Asset {
                 id: 1,
@@ -1121,10 +1179,11 @@ mod tests {
         }
     }
     #[tokio::test]
-    async fn recovery_retry_retains_serial_approval_but_never_trusts_a_version_file() {
+    async fn recovery_retry_retains_checked_version_json_approval() {
         let events = Arc::new(EventBus::default());
         let manager = FirmwareManager::new(events.clone(), Arc::new(SerialManager::new(events)));
         let mut job = recovery_job();
+        job.device.version_source = "version-json".into();
         // Reaches download without demanding unknown-version confirmation again.
         assert_eq!(
             manager.prepare(&mut job).await.unwrap_err().code,
@@ -1137,9 +1196,10 @@ mod tests {
         );
         job.device.version_source = "serial".into();
         job.device.version = Some("2.0.0".into());
+        // A downgrade also reaches download using the retained checked version.
         assert_eq!(
             manager.prepare(&mut job).await.unwrap_err().code,
-            "firmware_downgrade"
+            "firmware_cache"
         );
     }
     #[tokio::test]
@@ -1165,7 +1225,7 @@ mod tests {
         .await
         .unwrap();
         let state = manager.current();
-        assert_eq!(state.error.unwrap().code, "telemetry_disabled");
+        assert_eq!(state.error.unwrap().code, "telemetry_on_device");
         assert_eq!(state.failed_stage.as_deref(), Some("reconnecting"));
         assert!(state.can_retry && state.retry_connection_only);
         assert!(!state.cancellable);
@@ -1186,15 +1246,40 @@ mod tests {
         assert!(!manager.busy());
     }
     #[test]
-    fn versions_require_explicit_reinstall_and_unknown_confirmation() {
+    fn telemetry_checks_both_radios_and_requires_cached_version_acknowledgement() {
+        let versions = telemetry::Versions {
+            ground_station: "1.3.0".into(),
+            telemetry_1: Some("1.1.0".into()),
+            telemetry_2: Some("1.2.0".into()),
+        };
         let mut req = request();
-        assert!(version_policy(Some("1.0.0"), "1.1.0", &req).is_ok());
         assert_eq!(
-            version_policy(Some("2.0.0"), "1.1.0", &req)
+            telemetry_version_policy(&versions, "1.2.0", &req)
                 .unwrap_err()
                 .code,
-            "firmware_downgrade"
+            "firmware_unknown_confirmation"
         );
+        req.unknown_version_confirmed = true;
+        assert_eq!(
+            telemetry_version_policy(&versions, "1.2.0", &req)
+                .unwrap_err()
+                .code,
+            "firmware_reinstall_confirmation"
+        );
+        req.reinstall_confirmed = true;
+        telemetry_version_policy(&versions, "1.2.0", &req).unwrap();
+        telemetry_version_policy(&versions, "1.1.0", &req).unwrap();
+        req.reinstall_confirmed = false;
+        telemetry_version_policy(&versions, "1.0.0", &req).unwrap();
+    }
+
+    #[test]
+    fn versions_allow_downgrades_and_require_reinstall_and_unknown_confirmation() {
+        let mut req = request();
+        assert!(version_policy(Some("1.0.0"), "1.1.0", &req).is_ok());
+        assert!(version_policy(Some("2.0.0"), "1.1.0", &req).is_ok());
+        assert!(version_policy(Some("3.1.0"), "3.0.2", &req).is_ok());
+        assert!(version_policy(Some("3.1.0+local"), "3.0.2", &req).is_ok());
         assert!(version_policy(Some("1.1.0"), "1.1.0", &req).is_err());
         assert_eq!(
             version_policy(Some("1.1.0+local"), "1.1.0", &req)
@@ -1221,7 +1306,7 @@ mod tests {
         let mut req = request();
         req.no_unsaved_changes = false;
         assert!(validate_confirmations(&req, Target::Vega).is_err());
-        assert!(validate_confirmations(&request(), Target::Telemetry).is_err());
+        assert!(validate_confirmations(&request(), Target::Telemetry).is_ok());
     }
     #[test]
     fn ambiguity_never_picks_first_device() {

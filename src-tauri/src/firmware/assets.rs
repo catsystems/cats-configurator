@@ -10,6 +10,7 @@ use crate::error::HostError;
 
 pub const GS_IMAGE_LIMIT: usize = 1408 * 1024;
 pub const VEGA_IMAGE_LIMIT: usize = 512 * 1024;
+pub const TELEMETRY_IMAGE_LIMIT: usize = 128 * 1024;
 const RELEASES: &str = "https://api.github.com/repos/catsystems/cats-embedded/releases";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -36,10 +37,10 @@ impl Target {
         }
     }
     pub fn limit(self) -> usize {
-        if self == Self::GroundStation {
-            GS_IMAGE_LIMIT * 2
-        } else {
-            VEGA_IMAGE_LIMIT
+        match self {
+            Self::GroundStation => GS_IMAGE_LIMIT * 2,
+            Self::Vega => VEGA_IMAGE_LIMIT,
+            Self::Telemetry => TELEMETRY_IMAGE_LIMIT,
         }
     }
 }
@@ -143,7 +144,7 @@ pub fn select_assets(releases: &[Release]) -> Vec<Asset> {
         .filter(|r| !r.draft && !r.prerelease && official_release_url(&r.html_url))
     {
         for source in &release.assets {
-            for target in [Target::Vega, Target::GroundStation] {
+            for target in [Target::Vega, Target::GroundStation, Target::Telemetry] {
                 let Some(version) = asset_version(target, &source.name) else {
                     continue;
                 };
@@ -257,7 +258,7 @@ pub fn validate(asset: &Asset, bytes: &[u8]) -> Result<(), HostError> {
     match asset.target {
         Target::Vega => validate_vega(bytes),
         Target::GroundStation => validate_uf2(bytes),
-        Target::Telemetry => Err(error("Telemetry updating is not supported.")),
+        Target::Telemetry => validate_telemetry(bytes),
     }
 }
 
@@ -280,6 +281,23 @@ pub fn validate_vega(bytes: &[u8]) -> Result<(), HostError> {
         return Err(error(
             "Image is not a valid STM32F411 application at 0x08000000.",
         ));
+    }
+    Ok(())
+}
+
+pub fn validate_telemetry(bytes: &[u8]) -> Result<(), HostError> {
+    // Matches RadioUpdate::validVectors on cats-embedded: STM32G071, not Vega.
+    if !(256..=TELEMETRY_IMAGE_LIMIT).contains(&bytes.len()) {
+        return Err(error("Invalid STM32G071 telemetry image size."));
+    }
+    let stack = word(bytes, 0);
+    let reset = word(bytes, 4);
+    if !(0x2000_0000..=0x2000_9000).contains(&stack)
+        || stack % 8 != 0
+        || reset & 1 == 0
+        || !(0x0800_0000..0x0800_0000 + bytes.len() as u32).contains(&(reset & !1))
+    {
+        return Err(error("Invalid STM32G071 telemetry application vectors."));
     }
     Ok(())
 }
@@ -313,13 +331,6 @@ pub fn validate_uf2(bytes: &[u8]) -> Result<(), HostError> {
         seen[index] = true;
     }
     Ok(())
-}
-
-pub fn gs_version(line: &str) -> Option<String> {
-    let value = line
-        .trim()
-        .strip_prefix("CATS-FW target=ground-station version=")?;
-    Version::parse(value).ok().map(|v| v.to_string())
 }
 
 #[cfg(test)]
@@ -380,6 +391,76 @@ mod tests {
         bytes
     }
     #[test]
+    fn telemetry_vectors_match_g071_and_reject_vega_or_truncated_images() {
+        let mut bytes = bin();
+        assert!(validate_telemetry(&bytes).is_err()); // Vega stack is outside G071 RAM.
+        bytes[..4].copy_from_slice(&0x2000_9000u32.to_le_bytes());
+        assert!(validate_telemetry(&bytes).is_ok());
+        assert!(validate_telemetry(&bytes[..255]).is_err());
+        for (offset, value) in [
+            (0, 0x2000_9008u32),
+            (0, 0x2000_0001),
+            (4, 0x0800_0020),
+            (4, 0x0802_0001),
+        ] {
+            let mut bad = bytes.clone();
+            bad[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+            assert!(validate_telemetry(&bad).is_err());
+        }
+        let name = "telemetry-1.2.0.bin";
+        let selected = select_assets(&[Release {
+            draft: false,
+            prerelease: false,
+            html_url: "https://github.com/catsystems/cats-embedded/releases/tag/2026.09".into(),
+            body: None,
+            assets: vec![ReleaseAsset {
+                id: 3,
+                name: name.into(),
+                size: bytes.len() as u64,
+                browser_download_url: format!(
+                    "https://github.com/catsystems/cats-embedded/releases/download/2026.09/{name}"
+                ),
+                digest: Some(format!("sha256:{}", hash(&bytes))),
+            }],
+        }]);
+        assert_eq!(selected.len(), 1);
+        assert_eq!(selected[0].target, Target::Telemetry);
+        validate(&selected[0], &bytes).unwrap();
+        bytes[100] ^= 1;
+        assert!(validate(&selected[0], &bytes).is_err());
+    }
+
+    #[tokio::test]
+    #[ignore = "read-only official asset download and validation; requires network"]
+    async fn official_firmware_downloads_validate_live() {
+        let selected = releases().await.unwrap();
+        assert!(selected.iter().any(|a| a.target == Target::GroundStation));
+        assert!(selected.iter().any(|a| a.target == Target::Telemetry));
+        for asset in selected {
+            let mut response = client(true)
+                .unwrap()
+                .get(&asset.url)
+                .send()
+                .await
+                .unwrap()
+                .error_for_status()
+                .unwrap();
+            let mut bytes = Vec::new();
+            while let Some(chunk) = response.chunk().await.unwrap() {
+                assert!(bytes.len() + chunk.len() <= asset.target.limit());
+                bytes.extend_from_slice(&chunk);
+            }
+            validate(&asset, &bytes).unwrap();
+            println!(
+                "Validated {}: {} bytes, SHA-256 {}",
+                asset.name,
+                bytes.len(),
+                hash(&bytes)
+            );
+        }
+    }
+
+    #[test]
     fn firmware_vectors_are_bounded() {
         assert!(validate_vega(&bin()).is_ok());
         for (offset, value) in [
@@ -410,7 +491,7 @@ mod tests {
         assert!(validate_uf2(&swapped).is_ok());
     }
     #[test]
-    fn native_names_and_serial_metadata_are_strict() {
+    fn native_names_are_strict() {
         assert_eq!(
             asset_version(Target::GroundStation, "ground_station-1.2.3.UF2").unwrap(),
             Version::new(1, 2, 3)
@@ -423,11 +504,6 @@ mod tests {
         ] {
             assert!(asset_version(Target::GroundStation, name).is_none());
         }
-        assert_eq!(
-            gs_version("CATS-FW target=ground-station version=1.2.3\r\n").as_deref(),
-            Some("1.2.3")
-        );
-        assert!(gs_version("TinyUF2 version=1.2.3").is_none());
     }
     #[test]
     fn source_and_redirect_allowlist_is_exact() {

@@ -200,7 +200,7 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
             [Code signing policy](https://github.com/catsystems/cats-configurator/blob/main/CODE_SIGNING_POLICY.md)
-            Tauri alpha packages do not include automatic updates. Windows packages are unsigned; macOS packages are ad-hoc signed and not notarized.
+            Tauri packages do not include automatic Configurator self-updates. Windows packages are unsigned; macOS packages are ad-hoc signed and not notarized.
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: release-artifacts/*

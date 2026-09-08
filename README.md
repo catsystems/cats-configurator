@@ -12,9 +12,9 @@ renderer and a Rust/Tauri host for serial communication, configuration,
 profiles, preflight, local files, and CATS Flights handoff.
 
 The Tauri implementation now lives at the repository root and replaces the
-Electron implementation on this branch. The version remains
-`2.0.0-alpha.1`; automatic updates are disabled. Windows alpha packages are
-unsigned, and macOS alpha packages are ad-hoc signed but not notarized.
+Electron implementation on this branch. The testing version is
+`2.0.0`; automatic Configurator self-updates remain disabled. Windows test packages
+are unsigned, and macOS test packages are ad-hoc signed but not notarized.
 Upgrading an existing Electron installation has not yet been validated.
 
 ## Requirements

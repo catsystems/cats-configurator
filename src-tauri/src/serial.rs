@@ -524,12 +524,15 @@ async fn run_real(
                 let connection_error = result.as_ref().err().filter(|error| {
                     matches!(error.code, "serial_read_failed" | "serial_write_failed")
                 }).cloned();
+                // Capture ownership before replying: the caller may finish the
+                // firmware operation and release its lock as soon as it wakes.
+                let firmware_owned = firmware_active.load(Ordering::SeqCst);
                 drop(pending);
                 let _ = reply.send(result);
                 if let Some(error) = connection_error {
                     transcript.write("ERROR", &error.message);
                     transcript.stop("Port closed");
-                    publish_disconnected(&events, Some(&error.message));
+                    publish_transport_disconnected(&events, Some(&command), &error.message, firmware_owned);
                     break;
                 }
             }
@@ -562,7 +565,9 @@ async fn run_real(
                     Err(error) => {
                         transcript.write("ERROR", &error.to_string());
                         transcript.stop("Port closed");
-                        publish_disconnected(&events, Some(&error.to_string()));
+                        publish_transport_disconnected(
+                            &events, None, &error.to_string(), firmware_active.load(Ordering::SeqCst),
+                        );
                         break;
                     }
                 }
@@ -591,6 +596,21 @@ fn publish_disconnected(events: &EventBus, message: Option<&str>) {
     }
     events.send("board:active", json!(false));
     events.send("serial:disconnected", Value::Null);
+}
+
+fn publish_transport_disconnected(
+    events: &EventBus,
+    command: Option<&str>,
+    message: &str,
+    firmware_owned: bool,
+) {
+    // Firmware operations report failures through their own stage/result and
+    // expect USB removal during bootloader entry. Keep transport state events,
+    // but do not also send an unrelated serial-error toast (including idle reads).
+    // Ordinary reboot commands likewise intentionally drop their connection.
+    let reboot = command.is_some_and(|command| normalize_command(command) == "reboot");
+    let message = (!firmware_owned && !reboot).then_some(message);
+    publish_disconnected(events, message);
 }
 
 async fn execute_with_retry(
@@ -863,6 +883,53 @@ fn fake_config(key: &str) -> Option<(&'static str, &'static str)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn firmware_disconnects_skip_duplicate_errors_but_keep_connection_state_events() {
+        for (command, firmware_owned, report_error) in [
+            (Some("reboot"), false, false),
+            (Some(" Reboot "), false, false),
+            (Some("reboot now"), false, true),
+            (Some("status"), false, true),
+            (Some("bl"), false, true),
+            (None, false, true),
+            (Some("bl"), true, false),
+            (Some("version"), true, false),
+            (Some("status"), true, false),
+            (None, true, false),
+        ] {
+            let captured = Arc::new(StdMutex::new(Vec::<Value>::new()));
+            let received = Arc::clone(&captured);
+            let events = EventBus::default();
+            events
+                .initialize(tauri::ipc::Channel::new(move |body| {
+                    let tauri::ipc::InvokeResponseBody::Json(body) = body else {
+                        panic!("Expected a JSON event");
+                    };
+                    received
+                        .lock()
+                        .unwrap()
+                        .push(serde_json::from_str(&body).unwrap());
+                    Ok(())
+                }))
+                .unwrap();
+            let message = "The I/O operation has been aborted. (os error 995)";
+            publish_transport_disconnected(&events, command, message, firmware_owned);
+            let mut expected = Vec::new();
+            if report_error {
+                expected.push(json!({ "channel": "serial:error", "payload": message }));
+            }
+            expected.extend([
+                json!({ "channel": "board:active", "payload": false }),
+                json!({ "channel": "serial:disconnected", "payload": null }),
+            ]);
+            assert_eq!(
+                *captured.lock().unwrap(),
+                expected,
+                "command={command:?}, firmware_owned={firmware_owned}"
+            );
+        }
+    }
 
     #[tokio::test]
     async fn cancelled_caller_does_not_leak_or_prematurely_release_the_device_lock() {

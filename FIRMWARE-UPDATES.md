@@ -10,7 +10,9 @@ Publish component assets as `flight_computer-<semver>.bin` and
 after installation. A release tag may identify an integration release instead;
 it is not used as the component version. Drafts, prereleases, development asset
 versions, legacy unversioned filenames, and custom/local files are not eligible.
-`telemetry-<semver>.bin` is reserved but telemetry updating is disabled.
+`telemetry-<semver>.bin` is supported for preparing Ground Station radio updates.
+Configurator validates and stages the image; both receivers are programmed by
+the Ground Station after safe USB eject and confirmation on its screen.
 
 Downloads use a bounded GitHub API scan, restricted HTTPS redirects, exact size,
 available GitHub SHA-256 digest, and target-specific structural validation.
@@ -18,6 +20,13 @@ Without a GitHub digest, a locally recorded download hash protects retry within
 the current app session; after restart such an asset is downloaded again.
 
 ## Device safety and recovery
+
+Firmware downgrades are allowed through the normal update confirmation, including
+installing the official stable release over a newer development version. The same
+policy applies to Vega, Ground Station, and preparation of GS radio firmware.
+Same-version reinstalls and unknown/unverified installed versions still require
+their existing confirmations. Image validation and post-install verification
+apply equally to upgrades and downgrades.
 
 - Vega requires an accessible STM32 Bootloader WinUSB driver on Windows,
   an identified Vega reporting READY, no pending serial transaction, and
@@ -28,6 +37,11 @@ the current app session; after restart such an asset is downloaded again.
   or ST-LINK driver. The updater never silently installs or changes drivers.
 - The native host owns the serial connection during an update. Ordinary commands,
   automatic connections, navigation, and normal application close/quit are blocked.
+  Serial disconnects during a firmware operation update the connection state but
+  do not also raise a generic serial-error notification. The firmware operation
+  handles bootloader entry, reconnect deadlines, and failures through its own result;
+  a disconnect alone never establishes update success. Normal serial operations
+  still report unexpected connection errors.
   Cancellation ends at the bootloader-transition boundary. OS forced termination,
   power loss, or unplugging cannot be prevented by the app.
 - Vega enters DFU through `bl`. The native Rust backend uses `nusb` and ST's
@@ -38,20 +52,127 @@ the current app session; after restart such an asset is downloaded again.
   the separate application-start request. No mass erase, option-byte writes,
   protection changes, or USB reset commands are exposed. Failure leaves the
   device in DFU; retry revalidates the cache and selects the same DFU identity.
-- Ground Station uses a dedicated 115200-baud console and the existing 1200-baud
-  TinyUF2 transition. More than one ambiguous application/recovery device is
+- Ground Station reads component versions from its mounted `version.json` and uses a USB runtime
+  `DFU_DETACH` request to invoke the `0x11F2` TinyUF2 reset hint. The 1200-baud
+  transition enters ESP32 ROM download mode and must not be used for UF2 updates.
+  If runtime DFU is inaccessible (for example, its Windows interface has no
+  compatible driver), enter Settings → Update Firmware → Ground Station on the
+  device, then check devices again. More than one ambiguous application/recovery device is
   rejected. Only validated ESP32-S2 application UF2 files are copied as `NEW.UF2`.
   The bootloader and partition table are never updated by this feature.
-- Copy/flush completion or drive disappearance alone is not success: the running
-  device must report the selected firmware version after reconnection. An I/O
-  error during copy/flush remains a failure even if a drive disappeared.
+- Copy/flush completion or drive disappearance alone is not success: the
+  restarted device must expose the selected firmware version in a freshly read
+  `version.json` after recovery disconnects and its application reconnects. A
+  Windows device-disappeared error (433 or 1167) at final flush/sync, after the
+  entire image was accepted by `write_all`, proceeds to that verification: TinyUF2
+  may restart before Windows finishes finalizing the file. Partial writes and
+  all other I/O errors remain failures, even if the drive disappeared.
 
-Ground Station emits `CATS-FW target=ground-station version=<semver>` on console
-activation and generates the same line in `/version.txt` before handing its FAT
-volume to the PC. A file-derived version is unverified information. It cannot
-authorize a downgrade or confirm an installation; live serial takes precedence.
+Current Ground Station firmware generates `/version.json` containing
+`ground_station`, `telemetry_1`, and `telemetry_2` before handing its FAT volume to
+the PC. Configurator uses that file for discovery, pre-update version policy,
+and post-restart verification. It requires one unambiguous application device and
+one metadata volume; missing/malformed metadata remains unknown. No GS serial
+console is opened, and neither the console banner nor old `version.txt` is used.
+File metadata is device-reported information, not cryptographic attestation.
 Missing, malformed, or failed metadata does not disable the device or its drive.
 Configuration, calibration, and logs remain untouched.
+
+### Ground Station radio preparation (2.0.0 testing installer)
+
+Matched against fetched `cats-embedded origin/main` at `d03fa477971158c6ca9c62c811af4dad428daa32`.
+On Firmware Updates, select the normal GS USB drive in **Ground Station radios**.
+Discovery requires a mounted FAT removable volume and the three component fields
+in `version.json`; these identify a candidate, not cryptographic device identity.
+The user confirms the intended destination. The two radio versions are displayed
+as unverified file metadata. Both are checked for reported same-version reinstalls,
+and explicit unknown/unverified-version confirmation is required.
+
+The native host downloads the official stable telemetry asset and checks its
+size, available SHA-256 digest, and STM32G071 vectors (256 bytes–128 KiB, 36 KiB
+RAM, application at `0x08000000`). It creates `telemetry_firmware` if needed,
+writes and syncs a unique `.part`, reads it back, then renames it to the official
+`.bin` name. An identical existing image is accepted; conflicting files are never
+overwritten. The selected volume identity and metadata are checked again.
+An interrupted `.part` is not selectable by the GS updater.
+
+**Prepared is not installed.** Safely eject the drive in Windows, then use
+**Settings → Update Firmware → Radio Receivers** on the GS. Select the prepared
+file and confirm updating both radios. The embedded updater owns UART handoff,
+ROM erase/write/readback, receiver restart and result reporting. Check **Both
+radios verified** and both versions on the device, then power-cycle and reconnect
+to refresh `version.json`. Configurator cannot start or verify that operation
+through the current GS console protocol. Vega telemetry updating remains disabled.
+Keep the GS powered and do not run another Configurator firmware operation during
+its on-device radio update. Physical acceptance of these GS paths remains pending.
+
+**How to install on the GS** opens an offline illustrated guide from the Ground
+Station radios card, even without a detected device or release. After preparation,
+**Show installation guide** also appears beside the result. It covers safe eject,
+Settings → System → Update Firmware → Radio Receivers, file selection, installation,
+both-receiver verification, and refreshing the reported versions. The six bundled
+400×240 screenshots in `src/assets/radio-update` were captured from the compiled
+Ground Station WebAssembly simulator using the `radio-update.json` scenario flow
+and its production Window renderer. Filenames, versions, sizes and CRC values in
+these screenshots are illustrative simulator values, not release metadata.
+
+Initial 2.0.0 build validation on Windows, 2026-09-06: 59 frontend tests and 52 Rust tests passed
+(10 opt-in tests excluded), along with ESLint, Prettier, Rust formatting, Clippy
+with warnings denied, release-contract checks, production frontend and NSIS
+builds. A separate read-only live test downloaded and validated the official
+Vega 3.0.2, GS 1.3.0 and telemetry 1.2.0 assets against their release SHA-256
+digests. No hardware was flashed. The unsigned installer is
+`src-tauri/target/release/bundle/nsis/CATS Configurator_2.0.0_x64-setup.exe`
+(11,718,400 bytes; SHA-256
+`10ee5093bdb6fb90580842f436b5656c7f24cd458eac6e7dd4923cff31f471a1`).
+Both executable and installer metadata report 2.0.0. Local packaging used the
+existing Node 24 runtime and local Vite/Tauri executables because npm was absent;
+no dependencies or package manager were changed.
+
+### Markdown and version.json follow-up
+
+Release notes render Markdown headings, tables, lists, code and links through
+`markdown-it`. Raw HTML and embedded images are disabled; link clicks use the
+existing native HTTPS allowlist and external browser.
+
+The previous GS preparation failure, Windows error 995, was reproduced on COM3
+before any write. The console input purge cancelled the outstanding asynchronous
+read. Ground Station discovery, preparation and post-restart verification now
+use `version.json` instead of opening the console, as requested. Three consecutive
+read-only checks on the connected GS returned 1.3.0 in 0.02 seconds total.
+Post-update verification still requires recovery-drive disappearance, application
+reconnection, and a newly read matching version file. No physical firmware update
+was performed during this follow-up.
+
+Validation: 63 frontend tests and 50 Rust tests passed (11 opt-in tests excluded),
+plus ESLint, Prettier, Clippy with warnings denied, and release-contract checks.
+The lower Rust count reflects removal of the superseded console-parser tests.
+The rebuilt 2.0.0 NSIS installer (2026-09-06 15:21 local) is 11,863,821 bytes,
+SHA-256 `02e33c9bc24b863578c1f391a01280fb76d4ce6cca1af8aa38e0c04aca731f2f`.
+It replaces the initial installer at the same path above.
+
+### TinyUF2 automatic-disconnect follow-up
+
+The testing report showed Windows error 433 after a successful UF2 copy and the
+expected brief USB-drive disappearance. The pinned TinyUF2 implementation calls
+`board_dfu_complete()` once all UF2 blocks arrive (`src/msc.c` at
+`8542b474ffa19c0dd66a8ccc99b1d6b8caff8d12`), which can race the host's final flush.
+Configurator now proceeds to restart/version.json verification for Windows
+errors 433 and 1167 at final flush/sync, only after `write_all` accepted the entire
+image. This is not reported as installation success on its own. Partial-write
+errors, unrelated flush/sync failures, and missing or mismatched post-restart
+versions still fail. A verification retry checks only the connection.
+
+Validation: 63 frontend tests and 53 Rust tests passed (11 opt-in tests excluded),
+including partial-write disconnects, final-flush disconnects, and strict sync-error
+classification. ESLint, Prettier, Rust formatting, Clippy with warnings denied,
+release-contract and production-target checks passed. Hardware re-testing of this
+change is still required; no device was flashed while implementing it.
+Three read-only checks of the attached Ground Station's `version.json` each
+returned 1.3.0. The rebuilt unsigned 2.0.0 NSIS installer (2026-09-06 15:30 local)
+is 11,873,317 bytes, SHA-256
+`02ac9bf07d06a6259a5b9efbd7219916349c26a782e08a793aa62373a737126a`.
+It replaces the previous installer at the same path above.
 
 ## Validation and release readiness
 
@@ -109,7 +230,7 @@ recorded; the UI and native host both enforce this restriction.
 For the requested Mac bench test, pull-request CI builds Apple Silicon and Intel
 DMGs with the explicit `firmware-hardware-test` Cargo feature. These installers
 show a hardware-test warning and enable the native Mac update path while keeping
-device identity, safety confirmation, image validation, downgrade protection,
+device identity, safety confirmation, image validation, version confirmations,
 and verification requirements intact. Tag/main builds do not enable this feature.
 The feature does not permit custom firmware or change the official asset contract.
 CI checks each DMG, ad-hoc app signature, and executable architecture, then copies
@@ -123,28 +244,30 @@ or x64 for Intel.
 Before testing, disconnect Vega deployment charges, close other serial/DFU tools,
 and keep a known recovery route available. Record the Mac model, macOS version,
 USB connection/cable, starting and selected firmware versions, and the updater's
-final result. A successful test requires the selected version from fresh serial
-reporting after writing, plus a power-cycle and settings check. Do not interrupt
+final result. A successful test requires the selected version from fresh Vega
+serial reporting or the restarted GS `version.json`, plus a power-cycle and settings check. Do not interrupt
 an active write for an initial acceptance test.
 
 ### Retry and cancellation audit
 
 Validated firmware is retained in memory through the USB operation, so changing
 a cache file after validation cannot change the image written. Retrying a failed
-write revalidates its cached bytes. A GS retry preserves the serial version and
-confirmation from before entering recovery; file-derived metadata never grants
-that approval.
+write revalidates its cached bytes. A GS retry preserves the checked `version.json`
+version and confirmation from before entering recovery. It does not replace that
+approval with metadata from an unrelated or ambiguous volume.
 
 After a successful write, a failed reconnection/version check offers **Retry
 connection check**. It does not download, erase, or rewrite another image. Missing
 or delayed startup reporting is retried within bounded deadlines; a reported
 version mismatch remains a failure. Accepted cancellation cannot be lost before
 the background worker starts, and cancellation is rejected after the transition
-boundary. Failed writes, flushes, and final disk synchronization remain failures.
+boundary. Failed writes remain failures. Only Windows device-disappeared errors
+at final flush/sync after the full UF2 write proceed to reconnect verification;
+a failed verification offers a connection-only retry, never an automatic rewrite.
 The serial request owns its pending-operation count until the request completes
 or its worker stops. Cancelling the caller cannot leak the lock or permit a
 firmware transition while that command is still running. SemVer build metadata
-does not turn a same-version reinstall into a downgrade, and odd-length Vega
+does not bypass same-version reinstall confirmation, and odd-length Vega
 images are rejected before entering DFU.
 
 The portability audit passed 57 frontend tests and 46 Rust tests on both Windows

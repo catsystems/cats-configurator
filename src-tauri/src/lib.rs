@@ -1129,7 +1129,9 @@ mod tests {
         }
     }
     #[test]
-    fn application_version_is_alpha() {
-        assert!(env!("CARGO_PKG_VERSION").starts_with("2.0.0-alpha"));
+    fn application_version_matches_installer() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(config["version"].as_str(), Some(env!("CARGO_PKG_VERSION")));
     }
 }

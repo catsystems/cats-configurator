@@ -70,6 +70,13 @@
         >
       </div>
       <p class="mt-2">{{ snapshot.message }}</p>
+      <v-btn
+        v-if="snapshot.stage === 'prepared'"
+        class="mt-4"
+        color="primary"
+        @click="radioGuideOpen = true"
+        >Show installation guide</v-btn
+      >
       <p v-if="snapshot.failedStage" class="text-caption mt-2">
         Failed stage: {{ snapshot.failedStage }}
       </p>
@@ -105,10 +112,25 @@
             density="compact"
           />
           <dl class="firmware-versions mb-4">
-            <dt>Installed version</dt>
-            <dd>
+            <dt>
+              {{
+                target.id === "telemetry"
+                  ? "Radio 1 / Radio 2"
+                  : "Installed version"
+              }}
+            </dt>
+            <dd v-if="target.id === 'telemetry'">
+              {{ device(target.id)?.telemetryVersions?.[0] ?? "Unknown" }} /
+              {{ device(target.id)?.telemetryVersions?.[1] ?? "Unknown" }}
+              (file, unverified)
+            </dd>
+            <dd v-else>
               {{ device(target.id)?.version ?? "Unknown"
               }}<span
+                v-if="device(target.id)?.versionSource === 'version-json'"
+              >
+                (version.json)</span
+              ><span
                 v-if="device(target.id)?.versionSource === 'file-unverified'"
               >
                 (file, unverified)</span
@@ -139,7 +161,19 @@
             color="primary"
             :disabled="!canUpdate(target.id)"
             @click="confirm(target.id)"
-            >Update {{ target.name }}</v-btn
+            >{{
+              target.id === "telemetry"
+                ? "Prepare radio firmware"
+                : `Update ${target.name}`
+            }}</v-btn
+          >
+          <v-btn
+            v-if="target.id === 'telemetry'"
+            class="mt-3 d-flex"
+            variant="text"
+            prepend-icon="mdi-help-circle-outline"
+            @click="radioGuideOpen = true"
+            >How to install on the GS</v-btn
           >
           <v-expansion-panels
             v-if="asset(target.id)"
@@ -147,38 +181,41 @@
             variant="accordion"
           >
             <v-expansion-panel title="Release notes">
-              <v-expansion-panel-text
-                ><p class="release-notes">
-                  {{ asset(target.id).notes || "No release notes provided." }}
-                </p></v-expansion-panel-text
-              >
+              <v-expansion-panel-text>
+                <ReleaseNotes
+                  :notes="asset(target.id).notes"
+                  :release-url="asset(target.id).releaseUrl"
+                  @error="localError = $event"
+                />
+              </v-expansion-panel-text>
             </v-expansion-panel>
           </v-expansion-panels>
         </v-card>
       </v-col>
     </v-row>
 
-    <v-card variant="outlined" class="pa-5 mt-6">
-      <div class="d-flex align-center ga-3 mb-2">
-        <h2 class="text-h5">Telemetry</h2>
-        <v-chip size="small">Updating unavailable</v-chip>
-      </div>
-      <p class="mb-2">
-        Installed version:
-        {{ snapshot?.telemetryVersion ?? "Unknown — connect Vega to read it" }}
-      </p>
-      <p class="text-body-2 text-medium-emphasis">
-        Existing telemetry boards require ST-LINK/TC2030 provisioning. Updating
-        through Vega remains disabled until the routed updater passes separate
-        hardware acceptance.
-      </p>
-    </v-card>
+    <v-dialog
+      v-model="radioGuideOpen"
+      max-width="960"
+      scrollable
+      aria-labelledby="radio-guide-title"
+    >
+      <RadioUpdateGuide @close="radioGuideOpen = false" />
+    </v-dialog>
 
     <v-dialog v-model="dialog" max-width="640" :persistent="busy">
       <v-card class="pa-5">
-        <h2 class="text-h5 mb-3">Confirm firmware update</h2>
+        <h2 class="text-h5 mb-3">
+          {{
+            confirmTarget === "telemetry"
+              ? "Prepare Ground Station radio firmware"
+              : "Confirm firmware update"
+          }}
+        </h2>
         <p class="mb-3">
-          Install {{ asset(confirmTarget)?.version }} on
+          {{ confirmTarget === "telemetry" ? "Copy firmware" : "Install" }}
+          {{ asset(confirmTarget)?.version }}
+          {{ confirmTarget === "telemetry" ? "to" : "on" }}
           {{ device(confirmTarget)?.label }}?
         </p>
         <v-checkbox
@@ -186,7 +223,9 @@
           :label="
             confirmTarget === 'vega'
               ? 'Deployment charges are disconnected and Vega is safely on the bench.'
-              : 'Tracking and recording have stopped, and all Ground Station drive files are closed.'
+              : confirmTarget === 'telemetry'
+                ? 'This is my Ground Station drive. Tracking and recording have stopped, and its files are closed.'
+                : 'Tracking and recording have stopped, and all Ground Station drive files are closed.'
           "
           hide-details
           class="mb-3"
@@ -201,19 +240,29 @@
         <v-checkbox
           v-if="unknownVersion"
           v-model="unknownConfirmed"
-          label="The installed version is unknown or unverified. I understand that downgrade protection is unavailable."
+          label="The installed version is unknown or unverified. I want to continue without a verified installed version."
           hide-details
           class="mb-3"
         />
-        <p class="text-body-2 text-medium-emphasis mb-4">
+        <p
+          v-if="confirmTarget === 'telemetry'"
+          class="text-body-2 text-medium-emphasis mb-4"
+        >
+          Configurator prepares the file only. Safely eject the drive
+          afterwards, then open Settings → System → Update Firmware → Radio
+          Receivers on the Ground Station. Select the file and confirm updating
+          both radios on its screen. Keep the Ground Station powered throughout
+          the update.
+        </p>
+        <p v-else class="text-body-2 text-medium-emphasis mb-4">
           Keep USB connected. Cancellation is only available before entering the
           bootloader.
         </p>
         <div class="d-flex justify-end ga-3">
           <v-btn variant="text" @click="dialog = false">Back</v-btn
-          ><v-btn color="primary" :disabled="!confirmed" @click="start"
-            >Start update</v-btn
-          >
+          ><v-btn color="primary" :disabled="!confirmed" @click="start">{{
+            confirmTarget === "telemetry" ? "Prepare file" : "Start update"
+          }}</v-btn>
         </div>
       </v-card>
     </v-dialog>
@@ -223,9 +272,12 @@
 <script>
 import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
+import ReleaseNotes from "@/components/ReleaseNotes.vue";
+import RadioUpdateGuide from "@/components/RadioUpdateGuide.vue";
 
 export default {
   name: "FirmwareUpdates",
+  components: { ReleaseNotes, RadioUpdateGuide },
   data: () => ({
     targets: [
       {
@@ -238,10 +290,17 @@ export default {
         name: "Ground Station",
         description: "ESP32-S2 firmware · updates through TinyUF2",
       },
+      {
+        id: "telemetry",
+        name: "Ground Station radios",
+        description:
+          "Prepare the official telemetry image on the Ground Station USB drive, then follow the installation guide to update both radios on the device. Connect its normal USB drive to detect version.json.",
+      },
     ],
     selected: {},
     localError: "",
     dialog: false,
+    radioGuideOpen: false,
     confirmTarget: "vega",
     safetyConfirmed: false,
     reinstallConfirmed: false,
@@ -262,6 +321,14 @@ export default {
         .replace(/^./, (c) => c.toUpperCase());
     },
     sameVersion() {
+      if (this.confirmTarget === "telemetry") {
+        return (
+          this.device("telemetry")?.telemetryVersions?.some(
+            (version) =>
+              version?.split("+")[0] === this.asset("telemetry")?.version,
+          ) ?? false
+        );
+      }
       const installed = this.device(this.confirmTarget)?.version;
       return (
         !!installed &&
@@ -270,7 +337,10 @@ export default {
     },
     unknownVersion() {
       const device = this.device(this.confirmTarget);
-      return !device?.version || device.versionSource !== "serial";
+      return (
+        !device?.version ||
+        !["serial", "version-json"].includes(device.versionSource)
+      );
     },
     confirmed() {
       return (
@@ -378,9 +448,5 @@ export default {
 .firmware-versions dd {
   margin: 0;
   font-weight: 600;
-}
-.release-notes {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 </style>
