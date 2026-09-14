@@ -56,6 +56,10 @@ const installerHooks = await fs.readFile(
 );
 assert.match(installerHooks, /0f7e2335-0fae-5554-8f8f-93ac69b9f97d/);
 assert.match(installerHooks, /\/KEEP_APP_DATA --updated/);
+assert.match(
+  installerHooks,
+  /Push \$R0\s+Push \$R1\s+Push \$R2\s+Push \$R3\s+!insertmacro CheckIfAppIsRunning "CATS Configurator\.exe" "CATS Configurator"\s+Pop \$R3\s+Pop \$R2\s+Pop \$R1\s+Pop \$R0/,
+);
 
 const workflow = await fs.readFile(
   new URL("../.github/workflows/build.yml", import.meta.url),

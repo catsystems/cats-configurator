@@ -37,13 +37,23 @@
     Goto cats_legacy_install_failed
   ${EndIf}
 
+  ; The Tauri process check uses $R0-$R3 internally, so preserve the legacy
+  ; installation values across it.
+  Push $R0
+  Push $R1
+  Push $R2
+  Push $R3
   !insertmacro CheckIfAppIsRunning "CATS Configurator.exe" "CATS Configurator"
+  Pop $R3
+  Pop $R2
+  Pop $R1
+  Pop $R0
 
   InitPluginsDir
   ClearErrors
   CopyFiles /SILENT "$R2" "$PLUGINSDIR\cats-configurator-electron-uninstaller.exe"
   ${If} ${Errors}
-    StrCpy $R4 "The earlier CATS Configurator installation could not be prepared for removal. Close the app and run this installer again."
+    StrCpy $R4 "The earlier CATS Configurator uninstaller could not be copied. Restart Windows, then run this installer again."
     Goto cats_legacy_install_failed
   ${EndIf}
 
