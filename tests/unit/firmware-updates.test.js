@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FirmwareUpdates from "@/views/FirmwareUpdates.vue";
 import AppBar from "@/components/AppBar.vue";
+import RadioUpdateGuide from "@/components/RadioUpdateGuide.vue";
 import { useAppStore } from "@/store";
 import vuetify from "@/plugins/vuetify";
 
@@ -29,7 +30,7 @@ const snapshot = () => ({
       notes: "<script>not executable</script>",
     },
   ],
-  telemetryVersion: "1.1.3",
+  telemetryVersion: "9.8.7",
 });
 
 describe("firmware updates", () => {
@@ -73,7 +74,7 @@ describe("firmware updates", () => {
     expect(useAppStore().active).toBe(false);
     expect(wrapper.text()).toContain("Firmware Updates");
     expect(wrapper.text()).not.toContain("Vega telemetry");
-    expect(wrapper.text()).not.toContain("1.1.3");
+    expect(wrapper.text()).not.toContain("9.8.7");
     expect(wrapper.text()).toContain("Ground Station radios");
     expect(wrapper.text()).toContain("Legacy filenames");
     expect(wrapper.vm.canUpdate("ground-station")).toBe(true);
@@ -97,6 +98,12 @@ describe("firmware updates", () => {
     expect(wrapper.vm.canUpdate("telemetry")).toBe(true);
     expect(wrapper.text()).toContain("1.1.0 /");
     expect(wrapper.text()).toContain("Prepare radio firmware");
+    expect(wrapper.text()).toContain(
+      "radio-receiver updates require telemetry firmware 1.2.0 or newer",
+    );
+    expect(wrapper.text()).toContain(
+      "read the installation guide before continuing",
+    );
     wrapper.vm.confirm("telemetry");
     wrapper.vm.safetyConfirmed = true;
     await wrapper.vm.start();
@@ -113,6 +120,21 @@ describe("firmware updates", () => {
       unknownVersionConfirmed: true,
       reinstallConfirmed: true,
     });
+    wrapper.unmount();
+  });
+  it("explains the one-time installation required by older radio firmware", () => {
+    const wrapper = mount(RadioUpdateGuide, {
+      global: { plugins: [vuetify] },
+    });
+    const text = wrapper.text();
+    expect(text).toContain("Telemetry 1.1.3 and earlier cannot enter");
+    expect(text).toContain("ST-Link/TC2030");
+    expect(text).toContain("ROM-update-capable telemetry build");
+    expect(text).toContain("stops before flash erase");
+    expect(text).toContain("installed firmware remains unchanged");
+    expect(text).toContain("until the Ground Station restarts");
+    expect(text).toContain("missing entry acknowledgement is ambiguous");
+    expect(text).not.toMatch(/brick/i);
     wrapper.unmount();
   });
   it.each(["vega", "ground-station", "telemetry"])(

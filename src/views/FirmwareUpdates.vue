@@ -100,6 +100,16 @@
           <p class="text-body-2 text-medium-emphasis mb-5">
             {{ target.description }}
           </p>
+          <v-alert
+            v-if="target.id === 'telemetry'"
+            type="warning"
+            variant="tonal"
+            class="mb-4"
+          >
+            Ground Station radio-receiver updates require telemetry firmware
+            1.2.0 or newer. If either receiver is on 1.1.3 or earlier, read the
+            installation guide before continuing.
+          </v-alert>
           <v-select
             v-model="selected[target.id]"
             :items="devices(target.id)"

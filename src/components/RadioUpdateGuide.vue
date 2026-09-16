@@ -12,6 +12,15 @@
         Configurator prepares the firmware file. Finish the installation on the
         Ground Station to update both radio receivers.
       </p>
+      <v-alert type="warning" variant="tonal" class="mb-4">
+        Ground Station radio-receiver updates require telemetry firmware 1.2.0
+        or newer. Telemetry 1.1.3 and earlier cannot enter the update protocol;
+        install a ROM-update-capable telemetry build once with ST-Link/TC2030
+        before using Ground Station updates. An unsupported attempt stops before
+        flash erase, so the installed firmware remains unchanged. The Ground
+        Station may quarantine that receiver until the Ground Station restarts
+        because a missing entry acknowledgement is ambiguous.
+      </v-alert>
       <p class="text-body-2 text-medium-emphasis mb-6">
         Screenshots are from the GS simulator. Filenames, versions, sizes and
         checksums are examples; yours may differ. Use the arrow buttons to
