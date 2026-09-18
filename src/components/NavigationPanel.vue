@@ -36,13 +36,16 @@
           :to="item.link"
           :title="item.title"
           color="primary"
-          :disabled="(item.requiresBoard && !active) || !!changedTab"
+          :disabled="
+            firmwareBusy || (item.requiresBoard && !active) || !!changedTab
+          "
         />
         <v-list-item
           class="flights-link"
           :href="flightsUrl"
           target="_blank"
           rel="noreferrer"
+          @click.prevent="openFlights"
         >
           <template #title>
             <span>Flights</span>
@@ -56,7 +59,7 @@
 </template>
 
 <script>
-import { mapState } from "pinia";
+import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
 import { getConfigs } from "@/services/configService";
 import { getEvents } from "@/services/eventService";
@@ -82,9 +85,17 @@ export default {
     };
   },
   computed: {
-    ...mapState(useAppStore, ["active", "changedTab"]),
+    ...mapState(useAppStore, ["active", "changedTab", "firmwareBusy"]),
   },
   methods: {
+    ...mapActions(useAppStore, ["showErrorSnackbar"]),
+    async openFlights() {
+      try {
+        await window.cats.app.openExternal(this.flightsUrl);
+      } catch (error) {
+        this.showErrorSnackbar(error.message);
+      }
+    },
     discard() {
       switch (this.changedTab) {
         case "config":

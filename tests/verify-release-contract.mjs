@@ -1,75 +1,103 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
+import fs from "node:fs/promises";
+import packageJson from "../package.json" with { type: "json" };
+import lockfile from "../package-lock.json" with { type: "json" };
+import config from "../src-tauri/tauri.conf.json" with { type: "json" };
 
-const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
-const packageLock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
-const workflow = fs.readFileSync(".github/workflows/build.yml", "utf8");
+const cargo = await fs.readFile(
+  new URL("../src-tauri/Cargo.toml", import.meta.url),
+  "utf8",
+);
+assert.equal(packageJson.name, "cats-configurator");
+assert.equal(config.productName, packageJson.productName);
+assert.equal(config.version, packageJson.version);
+assert.equal(config.identifier, "com.cats.cats-configurator");
+assert.equal(config.build.frontendDist, "../dist");
+assert.equal(lockfile.name, packageJson.name);
+assert.equal(lockfile.version, packageJson.version);
+assert.equal(lockfile.packages[""].name, packageJson.name);
+assert.equal(lockfile.packages[""].version, packageJson.version);
+assert.match(cargo, /^name = "cats-configurator"$/m);
+assert.equal(cargo.match(/^version = "([^"]+)"$/m)?.[1], packageJson.version);
 
-assert.equal(
-  packageJson.version,
-  packageLock.version,
-  "package and lockfile versions must match",
+for (const section of ["dependencies", "devDependencies"]) {
+  assert.deepEqual(lockfile.packages[""][section], packageJson[section]);
+  for (const name of Object.keys(packageJson[section])) {
+    assert.ok(
+      !name.startsWith("electron"),
+      `Legacy Electron dependency: ${name}`,
+    );
+  }
+}
+
+for (const [platform, targets] of [
+  ["windows", ["nsis"]],
+  ["macos", ["app", "dmg"]],
+  ["linux", ["appimage", "deb"]],
+]) {
+  const platformConfig = JSON.parse(
+    await fs.readFile(
+      new URL(`../src-tauri/tauri.${platform}.conf.json`, import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.deepEqual(platformConfig.bundle.targets, targets);
+  if (platform === "windows") {
+    assert.equal(
+      platformConfig.bundle.windows.nsis.installerHooks,
+      "installer-hooks.nsh",
+    );
+  }
+}
+
+const installerHooks = await fs.readFile(
+  new URL("../src-tauri/installer-hooks.nsh", import.meta.url),
+  "utf8",
 );
-assert.equal(
-  packageJson.version,
-  packageLock.packages[""].version,
-  "root lockfile metadata must match the package version",
-);
-assert.equal(
-  packageJson.productName,
-  "CATS Configurator",
-  "product name no longer matches the signing metadata contract",
-);
-assert.equal(
-  packageJson.author,
-  "Control and Telemetry Systems GmbH",
-  "company name no longer matches the signing metadata contract",
-);
-assert.equal(
-  packageJson.build.copyright,
-  "Copyright © 2026 Control and Telemetry Systems GmbH",
-  "copyright no longer matches the signing metadata contract",
-);
-assert.equal(
-  packageJson.build.win.executableName,
-  "CATS Configurator",
-  "Windows executable name no longer matches the signing metadata contract",
-);
-assert.equal(
-  packageJson.build.win.artifactName,
-  "${name}-Setup-${version}.${ext}",
-  "Windows release name no longer matches the updater contract",
-);
-assert.equal(
-  packageJson.build.mac.artifactName,
-  "${name}-${version}-${arch}.${ext}",
-  "macOS release name no longer matches the updater contract",
-);
-assert.equal(
-  packageJson.build.linux.artifactName,
-  "${name}-${version}.${ext}",
-  "Linux release name no longer matches the updater contract",
+assert.match(installerHooks, /0f7e2335-0fae-5554-8f8f-93ac69b9f97d/);
+assert.match(installerHooks, /\/KEEP_APP_DATA --updated/);
+assert.match(
+  installerHooks,
+  /Push \$R0\s+Push \$R1\s+Push \$R2\s+Push \$R3\s+!insertmacro CheckIfAppIsRunning "CATS Configurator\.exe" "CATS Configurator"\s+Pop \$R3\s+Pop \$R2\s+Pop \$R1\s+Pop \$R0/,
 );
 
-for (const expected of [
-  "--win nsis --x64",
-  "--mac dmg --x64",
-  "--mac dmg --arm64",
-  "--linux AppImage --x64",
+const workflow = await fs.readFile(
+  new URL("../.github/workflows/build.yml", import.meta.url),
+  "utf8",
+);
+for (const filename of [
+  "cats-configurator-Setup-$version.exe",
+  "cats-configurator-$version.AppImage",
+  "cats-configurator-$version-arm64.dmg",
+  "cats-configurator-$version-x64.dmg",
 ]) {
   assert.ok(
-    workflow.includes(expected),
-    `release workflow is missing ${expected}`,
+    workflow.includes(filename),
+    `Missing release filename: ${filename}`,
   );
 }
 
-assert.ok(
-  workflow.includes("npm run verify:release-tag"),
-  "release workflow does not validate the tag against the package version",
+const host = await fs.readFile(
+  new URL("../src/host.js", import.meta.url),
+  "utf8",
 );
-assert.ok(
-  workflow.includes("CODE_SIGNING_POLICY.md"),
-  "generated release notes do not link to the code signing policy",
+const backend = await fs.readFile(
+  new URL("../src-tauri/src/lib.rs", import.meta.url),
+  "utf8",
 );
+const commands = [...host.matchAll(/(?:call|invoke)\("([a-z_]+)"/g)].map(
+  (match) => match[1],
+);
+const handlers =
+  backend.match(/tauri::generate_handler!\[([\s\S]*?)\]/)?.[1] ?? "";
+for (const command of commands) {
+  assert.match(
+    handlers,
+    new RegExp(`\\b${command}\\b`),
+    `Unregistered host command: ${command}`,
+  );
+}
 
-console.log("Release artifact naming and architecture contract verified.");
+console.log(
+  "Root Tauri identity, lockfile, native targets, upgrade bridge, and host commands verified.",
+);

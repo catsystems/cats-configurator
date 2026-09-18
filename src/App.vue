@@ -3,7 +3,6 @@
     <AppBar />
     <NavPanel :items="navItems" />
     <Snackbar />
-    <UpdateDialog />
     <AppFooter />
 
     <v-main>
@@ -18,7 +17,6 @@ import { useAppStore } from "@/store";
 import AppBar from "@/components/AppBar.vue";
 import NavPanel from "@/components/NavigationPanel.vue";
 import Snackbar from "@/components/Snackbar.vue";
-import UpdateDialog from "@/components/UpdateDialog.vue";
 import AppFooter from "@/components/Footer.vue";
 
 export default {
@@ -27,7 +25,6 @@ export default {
     AppBar,
     NavPanel,
     Snackbar,
-    UpdateDialog,
     AppFooter,
   },
   data() {
@@ -48,6 +45,7 @@ export default {
         { title: "Preflight", link: "/preflight", requiresBoard: true },
         { title: "CLI", link: "/cli", requiresBoard: true },
         { title: "Flight Logs", link: "/flight-logs", requiresBoard: false },
+        { title: "Firmware Updates", link: "/firmware", requiresBoard: false },
       ],
     };
   },
@@ -55,12 +53,15 @@ export default {
     if (this.$route.path !== "/") this.$router.push("/");
 
     this.subscriptions.push(
-      window.cats.updates.onState((state) => this.handleUpdateState(state)),
+      window.cats.firmware.onState((snapshot) =>
+        this.setFirmwareSnapshot(snapshot),
+      ),
       window.cats.app.onAlert((text) => window.alert(text)),
       window.cats.board.onStaticData((data) => this.setStaticData(data)),
       window.cats.board.onActive((value) => {
         const wasActive = this.active;
         this.setActiveState(value);
+        if (this.firmwareBusy) return;
         if (value && !wasActive) {
           if (this.$route.name !== "Config") this.$router.push("/config");
         } else if (!value && wasActive) {
@@ -84,19 +85,20 @@ export default {
         this.showSuccessSnackbar("Values saved successfully!");
       }),
     );
-    void window.cats.updates
+    void window.cats.firmware
       .current()
-      .then((state) => this.setUpdateState(state))
+      .then(this.setFirmwareSnapshot)
       .catch((error) => this.showErrorSnackbar(error.message));
   },
   beforeUnmount() {
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
   },
   computed: {
-    ...mapState(useAppStore, ["active"]),
+    ...mapState(useAppStore, ["active", "firmwareBusy"]),
   },
   methods: {
     ...mapActions(useAppStore, [
+      "setFirmwareSnapshot",
       "setStaticData",
       "setActiveState",
       "setChangedTab",
@@ -108,17 +110,7 @@ export default {
       "clearCurrentBoardProfile",
       "showSuccessSnackbar",
       "showErrorSnackbar",
-      "setUpdateState",
     ]),
-    handleUpdateState(state) {
-      this.setUpdateState(state);
-      if (!state.manual) return;
-      if (state.status === "up-to-date") {
-        this.showSuccessSnackbar("CATS Configurator is up to date.");
-      } else if (state.status === "error") {
-        this.showErrorSnackbar(state.message || "The update check failed.");
-      }
-    },
   },
 };
 </script>

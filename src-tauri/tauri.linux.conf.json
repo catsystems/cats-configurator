@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["appimage", "deb"],
+    "resources": ["resources/70-cats-devices.rules"],
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/lib/udev/rules.d/70-cats-devices.rules": "resources/70-cats-devices.rules"
+        }
+      }
+    }
+  }
+}

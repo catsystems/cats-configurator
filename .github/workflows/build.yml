@@ -1,6 +1,7 @@
 name: CI and release
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -12,81 +13,32 @@ permissions:
   contents: read
 
 jobs:
-  quality:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install locked dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Check formatting
-        run: npm run format:check
-
-      - name: Run unit and component tests
-        run: npm test
-
-      - name: Audit production dependencies
-        run: npm run audit:prod
-
-      - name: Reject critical development dependency findings
-        run: npm audit --audit-level=critical
-
-      - name: Run Electron smoke test
-        run: xvfb-run --auto-servernum npm run test:e2e
-
-      - name: Verify CATS Flights production origin
-        run: npm run verify:production-target
-
-      - name: Verify release artifact contract
-        run: npm run verify:release-contract
-
-      - name: Verify release tag matches package version
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: npm run verify:release-tag -- "$RELEASE_TAG"
-
   package:
-    needs: quality
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
-            artifact: cats-configurator-windows
-            platform: win32
-            arch: x64
-            command: npm run build -- --win nsis --x64 --publish never
-            files: builds/*.exe
+            name: Windows x64
+            artifact: cats-configurator-windows-x64
+            build_command: npm run build
+            artifact_path: src-tauri/target/release/bundle/nsis/*.exe
+          - os: ubuntu-22.04
+            name: Linux x64
+            artifact: cats-configurator-linux-x64-appimage
+            build_command: npm run build
+            artifact_path: src-tauri/target/release/bundle/appimage/*.AppImage
           - os: macos-latest
-            artifact: cats-configurator-macos-x64
-            platform: darwin
-            arch: x64
-            command: npm run build -- --mac dmg --x64 --publish never
-            files: builds/*.dmg
-          - os: macos-latest
+            name: macOS Apple Silicon
             artifact: cats-configurator-macos-arm64
-            platform: darwin
-            arch: arm64
-            command: npm run build -- --mac dmg --arm64 --publish never
-            files: builds/*.dmg
-          - os: ubuntu-latest
-            artifact: cats-configurator-linux
-            platform: linux
-            arch: x64
-            command: npm run build -- --linux AppImage --x64 --publish never
-            files: builds/*.AppImage
+            build_command: npm run build -- --target aarch64-apple-darwin
+            artifact_path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          - os: macos-latest
+            name: macOS Intel
+            artifact: cats-configurator-macos-x64
+            build_command: npm run build -- --target x86_64-apple-darwin
+            artifact_path: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
@@ -98,22 +50,149 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Install locked dependencies
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+          targets: ${{ startsWith(matrix.os, 'macos-') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install Linux system dependencies
+        if: startsWith(matrix.os, 'ubuntu-')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libudev-dev libssl-dev pkg-config patchelf xdg-utils
+
+      - name: Install locked renderer dependencies
         run: npm ci
 
-      - name: Package application
-        run: ${{ matrix.command }}
+      - name: Check renderer formatting
+        run: npm run format:check
+
+      - name: Lint renderer
+        run: npm run lint
+
+      - name: Test renderer and host bridge
+        run: npm test
+
+      - name: Audit production dependencies
+        run: npm run audit:prod
+
+      - name: Reject critical development dependency findings
+        run: npm audit --audit-level=critical
+
+      - name: Verify application and release contract
+        run: npm run verify:release-contract
+
+      - name: Verify release tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: npm run verify:release-tag -- "$RELEASE_TAG"
 
-      - name: Verify update asset name
-        run: npm run verify:packaged-artifact -- ${{ matrix.platform }} ${{ matrix.arch }}
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 
-      - name: Upload package
+      - name: Lint Rust backend
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Test Rust backend
+        run: npm run test:rust
+
+      - name: Check Intel macOS backend
+        if: matrix.artifact == 'cats-configurator-macos-x64'
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --target x86_64-apple-darwin --all-targets -- -D warnings
+
+      - name: Test Mac hardware-test build
+        if: startsWith(matrix.os, 'macos-') && github.event_name == 'pull_request'
+        run: |
+          cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets --features firmware-hardware-test -- -D warnings
+          cargo test --manifest-path src-tauri/Cargo.toml --locked --features firmware-hardware-test
+
+      - name: Build native package
+        if: "!(startsWith(matrix.os, 'macos-') && github.event_name == 'pull_request')"
+        run: ${{ matrix.build_command }}
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.os, 'macos-') && '-' || '' }}
+
+      - name: Build Mac hardware-test installer
+        if: startsWith(matrix.os, 'macos-') && github.event_name == 'pull_request'
+        run: ${{ matrix.build_command }} --features firmware-hardware-test
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+
+      - name: Verify Mac installer and app signature
+        if: startsWith(matrix.os, 'macos-')
+        shell: bash
+        run: |
+          shopt -s nullglob
+          images=(src-tauri/target/*/release/bundle/dmg/*.dmg)
+          apps=(src-tauri/target/*/release/bundle/macos/*.app)
+          test "${#images[@]}" -eq 1
+          test "${#apps[@]}" -eq 1
+          hdiutil verify "${images[0]}"
+          codesign --verify --deep --strict --verbose=2 "${apps[0]}"
+          expected=arm64
+          if [[ '${{ matrix.artifact }}' == 'cats-configurator-macos-x64' ]]; then expected=x86_64; fi
+          test "$(lipo -archs "${apps[0]}/Contents/MacOS/cats-configurator")" = "$expected"
+
+      - name: Launch installed Mac app
+        if: startsWith(matrix.os, 'macos-')
+        shell: bash
+        run: |
+          shopt -s nullglob
+          images=(src-tauri/target/*/release/bundle/dmg/*.dmg)
+          mount="$RUNNER_TEMP/cats-installer"
+          installed="$RUNNER_TEMP/CATS Configurator.app"
+          mkdir -p "$mount"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "${images[0]}"
+          trap 'hdiutil detach "$mount" || true' EXIT
+          ditto "$mount/CATS Configurator.app" "$installed"
+          codesign --verify --deep --strict "$installed"
+          hdiutil detach "$mount"
+          trap - EXIT
+          "$installed/Contents/MacOS/cats-configurator" > "$RUNNER_TEMP/mac-app.log" 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          sleep 10
+          if ! kill -0 "$app_pid" 2>/dev/null; then
+            cat "$RUNNER_TEMP/mac-app.log"
+            echo "The installed Mac app exited during startup."
+            exit 1
+          fi
+
+      - name: Verify CATS Flights production origin
+        run: npm run verify:production-target
+
+      - name: Use release filenames recognized by CATS Configurator 1.4.2
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          case '${{ matrix.artifact }}' in
+            cats-configurator-windows-x64) filename="cats-configurator-Setup-$version.exe" ;;
+            cats-configurator-linux-x64-appimage) filename="cats-configurator-$version.AppImage" ;;
+            cats-configurator-macos-arm64) filename="cats-configurator-$version-arm64.dmg" ;;
+            cats-configurator-macos-x64) filename="cats-configurator-$version-x64.dmg" ;;
+            *) echo "Unknown release artifact: ${{ matrix.artifact }}"; exit 1 ;;
+          esac
+          shopt -s nullglob
+          packages=(${{ matrix.artifact_path }})
+          test "${#packages[@]}" -eq 1
+          mv -- "${packages[0]}" "$(dirname "${packages[0]}")/$filename"
+
+      - name: Upload native package
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.files }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+
+      - name: Upload Linux Debian package
+        if: startsWith(matrix.os, 'ubuntu-')
+        uses: actions/upload-artifact@v7
+        with:
+          name: cats-configurator-linux-x64-deb
+          path: src-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: error
 
   release:
@@ -134,8 +213,10 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           name: CATS Configurator ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
-            [Code signing policy](https://github.com/catsystems/cats-configurator/blob/main/CODE_SIGNING_POLICY.md)
+            [Release policy](https://github.com/catsystems/cats-configurator/blob/main/RELEASE-POLICY.md)
+            Tauri packages do not include automatic Configurator self-updates. Windows packages are unsigned; macOS packages are ad-hoc signed and not notarized.
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: release-artifacts/*
