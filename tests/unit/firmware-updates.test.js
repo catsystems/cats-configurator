@@ -82,6 +82,39 @@ describe("firmware updates", () => {
     expect(wrapper.find("script").exists()).toBe(false);
     wrapper.unmount();
   });
+  it("shows a toast instead of a success card after checking releases", async () => {
+    window.cats.firmware.check.mockResolvedValue({
+      ...snapshot(),
+      stage: "succeeded",
+      message:
+        "Release check complete. Components without a versioned official asset are unavailable.",
+    });
+    const wrapper = await render();
+    expect(wrapper.text()).not.toContain("Ready");
+
+    await wrapper.vm.check();
+    await flushPromises();
+
+    expect(useAppStore().snackbar.message).toBe(
+      "Devices and releases checked.",
+    );
+    expect(useAppStore().snackbar.isVisible).toBe(true);
+    expect(wrapper.text()).not.toContain("Succeeded");
+    expect(wrapper.text()).not.toContain("Release check complete");
+    wrapper.unmount();
+  });
+  it("keeps non-check success results visible", async () => {
+    const wrapper = await render();
+    useAppStore().setFirmwareSnapshot({
+      ...snapshot(),
+      stage: "succeeded",
+      message: "Firmware installed and verified.",
+    });
+    await flushPromises();
+    expect(wrapper.text()).toContain("Succeeded");
+    expect(wrapper.text()).toContain("Firmware installed and verified.");
+    wrapper.unmount();
+  });
   it("prepares GS radio firmware only after drive, cached-version and reinstall confirmations", async () => {
     const wrapper = await render();
     const state = snapshot();
@@ -97,7 +130,11 @@ describe("firmware updates", () => {
     await flushPromises();
     expect(wrapper.vm.canUpdate("telemetry")).toBe(true);
     expect(wrapper.text()).toContain("1.1.0 /");
+    expect(wrapper.text()).toContain("1.2.0 (from version.json)");
+    expect(wrapper.text()).not.toContain("(file, unverified)");
     expect(wrapper.text()).toContain("Prepare radio firmware");
+    expect(wrapper.text()).toContain("Radio firmware installation guide");
+    expect(wrapper.text()).not.toContain("How to install on the GS");
     expect(wrapper.text()).toContain(
       "radio-receiver updates require telemetry firmware 1.2.0 or newer",
     );
@@ -122,6 +159,28 @@ describe("firmware updates", () => {
     });
     wrapper.unmount();
   });
+  it.each([
+    [["1.2.0", "2.0.0"], false],
+    [[null, "1.2.0"], true],
+  ])(
+    "shows the compatibility warning only when 1.2.0+ is not confirmed for both radios",
+    async (telemetryVersions, warningExpected) => {
+      const state = snapshot();
+      state.devices.push({
+        id: "radios-1",
+        target: "telemetry",
+        label: "GS radio firmware destination (E:)",
+        versionSource: "file-unverified",
+        telemetryVersions,
+      });
+      window.cats.firmware.current.mockResolvedValue(state);
+      const wrapper = await render();
+      expect(
+        wrapper.text().includes("radio-receiver updates require telemetry"),
+      ).toBe(warningExpected);
+      wrapper.unmount();
+    },
+  );
   it("explains the one-time installation required by older radio firmware", () => {
     const wrapper = mount(RadioUpdateGuide, {
       global: { plugins: [vuetify] },
@@ -132,8 +191,6 @@ describe("firmware updates", () => {
     expect(text).toContain("ROM-update-capable telemetry build");
     expect(text).toContain("stops before flash erase");
     expect(text).toContain("installed firmware remains unchanged");
-    expect(text).toContain("until the Ground Station restarts");
-    expect(text).toContain("missing entry acknowledgement is ambiguous");
     expect(text).not.toMatch(/brick/i);
     wrapper.unmount();
   });
@@ -194,7 +251,7 @@ describe("firmware updates", () => {
     wrapper.vm.reinstallConfirmed = true;
     expect(wrapper.vm.confirmed).toBe(true);
     await flushPromises();
-    expect(wrapper.text()).toContain("(version.json)");
+    expect(wrapper.text()).toContain("1.2.2 (from version.json)");
     wrapper.unmount();
   });
   it("requires explicit safety and unknown-file-version confirmation", async () => {

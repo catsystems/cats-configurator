@@ -46,7 +46,7 @@
     >
 
     <v-card
-      v-if="snapshot"
+      v-if="showStatus"
       variant="tonal"
       class="pa-4 mb-6"
       aria-live="polite"
@@ -101,7 +101,7 @@
             {{ target.description }}
           </p>
           <v-alert
-            v-if="target.id === 'telemetry'"
+            v-if="target.id === 'telemetry' && radioNeedsCompatibilityWarning"
             type="warning"
             variant="tonal"
             class="mb-4"
@@ -132,14 +132,14 @@
             <dd v-if="target.id === 'telemetry'">
               {{ device(target.id)?.telemetryVersions?.[0] ?? "Unknown" }} /
               {{ device(target.id)?.telemetryVersions?.[1] ?? "Unknown" }}
-              (file, unverified)
+              (from version.json)
             </dd>
             <dd v-else>
               {{ device(target.id)?.version ?? "Unknown"
               }}<span
                 v-if="device(target.id)?.versionSource === 'version-json'"
               >
-                (version.json)</span
+                (from version.json)</span
               ><span
                 v-if="device(target.id)?.versionSource === 'file-unverified'"
               >
@@ -179,11 +179,11 @@
           >
           <v-btn
             v-if="target.id === 'telemetry'"
-            class="mt-3 d-flex"
+            class="mt-3 d-flex text-none"
             variant="text"
             prepend-icon="mdi-help-circle-outline"
             @click="radioGuideOpen = true"
-            >How to install on the GS</v-btn
+            >Radio firmware installation guide</v-btn
           >
           <v-expansion-panels
             v-if="asset(target.id)"
@@ -309,6 +309,7 @@ export default {
     ],
     selected: {},
     localError: "",
+    hideSuccessfulCheck: false,
     dialog: false,
     radioGuideOpen: false,
     confirmTarget: "vega",
@@ -325,10 +326,21 @@ export default {
     error() {
       return this.localError || this.snapshot?.error?.message;
     },
+    showStatus() {
+      if (!this.snapshot || this.snapshot.stage === "idle") return false;
+      return !(this.hideSuccessfulCheck && this.snapshot.stage === "succeeded");
+    },
     stageLabel() {
       return this.snapshot?.stage
         ?.replaceAll("-", " ")
         .replace(/^./, (c) => c.toUpperCase());
+    },
+    radioNeedsCompatibilityWarning() {
+      const versions = this.device("telemetry")?.telemetryVersions;
+      return (
+        !!versions &&
+        !versions.every((version) => this.radioSupportsUpdates(version))
+      );
     },
     sameVersion() {
       if (this.confirmTarget === "telemetry") {
@@ -378,7 +390,7 @@ export default {
     await this.perform(() => window.cats.firmware.current());
   },
   methods: {
-    ...mapActions(useAppStore, ["setFirmwareSnapshot"]),
+    ...mapActions(useAppStore, ["setFirmwareSnapshot", "showSuccessSnackbar"]),
     devices(target) {
       return (
         this.snapshot?.devices?.filter((device) => device.target === target) ??
@@ -393,6 +405,13 @@ export default {
     asset(target) {
       return this.snapshot?.available?.find((asset) => asset.target === target);
     },
+    radioSupportsUpdates(version) {
+      const parts = version?.split("+")[0].split(".").map(Number);
+      if (parts?.length !== 3 || parts.some((part) => !Number.isInteger(part)))
+        return false;
+      const [major, minor] = parts;
+      return major > 1 || (major === 1 && minor >= 2);
+    },
     canUpdate(target) {
       return (
         !this.busy &&
@@ -406,17 +425,23 @@ export default {
       this.localError = "";
       try {
         this.setFirmwareSnapshot(await action());
+        return true;
       } catch (error) {
         this.localError = error.message;
+        return false;
       }
     },
-    check() {
-      return this.perform(() => window.cats.firmware.check());
+    async check() {
+      this.hideSuccessfulCheck = true;
+      if (await this.perform(() => window.cats.firmware.check()))
+        this.showSuccessSnackbar("Devices and releases checked.");
     },
     cancel() {
+      this.hideSuccessfulCheck = false;
       return this.perform(() => window.cats.firmware.cancel());
     },
     retry() {
+      this.hideSuccessfulCheck = false;
       return this.perform(() => window.cats.firmware.retry());
     },
     confirm(target) {
@@ -428,6 +453,7 @@ export default {
     },
     async start() {
       if (!this.confirmed || !this.canUpdate(this.confirmTarget)) return;
+      this.hideSuccessfulCheck = false;
       const request = {
         deviceId: this.device(this.confirmTarget).id,
         assetId: this.asset(this.confirmTarget).id,

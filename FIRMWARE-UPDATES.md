@@ -106,8 +106,8 @@ through the current GS console protocol. Vega telemetry updating remains disable
 Keep the GS powered and do not run another Configurator firmware operation during
 its on-device radio update. Physical acceptance of these GS paths remains pending.
 
-**How to install on the GS** opens an offline illustrated guide from the Ground
-Station radios card, even without a detected device or release. After preparation,
+**Radio firmware installation guide** opens an offline illustrated guide from the
+Ground Station radios card, even without a detected device or release. After preparation,
 **Show installation guide** also appears beside the result. It covers safe eject,
 Settings → System → Update Firmware → Radio Receivers, file selection, installation,
 both-receiver verification, and refreshing the reported versions. The six bundled
