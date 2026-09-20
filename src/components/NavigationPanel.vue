@@ -43,6 +43,7 @@
           :href="flightsUrl"
           target="_blank"
           rel="noreferrer"
+          @click.prevent="openFlights"
         >
           <template #title>
             <span>Flights</span>
@@ -56,7 +57,7 @@
 </template>
 
 <script>
-import { mapState } from "pinia";
+import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
 import { getConfigs } from "@/services/configService";
 import { getEvents } from "@/services/eventService";
@@ -85,6 +86,14 @@ export default {
     ...mapState(useAppStore, ["active", "changedTab"]),
   },
   methods: {
+    ...mapActions(useAppStore, ["showErrorSnackbar"]),
+    async openFlights() {
+      try {
+        await window.cats.app.openExternal(this.flightsUrl);
+      } catch (error) {
+        this.showErrorSnackbar(error.message);
+      }
+    },
     discard() {
       switch (this.changedTab) {
         case "config":

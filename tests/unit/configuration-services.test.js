@@ -92,4 +92,26 @@ describe("configuration save services", () => {
 
     expect(window.cats.board.applyConfig).not.toHaveBeenCalled();
   });
+
+  it("reports the failed setting after an earlier setting was written", async () => {
+    window.cats.board.applyConfig.mockResolvedValue({
+      ok: false,
+      saved: false,
+      results: [
+        { key: "main_altitude", status: "written" },
+        {
+          key: "tele_test_phrase",
+          status: "failed",
+          message: "Board command timed out.",
+        },
+      ],
+    });
+
+    await expect(
+      setConfigs({
+        main_altitude: { value: 301 },
+        tele_test_phrase: { value: "cats249" },
+      }),
+    ).rejects.toThrow("tele_test_phrase: Board command timed out.");
+  });
 });
