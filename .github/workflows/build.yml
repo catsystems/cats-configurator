@@ -25,11 +25,9 @@ jobs:
             artifact_path: src-tauri/target/release/bundle/nsis/*.exe
           - os: ubuntu-22.04
             name: Linux x64
-            artifact: cats-configurator-linux-x64
+            artifact: cats-configurator-linux-x64-appimage
             build_command: npm run build
-            artifact_path: |
-              src-tauri/target/release/bundle/appimage/*.AppImage
-              src-tauri/target/release/bundle/deb/*.deb
+            artifact_path: src-tauri/target/release/bundle/appimage/*.AppImage
           - os: macos-latest
             name: macOS Apple Silicon
             artifact: cats-configurator-macos-arm64
@@ -62,7 +60,7 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu-')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libudev-dev libssl-dev pkg-config patchelf xdg-utils
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libudev-dev libssl-dev pkg-config patchelf squashfs-tools xdg-utils xvfb
 
       - name: Install locked renderer dependencies
         run: npm ci
@@ -123,6 +121,43 @@ jobs:
         env:
           APPLE_SIGNING_IDENTITY: "-"
 
+      - name: Use host Wayland libraries in Linux AppImage
+        if: startsWith(matrix.os, 'ubuntu-')
+        shell: bash
+        run: |
+          shopt -s nullglob
+          images=(src-tauri/target/release/bundle/appimage/*.AppImage)
+          test "${#images[@]}" -eq 1
+          bash scripts/patch-appimage-wayland.sh "${images[0]}"
+
+      - name: Verify Linux AppImage
+        if: startsWith(matrix.os, 'ubuntu-')
+        shell: bash
+        run: |
+          shopt -s nullglob
+          images=(src-tauri/target/release/bundle/appimage/*.AppImage)
+          test "${#images[@]}" -eq 1
+          image="$(realpath "${images[0]}")"
+          inspect="$RUNNER_TEMP/appimage-inspect"
+          mkdir -p "$inspect"
+          (
+            cd "$inspect"
+            "$image" --appimage-extract >/dev/null
+          )
+          if find "$inspect/squashfs-root/usr/lib" -maxdepth 1 -name 'libwayland-*.so*' -print -quit | grep -q .; then
+            echo "The AppImage still contains bundled Wayland libraries."
+            exit 1
+          fi
+          set +e
+          APPIMAGE_EXTRACT_AND_RUN=1 timeout 10s xvfb-run -a "$image" >"$RUNNER_TEMP/linux-app.log" 2>&1
+          status=$?
+          set -e
+          if [[ "$status" -ne 124 ]]; then
+            cat "$RUNNER_TEMP/linux-app.log"
+            echo "The Linux AppImage exited during startup."
+            exit 1
+          fi
+
       - name: Verify Mac installer and app signature
         if: startsWith(matrix.os, 'macos-')
         shell: bash
@@ -138,14 +173,65 @@ jobs:
           if [[ '${{ matrix.artifact }}' == 'cats-configurator-macos-x64' ]]; then expected=x86_64; fi
           test "$(lipo -archs "${apps[0]}/Contents/MacOS/cats-configurator")" = "$expected"
 
+      - name: Launch installed Mac app
+        if: startsWith(matrix.os, 'macos-')
+        shell: bash
+        run: |
+          shopt -s nullglob
+          images=(src-tauri/target/*/release/bundle/dmg/*.dmg)
+          mount="$RUNNER_TEMP/cats-installer"
+          installed="$RUNNER_TEMP/CATS Configurator.app"
+          mkdir -p "$mount"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "${images[0]}"
+          trap 'hdiutil detach "$mount" || true' EXIT
+          test -L "$mount/Applications"
+          test "$(readlink "$mount/Applications")" = "/Applications"
+          ditto "$mount/CATS Configurator.app" "$installed"
+          codesign --verify --deep --strict "$installed"
+          hdiutil detach "$mount"
+          trap - EXIT
+          "$installed/Contents/MacOS/cats-configurator" > "$RUNNER_TEMP/mac-app.log" 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          sleep 10
+          if ! kill -0 "$app_pid" 2>/dev/null; then
+            cat "$RUNNER_TEMP/mac-app.log"
+            echo "The installed Mac app exited during startup."
+            exit 1
+          fi
+
       - name: Verify CATS Flights production origin
         run: npm run verify:production-target
+
+      - name: Use release filenames recognized by CATS Configurator 1.4.2
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          case '${{ matrix.artifact }}' in
+            cats-configurator-windows-x64) filename="cats-configurator-Setup-$version.exe" ;;
+            cats-configurator-linux-x64-appimage) filename="cats-configurator-$version.AppImage" ;;
+            cats-configurator-macos-arm64) filename="cats-configurator-$version-arm64.dmg" ;;
+            cats-configurator-macos-x64) filename="cats-configurator-$version-x64.dmg" ;;
+            *) echo "Unknown release artifact: ${{ matrix.artifact }}"; exit 1 ;;
+          esac
+          shopt -s nullglob
+          packages=(${{ matrix.artifact_path }})
+          test "${#packages[@]}" -eq 1
+          mv -- "${packages[0]}" "$(dirname "${packages[0]}")/$filename"
 
       - name: Upload native package
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+
+      - name: Upload Linux Debian package
+        if: startsWith(matrix.os, 'ubuntu-')
+        uses: actions/upload-artifact@v7
+        with:
+          name: cats-configurator-linux-x64-deb
+          path: src-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: error
 
   release:

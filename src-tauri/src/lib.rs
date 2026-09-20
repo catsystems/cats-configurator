@@ -82,6 +82,62 @@ fn is_allowed_external_url(parsed: &url::Url) -> bool {
         }
 }
 
+fn configure_appimage_opener(
+    command: &mut std::process::Command,
+    path: Option<&std::ffi::OsStr>,
+    app_dir: Option<&std::ffi::OsStr>,
+) {
+    for variable in [
+        "APPDIR",
+        "APPIMAGE",
+        "ARGV0",
+        "LD_LIBRARY_PATH",
+        "LD_PRELOAD",
+        "OWD",
+    ] {
+        command.env_remove(variable);
+    }
+
+    if let (Some(path), Some(app_dir)) = (path, app_dir) {
+        let app_dir = std::path::Path::new(app_dir);
+        if let Ok(host_path) = std::env::join_paths(
+            std::env::split_paths(path).filter(|entry| !entry.starts_with(app_dir)),
+        ) {
+            command.env("PATH", host_path);
+        }
+    }
+}
+
+pub(crate) fn open_external_url(app: &tauri::AppHandle, url: &str) -> Result<(), HostError> {
+    if cfg!(target_os = "linux")
+        && (std::env::var_os("APPIMAGE").is_some() || std::env::var_os("APPDIR").is_some())
+    {
+        use std::{path::Path, process::Command};
+
+        let opener = if Path::new("/usr/bin/xdg-open").is_file() {
+            "/usr/bin/xdg-open"
+        } else {
+            "xdg-open"
+        };
+        let mut command = Command::new(opener);
+        command.arg(url);
+        configure_appimage_opener(
+            &mut command,
+            std::env::var_os("PATH").as_deref(),
+            std::env::var_os("APPDIR").as_deref(),
+        );
+        command
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| HostError::new("open_external_failed", error.to_string()))?;
+        return Ok(());
+    }
+
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|error| HostError::new("open_external_failed", error.to_string()))
+}
+
 #[tauri::command]
 fn app_open_external(app: tauri::AppHandle, url: String) -> Result<(), HostError> {
     let parsed = url::Url::parse(&url)
@@ -92,9 +148,7 @@ fn app_open_external(app: tauri::AppHandle, url: String) -> Result<(), HostError
             "The external URL is not approved by Configurator.",
         ));
     }
-    app.opener()
-        .open_url(url, None::<&str>)
-        .map_err(|error| HostError::new("open_external_failed", error.to_string()))
+    open_external_url(&app, &url)
 }
 
 #[tauri::command]
@@ -1115,6 +1169,55 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn appimage_opener_uses_only_host_paths() {
+        use std::{collections::HashMap, ffi::OsStr, path::Path};
+
+        let app_dir = Path::new(if cfg!(windows) {
+            r"C:\tmp\cats.AppDir"
+        } else {
+            "/tmp/cats.AppDir"
+        });
+        let host_bin = Path::new(if cfg!(windows) {
+            r"C:\host\bin"
+        } else {
+            "/host/bin"
+        });
+        let path = std::env::join_paths([
+            app_dir.join("usr/bin"),
+            host_bin.to_path_buf(),
+            app_dir.join("usr/sbin"),
+        ])
+        .unwrap();
+        let mut command = std::process::Command::new("xdg-open");
+
+        super::configure_appimage_opener(
+            &mut command,
+            Some(path.as_os_str()),
+            Some(app_dir.as_os_str()),
+        );
+
+        let environment: HashMap<_, _> = command.get_envs().collect();
+        for variable in [
+            "APPDIR",
+            "APPIMAGE",
+            "ARGV0",
+            "LD_LIBRARY_PATH",
+            "LD_PRELOAD",
+            "OWD",
+        ] {
+            assert_eq!(environment.get(OsStr::new(variable)), Some(&None));
+        }
+        let cleaned_path = environment
+            .get(OsStr::new("PATH"))
+            .and_then(|value| value.as_deref())
+            .unwrap();
+        assert_eq!(
+            std::env::split_paths(cleaned_path).collect::<Vec<_>>(),
+            [host_bin.to_path_buf()]
+        );
+    }
+
+    #[test]
     fn external_links_allow_canonical_flights_and_cats_github_only() {
         for link in [
             "https://catsystems.io/flights",
@@ -1164,7 +1267,6 @@ mod tests {
             assert!(super::command_allowed_during_firmware(command));
         }
     }
-
     #[test]
     fn application_version_matches_installer() {
         let config: serde_json::Value =

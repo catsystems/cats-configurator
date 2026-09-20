@@ -34,7 +34,7 @@
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/space-grotesk": "^5.3.0",
     "@mdi/font": "^7.4.47",
-    "@tauri-apps/cli": "^2.8.0",
+    "@tauri-apps/cli": "^2.11.5",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/test-utils": "^2.4.6",
     "eslint": "^10.8.0",
