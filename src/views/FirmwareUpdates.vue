@@ -18,25 +18,6 @@
       firmware.</v-alert
     >
     <v-alert
-      v-if="snapshot?.hardwareTest"
-      type="warning"
-      variant="tonal"
-      class="mb-4"
-      >Hardware-test build: firmware flashing is enabled for bench testing.
-      Linux and macOS update flows have not yet passed hardware acceptance. Use
-      only with deployment charges disconnected and keep the device connected
-      until verification finishes.</v-alert
-    >
-    <v-alert
-      v-if="snapshot && !snapshot.platformSupported"
-      type="info"
-      variant="tonal"
-      class="mb-4"
-      >Linux and macOS firmware integration is awaiting USB hardware acceptance.
-      Device and release checks are available; flashing remains disabled until
-      that platform passes acceptance.</v-alert
-    >
-    <v-alert
       v-if="error"
       type="error"
       variant="tonal"
@@ -310,6 +291,7 @@ export default {
     selected: {},
     localError: "",
     hideSuccessfulCheck: false,
+    checkPending: false,
     dialog: false,
     radioGuideOpen: false,
     confirmTarget: "vega",
@@ -374,6 +356,15 @@ export default {
     },
   },
   watch: {
+    "snapshot.stage"(stage) {
+      if (!this.checkPending) return;
+      if (stage === "succeeded") {
+        this.checkPending = false;
+        this.showSuccessSnackbar("Devices and releases checked.");
+      } else if (["failed", "cancelled"].includes(stage)) {
+        this.checkPending = false;
+      }
+    },
     "snapshot.devices": {
       immediate: true,
       handler() {
@@ -433,8 +424,9 @@ export default {
     },
     async check() {
       this.hideSuccessfulCheck = true;
-      if (await this.perform(() => window.cats.firmware.check()))
-        this.showSuccessSnackbar("Devices and releases checked.");
+      this.checkPending = true;
+      if (!(await this.perform(() => window.cats.firmware.check())))
+        this.checkPending = false;
     },
     cancel() {
       this.hideSuccessfulCheck = false;

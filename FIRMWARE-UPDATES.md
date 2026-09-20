@@ -233,11 +233,13 @@ show a hardware-test warning and enable the native Mac update path while keeping
 device identity, safety confirmation, image validation, version confirmations,
 and verification requirements intact. Tag/main builds do not enable this feature.
 The feature does not permit custom firmware or change the official asset contract.
-CI checks each DMG, ad-hoc app signature, and executable architecture. The packages
-are not notarized: move the app to Applications and use macOS **Privacy & Security
-
-> Open Anyway** for this trusted test build if Gatekeeper blocks it; do not disable
-> Gatekeeper globally. Choose the arm64 artifact for Apple Silicon or x64 for Intel.
+CI checks each DMG, ad-hoc app signature, and executable architecture, then copies
+the app from the mounted DMG and checks that it stays running after launch. The packages
+are not notarized: move the app to Applications and use **Open Anyway** under
+macOS **Privacy & Security** for this trusted test build if Gatekeeper blocks it;
+do not disable Gatekeeper globally. See [Apple's instructions](https://support.apple.com/en-us/102445).
+Choose the arm64 artifact for Apple Silicon
+or x64 for Intel.
 
 Before testing, disconnect Vega deployment charges, close other serial/DFU tools,
 and keep a known recovery route available. Record the Mac model, macOS version,

@@ -42,6 +42,51 @@ for (const [platform, targets] of [
     ),
   );
   assert.deepEqual(platformConfig.bundle.targets, targets);
+  if (platform === "windows") {
+    assert.equal(
+      platformConfig.bundle.windows.nsis.installerHooks,
+      "installer-hooks.nsh",
+    );
+  }
+}
+
+const installerHooks = await fs.readFile(
+  new URL("../src-tauri/installer-hooks.nsh", import.meta.url),
+  "utf8",
+);
+assert.match(installerHooks, /0f7e2335-0fae-5554-8f8f-93ac69b9f97d/);
+assert.match(installerHooks, /\/KEEP_APP_DATA --updated/);
+assert.match(
+  installerHooks,
+  /Push \$R0\s+Push \$R1\s+Push \$R2\s+Push \$R3\s+!insertmacro CheckIfAppIsRunning "CATS Configurator\.exe" "CATS Configurator"\s+Pop \$R3\s+Pop \$R2\s+Pop \$R1\s+Pop \$R0/,
+);
+
+const workflow = await fs.readFile(
+  new URL("../.github/workflows/build.yml", import.meta.url),
+  "utf8",
+);
+const appImagePatch = await fs.readFile(
+  new URL("../scripts/patch-appimage-wayland.sh", import.meta.url),
+  "utf8",
+);
+assert.doesNotMatch(workflow, /dmgbuild/);
+assert.doesNotMatch(workflow, /Build custom Mac installer/);
+assert.match(workflow, /test -L "\$mount\/Applications"/);
+assert.match(workflow, /bash scripts\/patch-appimage-wayland\.sh/);
+assert.match(workflow, /find "\$inspect\/squashfs-root\/usr\/lib"/);
+assert.match(appImagePatch, /libwayland-\*\.so\*/);
+assert.match(appImagePatch, /mksquashfs[\s\S]*-comp zstd/);
+assert.match(appImagePatch, /mksquashfs[\s\S]*-b 128K/);
+for (const filename of [
+  "cats-configurator-Setup-$version.exe",
+  "cats-configurator-$version.AppImage",
+  "cats-configurator-$version-arm64.dmg",
+  "cats-configurator-$version-x64.dmg",
+]) {
+  assert.ok(
+    workflow.includes(filename),
+    `Missing release filename: ${filename}`,
+  );
 }
 
 const host = await fs.readFile(
@@ -66,5 +111,5 @@ for (const command of commands) {
 }
 
 console.log(
-  "Root Tauri identity, lockfile, native targets, and host commands verified.",
+  "Root Tauri identity, lockfile, native targets, upgrade bridge, and host commands verified.",
 );

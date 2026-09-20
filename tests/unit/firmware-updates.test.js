@@ -8,6 +8,7 @@ import { useAppStore } from "@/store";
 import vuetify from "@/plugins/vuetify";
 
 const snapshot = () => ({
+  revision: 0,
   busy: false,
   cancellable: false,
   stage: "idle",
@@ -82,17 +83,31 @@ describe("firmware updates", () => {
     expect(wrapper.find("script").exists()).toBe(false);
     wrapper.unmount();
   });
-  it("shows a toast instead of a success card after checking releases", async () => {
+  it("shows a toast only after the background release check succeeds", async () => {
     window.cats.firmware.check.mockResolvedValue({
       ...snapshot(),
-      stage: "succeeded",
-      message:
-        "Release check complete. Components without a versioned official asset are unavailable.",
+      revision: 1,
+      busy: true,
+      cancellable: true,
+      stage: "checking",
+      message: "Detecting devices and checking official stable releases…",
     });
     const wrapper = await render();
     expect(wrapper.text()).not.toContain("Ready");
 
     await wrapper.vm.check();
+    await flushPromises();
+
+    expect(useAppStore().snackbar.isVisible).toBe(false);
+    expect(wrapper.text()).toContain("Checking");
+
+    useAppStore().setFirmwareSnapshot({
+      ...snapshot(),
+      revision: 2,
+      stage: "succeeded",
+      message:
+        "Release check complete. Components without a versioned official asset are unavailable.",
+    });
     await flushPromises();
 
     expect(useAppStore().snackbar.message).toBe(
@@ -101,6 +116,29 @@ describe("firmware updates", () => {
     expect(useAppStore().snackbar.isVisible).toBe(true);
     expect(wrapper.text()).not.toContain("Succeeded");
     expect(wrapper.text()).not.toContain("Release check complete");
+    wrapper.unmount();
+  });
+  it("does not show a success toast when the background release check fails", async () => {
+    window.cats.firmware.check.mockResolvedValue({
+      ...snapshot(),
+      revision: 1,
+      busy: true,
+      cancellable: true,
+      stage: "checking",
+    });
+    const wrapper = await render();
+
+    await wrapper.vm.check();
+    useAppStore().setFirmwareSnapshot({
+      ...snapshot(),
+      revision: 2,
+      stage: "failed",
+      error: { message: "Release lookup failed." },
+    });
+    await flushPromises();
+
+    expect(useAppStore().snackbar.isVisible).toBe(false);
+    expect(wrapper.text()).toContain("Release lookup failed.");
     wrapper.unmount();
   });
   it("keeps non-check success results visible", async () => {
@@ -230,12 +268,13 @@ describe("firmware updates", () => {
       wrapper.unmount();
     },
   );
-  it("clearly identifies a hardware-test installer", async () => {
+  it("does not show hardware-test deployment warnings", async () => {
     const wrapper = await render();
     useAppStore().setFirmwareSnapshot({ ...snapshot(), hardwareTest: true });
     await flushPromises();
-    expect(wrapper.text()).toContain("Hardware-test build");
-    expect(wrapper.text()).toContain("have not yet passed hardware acceptance");
+    expect(wrapper.text()).not.toContain("Hardware-test build");
+    expect(wrapper.text()).not.toContain("deployment charges disconnected");
+    expect(wrapper.text()).not.toContain("hardware acceptance");
     expect(wrapper.vm.canUpdate("ground-station")).toBe(true);
     wrapper.unmount();
   });
@@ -289,7 +328,9 @@ describe("firmware updates", () => {
     expect(wrapper.vm.canUpdate("ground-station")).toBe(false);
     store.changedTab = null;
     store.firmware.platformSupported = false;
+    await flushPromises();
     expect(wrapper.vm.canUpdate("ground-station")).toBe(false);
+    expect(wrapper.text()).not.toContain("awaiting USB hardware acceptance");
     wrapper.unmount();
   });
   it("does not autoselect ambiguous devices and presents recovery failures", async () => {

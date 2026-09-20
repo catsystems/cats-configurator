@@ -58,6 +58,9 @@ flight logs, or serial data to networked systems.
 The Windows NSIS installer installs CATS Configurator, registers it in the
 Windows installed-apps list, and provides an uninstaller. It does not install
 drivers or browser extensions and does not change security settings.
+When it finds an earlier Electron-based CATS Configurator installation, it
+removes that application before installing version 2.0.0 and retains the
+earlier installation's application data.
 If WebView2 is missing, the installer downloads and installs Microsoft's
 WebView2 runtime, which is required by the Windows application.
 

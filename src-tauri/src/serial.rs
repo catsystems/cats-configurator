@@ -300,8 +300,8 @@ impl SerialManager {
 
         let (requests, receiver) = mpsc::channel(32);
         let events = Arc::clone(&self.events);
-        let task = if env::var("CATS_FAKE_SERIAL").as_deref() == Ok("1")
-            && port_path.starts_with("CATS-FAKE")
+        let task = if port_path.starts_with("CATS-FAKE")
+            && (cfg!(test) || env::var("CATS_FAKE_SERIAL").as_deref() == Ok("1"))
         {
             tokio::spawn(run_fake(receiver, events, Arc::clone(&self.transcript)))
         } else {
@@ -988,9 +988,6 @@ mod tests {
 
     #[tokio::test]
     async fn fake_serial_identifies_and_streams_status() {
-        unsafe {
-            env::set_var("CATS_FAKE_SERIAL", "1");
-        }
         let events = Arc::new(EventBus::default());
         let serial = SerialManager::new(events);
         serial.connect("CATS-FAKE".into()).await.unwrap();
@@ -1001,16 +998,10 @@ mod tests {
             .unwrap();
         assert!(status.iter().any(|line| line == "State: READY"));
         serial.disconnect().await;
-        unsafe {
-            env::remove_var("CATS_FAKE_SERIAL");
-        }
     }
 
     #[tokio::test]
     async fn fake_serial_supports_the_complete_profile_configuration_set() {
-        unsafe {
-            env::set_var("CATS_FAKE_SERIAL", "1");
-        }
         let events = Arc::new(EventBus::default());
         let serial = SerialManager::new(events);
         let log_directory =
@@ -1051,9 +1042,6 @@ mod tests {
         assert!(transcript.contains("TX get"));
         assert!(transcript.contains("RX main_altitude = 200"));
         fs::remove_dir_all(log_directory).unwrap();
-        unsafe {
-            env::remove_var("CATS_FAKE_SERIAL");
-        }
     }
 
     #[test]

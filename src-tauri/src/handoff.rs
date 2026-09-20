@@ -2,7 +2,6 @@ use std::{sync::Arc, time::Duration};
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde_json::{Value, json};
-use tauri_plugin_opener::OpenerExt;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream},
@@ -242,7 +241,7 @@ impl HandoffManager {
             "waiting",
             "Waiting for CATS Flights to receive the log...",
         );
-        if let Err(error) = app.opener().open_url(&url, None::<&str>) {
+        if let Err(error) = crate::open_external_url(&app, &url) {
             self.cancel(&events).await;
             publish(
                 &events,
@@ -250,7 +249,7 @@ impl HandoffManager {
                 "failed",
                 "CATS Flights could not be opened in the browser.",
             );
-            return Err(HostError::new("open_external_failed", error.to_string()));
+            return Err(error);
         }
         Ok(json!({ "id": id, "status": "waiting" }))
     }
