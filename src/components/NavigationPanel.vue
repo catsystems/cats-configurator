@@ -36,7 +36,9 @@
           :to="item.link"
           :title="item.title"
           color="primary"
-          :disabled="(item.requiresBoard && !active) || !!changedTab"
+          :disabled="
+            firmwareBusy || (item.requiresBoard && !active) || !!changedTab
+          "
         />
         <v-list-item
           class="flights-link"
@@ -83,7 +85,7 @@ export default {
     };
   },
   computed: {
-    ...mapState(useAppStore, ["active", "changedTab"]),
+    ...mapState(useAppStore, ["active", "changedTab", "firmwareBusy"]),
   },
   methods: {
     ...mapActions(useAppStore, ["showErrorSnackbar"]),

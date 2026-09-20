@@ -19,6 +19,26 @@ beforeEach(async () => {
 });
 
 describe("Tauri host bridge", () => {
+  it("exposes only firmware selections and streams state with unsubscribe", async () => {
+    const request = { deviceId: "device", assetId: 42, safetyConfirmed: true };
+    await window.cats.firmware.start(request);
+    expect(native.invoke).toHaveBeenLastCalledWith("firmware_start", {
+      request,
+    });
+    const callback = vi.fn();
+    const unsubscribe = window.cats.firmware.onState(callback);
+    native.channels[0].onmessage({
+      channel: "firmware:state",
+      payload: { busy: true },
+    });
+    expect(callback).toHaveBeenCalledWith({ busy: true });
+    unsubscribe();
+    native.channels[0].onmessage({
+      channel: "firmware:state",
+      payload: { busy: false },
+    });
+    expect(callback).toHaveBeenCalledOnce();
+  });
   it("initializes native events and forwards arguments to root host commands", async () => {
     expect(native.invoke).toHaveBeenCalledWith("initialize_host", {
       events: native.channels[0],
