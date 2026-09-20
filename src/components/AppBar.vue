@@ -16,7 +16,7 @@
       <v-btn
         class="mr-2"
         :loading="isFetchingPorts"
-        :disabled="active || connectionPending"
+        :disabled="active || connectionPending || firmwareBusy"
         icon
         size="small"
         variant="elevated"
@@ -27,7 +27,7 @@
       <v-select
         v-model="selectedPort"
         :items="serialPorts"
-        :disabled="active || connectionPending"
+        :disabled="active || connectionPending || firmwareBusy"
         ref="portSelector"
         label="ports"
         no-data-text="No ports available"
@@ -47,7 +47,7 @@
         class="ml-2"
         style="width: 120px"
         :loading="connectBtnLoading"
-        :disabled="!selectedPort"
+        :disabled="!selectedPort || firmwareBusy"
         @click="connect"
       >
         Connect
@@ -60,6 +60,7 @@
         style="width: 120px"
         :loading="connectBtnLoading"
         @click="disconnect"
+        :disabled="firmwareBusy"
       >
         disconnect
       </v-btn>
@@ -99,7 +100,7 @@ export default {
     };
   },
   computed: {
-    ...mapState(useAppStore, ["serialPorts", "active"]),
+    ...mapState(useAppStore, ["serialPorts", "active", "firmwareBusy"]),
   },
   watch: {
     active(value) {
@@ -120,7 +121,7 @@ export default {
         this.connectionPending = false;
         this.connectBtnLoading = false;
         this.setActiveState(false);
-        this.$router.push("/");
+        if (!this.firmwareBusy) this.$router.push("/");
       }),
     );
     void this.getPorts();
@@ -146,11 +147,11 @@ export default {
       await this.refreshPorts(true);
     },
     async scanPorts() {
-      if (this.active || this.connectionPending) return;
+      if (this.active || this.connectionPending || this.firmwareBusy) return;
       await this.refreshPorts(false);
     },
     async refreshPorts(showLoading) {
-      if (this.portScanInFlight) return;
+      if (this.portScanInFlight || this.firmwareBusy) return;
       this.portScanInFlight = true;
       if (showLoading) this.isFetchingPorts = true;
       try {
@@ -166,7 +167,12 @@ export default {
           this.vegaPresence,
           candidates,
         );
-        if (candidate && !this.active && !this.connectionPending) {
+        if (
+          candidate &&
+          !this.active &&
+          !this.connectionPending &&
+          !this.firmwareBusy
+        ) {
           this.selectedPort = candidate.port;
           await this.connect({ automatic: true });
         }
@@ -178,7 +184,7 @@ export default {
       }
     },
     async connect({ automatic = false } = {}) {
-      if (!this.selectedPort) return;
+      if (!this.selectedPort || this.firmwareBusy) return;
       if (isVegaSerialPort(this.selectedPort)) {
         if (!automatic) {
           allowManualVegaConnection(this.vegaPresence, this.selectedPort);
@@ -196,6 +202,7 @@ export default {
       }
     },
     async disconnect() {
+      if (this.firmwareBusy) return;
       if (isVegaSerialPort(this.selectedPort)) {
         suppressVegaAutoConnect(this.vegaPresence, this.selectedPort);
       }

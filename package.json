@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.8.0",
+    "markdown-it": "15.0.1",
     "plotly.js-dist-min": "^3.7.0"
   },
   "devDependencies": {

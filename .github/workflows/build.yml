@@ -62,7 +62,7 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu-')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libudev-dev patchelf xdg-utils
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libudev-dev libssl-dev pkg-config patchelf xdg-utils
 
       - name: Install locked renderer dependencies
         run: npm ci
@@ -101,10 +101,42 @@ jobs:
       - name: Test Rust backend
         run: npm run test:rust
 
+      - name: Check Intel macOS backend
+        if: matrix.artifact == 'cats-configurator-macos-x64'
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --target x86_64-apple-darwin --all-targets -- -D warnings
+
+      - name: Test Mac hardware-test build
+        if: startsWith(matrix.os, 'macos-') && github.event_name == 'pull_request'
+        run: |
+          cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets --features firmware-hardware-test -- -D warnings
+          cargo test --manifest-path src-tauri/Cargo.toml --locked --features firmware-hardware-test
+
       - name: Build native package
+        if: "!(startsWith(matrix.os, 'macos-') && github.event_name == 'pull_request')"
         run: ${{ matrix.build_command }}
         env:
           APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.os, 'macos-') && '-' || '' }}
+
+      - name: Build Mac hardware-test installer
+        if: startsWith(matrix.os, 'macos-') && github.event_name == 'pull_request'
+        run: ${{ matrix.build_command }} --features firmware-hardware-test
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+
+      - name: Verify Mac installer and app signature
+        if: startsWith(matrix.os, 'macos-')
+        shell: bash
+        run: |
+          shopt -s nullglob
+          images=(src-tauri/target/*/release/bundle/dmg/*.dmg)
+          apps=(src-tauri/target/*/release/bundle/macos/*.app)
+          test "${#images[@]}" -eq 1
+          test "${#apps[@]}" -eq 1
+          hdiutil verify "${images[0]}"
+          codesign --verify --deep --strict --verbose=2 "${apps[0]}"
+          expected=arm64
+          if [[ '${{ matrix.artifact }}' == 'cats-configurator-macos-x64' ]]; then expected=x86_64; fi
+          test "$(lipo -archs "${apps[0]}/Contents/MacOS/cats-configurator")" = "$expected"
 
       - name: Verify CATS Flights production origin
         run: npm run verify:production-target
