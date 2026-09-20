@@ -27,7 +27,7 @@ regex = "1"
 nusb = { version = "0.2", features = ["tokio"] }
 reqwest = { version = "0.13", default-features = false, features = ["native-tls", "json"] }
 semver = "1"
-sha2 = "0.10"
+sha2 = "0.11"
 tauri = { version = "2.11.6", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
