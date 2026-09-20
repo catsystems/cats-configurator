@@ -3,8 +3,8 @@ export async function applyBoardValues(entries) {
   const result = await window.cats.board.applyConfig(entries);
   if (result?.ok) return result;
 
-  const failed = result?.results?.find(
-    ({ status }) => !["verified", "pending"].includes(status),
+  const failed = result?.results?.find(({ status }) =>
+    ["failed", "mismatch"].includes(status),
   );
   const detail = failed
     ? `${failed.key}: ${failed.message || failed.status}`

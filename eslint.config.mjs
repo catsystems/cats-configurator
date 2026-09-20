@@ -5,7 +5,13 @@ import globals from "globals";
 
 export default [
   {
-    ignores: ["builds/**", "dist/**", "node_modules/**", "out/**"],
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "src-tauri/target/**",
+      "src-tauri/gen/**",
+      "tmp/**",
+    ],
   },
   eslint.configs.recommended,
   ...vue.configs["flat/recommended"],

@@ -1,51 +1,41 @@
 {
   "name": "cats-configurator",
   "productName": "CATS Configurator",
-  "version": "1.4.2",
+  "version": "2.0.0",
   "description": "Desktop configuration and flight-log analysis utility for CATS flight computers.",
   "author": "Control and Telemetry Systems GmbH",
   "private": true,
-  "main": "out/main/background.js",
+  "type": "module",
   "scripts": {
-    "start": "electron-vite dev",
-    "dev": "electron-vite dev",
-    "build": "electron-vite build && electron-builder",
-    "build:app": "electron-vite build",
-    "build:dir": "electron-vite build && electron-builder --dir",
-    "preview": "electron-vite preview",
+    "start": "tauri dev",
+    "dev": "vite --port 1420",
+    "build": "tauri build",
+    "build:frontend": "vite build",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "electron-vite build && playwright test",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
+    "test:hardware": "cargo test --manifest-path src-tauri/Cargo.toml --locked hardware_ -- --ignored --nocapture --test-threads=1 --skip hardware_simulation_completes_or_reports_unavailable",
     "verify:production-target": "node tests/verify-production-target.mjs",
     "verify:release-contract": "node tests/verify-release-contract.mjs",
     "verify:release-tag": "node tests/verify-release-tag.mjs",
-    "verify:packaged-artifact": "node tests/verify-packaged-artifact.mjs",
-    "test:hardware": "node tests/hardware/vega-smoke.mjs",
-    "test:hardware:transaction": "node tests/hardware/vega-transaction.mjs",
-    "test:hardware:profile": "node tests/hardware/vega-profile.mjs",
-    "test:hardware:preflight": "node tests/hardware/vega-preflight.mjs",
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
-    "plotly.js-dist-min": "^3.7.0",
-    "semver": "^7.8.5",
-    "serialport": "^13.0.0"
+    "@tauri-apps/api": "^2.8.0",
+    "plotly.js-dist-min": "^3.7.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/space-grotesk": "^5.3.0",
     "@mdi/font": "^7.4.47",
-    "@playwright/test": "^1.55.0",
+    "@tauri-apps/cli": "^2.8.0",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/test-utils": "^2.4.6",
-    "electron": "^43.2.0",
-    "electron-builder": "^26.15.0",
-    "electron-vite": "^5.0.0",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.10.0",
@@ -62,41 +52,5 @@
   },
   "engines": {
     "node": ">=24.15 <25"
-  },
-  "build": {
-    "appId": "com.cats.cats-configurator",
-    "copyright": "Copyright © 2026 Control and Telemetry Systems GmbH",
-    "directories": {
-      "buildResources": "build",
-      "output": "builds"
-    },
-    "files": [
-      "out/**/*",
-      "package.json"
-    ],
-    "npmRebuild": false,
-    "win": {
-      "icon": "build/icon.ico",
-      "executableName": "CATS Configurator",
-      "artifactName": "${name}-Setup-${version}.${ext}",
-      "target": [
-        "nsis"
-      ]
-    },
-    "mac": {
-      "icon": "build/icon.icns",
-      "artifactName": "${name}-${version}-${arch}.${ext}",
-      "target": [
-        "dmg"
-      ]
-    },
-    "linux": {
-      "icon": "build/icon.png",
-      "artifactName": "${name}-${version}.${ext}",
-      "target": [
-        "AppImage"
-      ],
-      "category": "Utility"
-    }
   }
 }

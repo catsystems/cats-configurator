@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [2.0.0] - 08-09-2026
+
+- Deliver CATS Configurator 2.0.0 with its Vue interface and Rust/Tauri native
+  host for device communication and local file handling.
+- Build Windows, macOS (Intel and Apple Silicon), and Linux packages from one
+  workflow, with renderer/component tests and native Rust checks.
+- Keep Windows packages unsigned and macOS packages ad-hoc signed; automatic
+  Configurator self-updates remain disabled in version 2.0.0.
+
 ## [1.3.2] - 11-08-2026
 
 - Use a GitHub-safe Windows installer filename so the automatic updater can

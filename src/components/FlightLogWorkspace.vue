@@ -84,27 +84,25 @@
       <v-card
         class="flight-log-card"
         :class="{ 'bg-grey-lighten-2': dragover }"
-        @drop.prevent="onDrop($event)"
-        @dragover.prevent="dragover = true"
-        @dragenter.prevent="dragover = true"
-        @dragleave.prevent="dragover = false"
       >
         <v-card-title>{{
           active ? "Open a Vega flight log (.cfl)" : title
         }}</v-card-title>
         <v-card-text>
           <p v-if="errorString" class="flight-log-error">{{ errorString }}</p>
-          <v-file-input
-            v-model="fileInput"
-            variant="underlined"
-            accept=".cfl"
-            placeholder="Pick a flight log file"
-            prepend-icon="mdi-file"
-            label="Load flight log file"
-            :loading="fileLoading"
-            @drop.prevent="onDrop($event)"
-            @update:model-value="loadFlightLog"
-          />
+          <div class="d-flex align-center flex-wrap ga-3 mb-4">
+            <v-btn
+              color="primary"
+              prepend-icon="mdi-file"
+              :loading="fileLoading"
+              @click="chooseLocalFlightLog"
+            >
+              Choose flight log
+            </v-btn>
+            <span class="text-body-2 text-medium-emphasis">
+              or drop one .cfl file anywhere in this window
+            </span>
+          </div>
 
           <div v-if="session" class="current-log-heading">
             <div>
@@ -164,6 +162,7 @@
 </template>
 
 <script>
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { mapActions, mapState } from "pinia";
 import { useAppStore } from "@/store";
 import { makePlots } from "@/modules/plots";
@@ -181,7 +180,6 @@ export default {
     return {
       session: null,
       flightLog: null,
-      fileInput: undefined,
       fileLoading: false,
       exportButtonLoading: false,
       errorString: "",
@@ -212,6 +210,20 @@ export default {
         this.applyHandoffState(state),
       ),
     );
+    this.subscriptions.push(
+      await getCurrentWindow().onDragDropEvent(({ payload }) => {
+        if (payload.type === "over") this.dragover = true;
+        if (payload.type === "leave") this.dragover = false;
+        if (payload.type === "drop") {
+          this.dragover = false;
+          const flightLogs = payload.paths.filter((path) =>
+            path.toLowerCase().endsWith(".cfl"),
+          );
+          if (flightLogs.length === 1)
+            void this.loadFlightLogPath(flightLogs[0]);
+        }
+      }),
+    );
     const current = await window.cats.flightLog.current();
     if (current) await this.setSession(current, false);
     if (this.active) await this.discoverOnboard();
@@ -230,17 +242,25 @@ export default {
       await this.$nextTick();
       await this.renderPlots();
     },
-    async loadFlightLog(fileValue) {
-      const file = Array.isArray(fileValue) ? fileValue[0] : fileValue;
-      if (!file) return;
+    async chooseLocalFlightLog() {
+      this.fileLoading = true;
+      this.errorString = "";
+      try {
+        const session = await window.cats.flightLog.chooseLocal();
+        if (session) await this.setSession(session);
+      } catch (error) {
+        this.errorString = error.message;
+      } finally {
+        this.fileLoading = false;
+      }
+    },
+    async loadFlightLogPath(filePath) {
       this.fileLoading = true;
       this.errorString = "";
       this.session = null;
       this.flightLog = null;
       this.$refs.flightLogPlotContainer?.replaceChildren();
       try {
-        const filePath = window.cats.flightLog.pathForDroppedFile(file);
-        if (!filePath) throw new Error("Could not resolve the selected file.");
         await this.setSession(await window.cats.flightLog.load(filePath));
       } catch (error) {
         this.errorString = error.message;
@@ -443,13 +463,6 @@ export default {
       if (element && this.flightLog) {
         await makePlots(this.flightLog, element, this.useImperialUnits);
       }
-    },
-    onDrop(event) {
-      this.dragover = false;
-      if (event.dataTransfer.files.length !== 1) return;
-      const file = event.dataTransfer.files[0];
-      this.fileInput = file;
-      void this.loadFlightLog(file);
     },
     formatFileSize(bytes) {
       if (bytes < 1024) return `${bytes} B`;
