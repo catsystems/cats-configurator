@@ -737,16 +737,16 @@ impl FirmwareManager {
                 )
                 .await;
             self.serial.disconnect_for_firmware().await;
-            if let Err(error) = result {
-                if !matches!(
+            if let Err(error) = result
+                && !matches!(
                     error.code,
                     "serial_disconnected"
                         | "serial_read_failed"
                         | "serial_write_failed"
                         | "board_timeout"
-                ) {
-                    return Err(error);
-                }
+                )
+            {
+                return Err(error);
             }
             let deadline = Instant::now() + Duration::from_secs(30);
             loop {
@@ -827,20 +827,19 @@ impl FirmwareManager {
         let original = job.device.port.as_ref().unwrap();
         let deadline = Instant::now() + Duration::from_secs(40);
         loop {
-            if let Ok(port) = unique_port(original) {
-                if self.serial.connected_path().await.as_deref() == Some(&port.path)
-                    || self.serial.connect_for_firmware(port.path).await.is_ok()
-                {
-                    match self.vega_versions().await {
-                        Ok((Some(installed), telemetry)) => {
-                            verify_running_version(Some(&installed), &job.asset.version)?;
-                            self.snapshot.lock().unwrap().telemetry_version = telemetry;
-                            self.complete_device(job, Some(installed));
-                            return Ok(());
-                        }
-                        _ => {
-                            self.serial.disconnect_for_firmware().await;
-                        }
+            if let Ok(port) = unique_port(original)
+                && (self.serial.connected_path().await.as_deref() == Some(&port.path)
+                    || self.serial.connect_for_firmware(port.path).await.is_ok())
+            {
+                match self.vega_versions().await {
+                    Ok((Some(installed), telemetry)) => {
+                        verify_running_version(Some(&installed), &job.asset.version)?;
+                        self.snapshot.lock().unwrap().telemetry_version = telemetry;
+                        self.complete_device(job, Some(installed));
+                        return Ok(());
+                    }
+                    _ => {
+                        self.serial.disconnect_for_firmware().await;
                     }
                 }
             }
@@ -1030,12 +1029,15 @@ fn safe_vega_status(lines: &[String]) -> Result<(), HostError> {
     let state = lines
         .iter()
         .find_map(|line| line.trim().strip_prefix("State:").map(str::trim));
-    if state == Some("READY") {
+    if matches!(state, Some("CALIBRATING" | "READY")) {
         Ok(())
     } else {
         Err(HostError::new(
             "firmware_unsafe",
-            "Vega must report READY before updating. Wait for calibration; never update during flight or simulation.",
+            format!(
+                "Vega must report CALIBRATING or READY before updating. Reported state: {}. Never update during flight or simulation.",
+                state.filter(|state| !state.is_empty()).unwrap_or("unknown")
+            ),
         ))
     }
 }
@@ -1296,10 +1298,32 @@ mod tests {
     }
     #[test]
     fn safety_fails_closed_and_verification_requires_live_exact_version() {
-        assert!(safe_vega_status(&["State: READY".into()]).is_ok());
-        for state in ["CALIBRATING", "THRUSTING", "TOUCHDOWN", "INVALID", ""] {
+        for state in ["CALIBRATING", "READY"] {
+            assert!(safe_vega_status(&[format!("State:       {state}")]).is_ok());
+        }
+        for state in [
+            "THRUSTING",
+            "COASTING",
+            "DROGUE",
+            "MAIN",
+            "TOUCHDOWN",
+            "INVALID",
+            "",
+        ] {
             assert!(safe_vega_status(&[format!("State: {state}")]).is_err());
         }
+        assert!(
+            safe_vega_status(&["State: COASTING".into()])
+                .unwrap_err()
+                .message
+                .contains("Reported state: COASTING")
+        );
+        assert!(
+            safe_vega_status(&[])
+                .unwrap_err()
+                .message
+                .contains("Reported state: unknown")
+        );
         assert!(verify_running_version(None, "1.2.3").is_err());
         assert!(verify_running_version(Some("1.2.2"), "1.2.3").is_err());
         assert!(verify_running_version(Some("1.2.3"), "1.2.3").is_ok());

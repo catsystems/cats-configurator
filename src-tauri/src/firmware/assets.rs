@@ -237,7 +237,10 @@ pub async fn releases() -> Result<Vec<Asset>, HostError> {
 }
 
 pub fn hash(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 pub fn validate(asset: &Asset, bytes: &[u8]) -> Result<(), HostError> {
@@ -267,13 +270,13 @@ fn word(bytes: &[u8], offset: usize) -> u32 {
 }
 
 pub fn validate_vega(bytes: &[u8]) -> Result<(), HostError> {
-    if bytes.len() < 8 || bytes.len() > VEGA_IMAGE_LIMIT || bytes.len() % 2 != 0 {
+    if bytes.len() < 8 || bytes.len() > VEGA_IMAGE_LIMIT || !bytes.len().is_multiple_of(2) {
         return Err(error("Invalid STM32F411 image size."));
     }
     let stack = word(bytes, 0);
     let reset = word(bytes, 4);
     if !(0x2000_0008..=0x2002_0000).contains(&stack)
-        || stack % 8 != 0
+        || !stack.is_multiple_of(8)
         || reset & 1 == 0
         || (reset & !1) < 0x0800_0008
         || (reset & !1) >= 0x0800_0000 + bytes.len() as u32
@@ -293,7 +296,7 @@ pub fn validate_telemetry(bytes: &[u8]) -> Result<(), HostError> {
     let stack = word(bytes, 0);
     let reset = word(bytes, 4);
     if !(0x2000_0000..=0x2000_9000).contains(&stack)
-        || stack % 8 != 0
+        || !stack.is_multiple_of(8)
         || reset & 1 == 0
         || !(0x0800_0000..0x0800_0000 + bytes.len() as u32).contains(&(reset & !1))
     {
@@ -303,12 +306,12 @@ pub fn validate_telemetry(bytes: &[u8]) -> Result<(), HostError> {
 }
 
 pub fn validate_uf2(bytes: &[u8]) -> Result<(), HostError> {
-    if bytes.is_empty() || bytes.len() % 512 != 0 || bytes.len() > GS_IMAGE_LIMIT * 2 {
+    if bytes.is_empty() || !bytes.len().is_multiple_of(512) || bytes.len() > GS_IMAGE_LIMIT * 2 {
         return Err(error("Invalid Ground Station UF2 size."));
     }
     let count = bytes.len() / 512;
     let mut seen = vec![false; count];
-    for block in bytes.chunks_exact(512) {
+    for block in bytes.as_chunks::<512>().0 {
         if word(block, 0) != 0x0a32_4655
             || word(block, 4) != 0x9e5d_5157
             || word(block, 508) != 0x0ab1_6f30
@@ -372,7 +375,7 @@ mod tests {
     }
     fn uf2() -> Vec<u8> {
         let mut bytes = vec![0; 1024];
-        for (i, b) in bytes.chunks_exact_mut(512).enumerate() {
+        for (i, b) in bytes.as_chunks_mut::<512>().0.iter_mut().enumerate() {
             for (offset, value) in [
                 (0, 0x0a32_4655),
                 (4, 0x9e5d_5157),
@@ -522,6 +525,17 @@ mod tests {
         ] {
             assert!(!allowed_download_url(&Url::parse(url).unwrap()));
         }
+    }
+    #[test]
+    fn sha256_hash_matches_known_vectors() {
+        assert_eq!(
+            hash(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            hash(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
     }
     #[test]
     fn stable_selection_uses_component_version_and_digest_is_checked() {

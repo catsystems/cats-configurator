@@ -124,7 +124,7 @@ fn transfer_size(bytes: &[u8]) -> Result<usize, HostError> {
     }
     let size = u16::from_le_bytes([bytes[5], bytes[6]]) as usize;
     let version = u16::from_le_bytes([bytes[7], bytes[8]]);
-    if !(64..=2048).contains(&size) || size % 4 != 0 || version != 0x011a {
+    if !(64..=2048).contains(&size) || !size.is_multiple_of(4) || version != 0x011a {
         return Err(error(
             "Unsupported STM32 DfuSe transfer size or protocol version.",
         ));
@@ -287,7 +287,7 @@ impl<T: Transport> Session<T> {
     }
     fn check_image(&self, bytes: &[u8]) -> Result<(), HostError> {
         assets::validate_vega(bytes)?;
-        if bytes.len() % 2 != 0 || bytes.len() as u32 > self.layout.end - BASE {
+        if !bytes.len().is_multiple_of(2) || bytes.len() as u32 > self.layout.end - BASE {
             return Err(error(
                 "Firmware size is not aligned or exceeds this Vega's flash capacity.",
             ));

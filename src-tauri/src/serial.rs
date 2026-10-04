@@ -407,10 +407,9 @@ impl SerialManager {
                     })
                     .await
                     .is_ok()
+                    && let Ok(Ok(output)) = response.await
                 {
-                    if let Ok(Ok(output)) = response.await {
-                        publish_version(&events, output);
-                    }
+                    publish_version(&events, output);
                 }
             });
         }

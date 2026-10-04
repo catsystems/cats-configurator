@@ -100,14 +100,13 @@ async fn collect_configurations(
     if let Ok(output) = serial
         .execute_unlocked("get".into(), CommandOptions::default())
         .await
+        && let Ok(configs) = parse_config_responses(&output)
     {
-        if let Ok(configs) = parse_config_responses(&output) {
-            for config in configs {
-                if let Some(key) = config["key"].as_str() {
-                    if !config["type"].is_null() {
-                        configurations.insert(key.to_string(), config);
-                    }
-                }
+        for config in configs {
+            if let Some(key) = config["key"].as_str()
+                && !config["type"].is_null()
+            {
+                configurations.insert(key.to_string(), config);
             }
         }
     }
@@ -449,21 +448,22 @@ pub fn compare_profile(profile: &Value, snapshot: &Value) -> Result<Value, HostE
     }
     let profile_model = profile["source"]["boardModel"].as_str();
     let board_model = snapshot["board"]["model"].as_str();
-    if let (Some(profile_model), Some(board_model)) = (profile_model, board_model) {
-        if !profile_model.is_empty() && !board_model.is_empty() && profile_model != board_model {
-            blocked = true;
-            warnings.push(json!({ "severity": "error", "message": format!("Profile board {profile_model} does not match connected board {board_model}.") }));
-        }
+    if let (Some(profile_model), Some(board_model)) = (profile_model, board_model)
+        && !profile_model.is_empty()
+        && !board_model.is_empty()
+        && profile_model != board_model
+    {
+        blocked = true;
+        warnings.push(json!({ "severity": "error", "message": format!("Profile board {profile_model} does not match connected board {board_model}.") }));
     }
     let profile_firmware = profile["source"]["firmwareVersion"].as_str();
     let board_firmware = snapshot["board"]["firmwareVersion"].as_str();
-    if let (Some(profile_firmware), Some(board_firmware)) = (profile_firmware, board_firmware) {
-        if !profile_firmware.is_empty()
-            && !board_firmware.is_empty()
-            && profile_firmware != board_firmware
-        {
-            warnings.push(json!({ "severity": "warning", "message": format!("Profile firmware {profile_firmware} differs from connected firmware {board_firmware}. Review the diff before applying.") }));
-        }
+    if let (Some(profile_firmware), Some(board_firmware)) = (profile_firmware, board_firmware)
+        && !profile_firmware.is_empty()
+        && !board_firmware.is_empty()
+        && profile_firmware != board_firmware
+    {
+        warnings.push(json!({ "severity": "warning", "message": format!("Profile firmware {profile_firmware} differs from connected firmware {board_firmware}. Review the diff before applying.") }));
     }
     let unsupported_count = rows
         .iter()

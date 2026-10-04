@@ -124,7 +124,7 @@ fn parse_actions(value: Option<&Value>) -> Vec<Action> {
         .map(|value| value.trim_matches('"').trim().parse::<i64>().ok())
         .collect::<Vec<_>>();
     let mut actions = Vec::new();
-    for pair in values.chunks_exact(2) {
+    for pair in values.as_chunks::<2>().0 {
         let (Some(index), Some(value)) = (pair[0], pair[1]) else {
             continue;
         };
