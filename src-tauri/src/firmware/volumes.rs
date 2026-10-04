@@ -235,10 +235,11 @@ async fn macos() -> Result<Vec<Volume>, HostError> {
         .await
         .map_err(|_| error("macOS disk discovery timed out. Close disk utilities and retry."))?
         .map_err(|e| error(e.to_string()))?;
-        if output.status.success() && output.stdout.len() <= 128 * 1024 {
-            if let Some(volume) = mac_volume(entry.path(), &output.stdout) {
-                result.push(volume);
-            }
+        if output.status.success()
+            && output.stdout.len() <= 128 * 1024
+            && let Some(volume) = mac_volume(entry.path(), &output.stdout)
+        {
+            result.push(volume);
         }
     }
     Ok(result)
