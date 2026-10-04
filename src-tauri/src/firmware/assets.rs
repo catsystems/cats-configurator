@@ -237,7 +237,10 @@ pub async fn releases() -> Result<Vec<Asset>, HostError> {
 }
 
 pub fn hash(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 pub fn validate(asset: &Asset, bytes: &[u8]) -> Result<(), HostError> {
@@ -522,6 +525,17 @@ mod tests {
         ] {
             assert!(!allowed_download_url(&Url::parse(url).unwrap()));
         }
+    }
+    #[test]
+    fn sha256_hash_matches_known_vectors() {
+        assert_eq!(
+            hash(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            hash(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
     }
     #[test]
     fn stable_selection_uses_component_version_and_digest_is_checked() {
