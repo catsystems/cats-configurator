@@ -29,9 +29,9 @@ their existing confirmations. Image validation and post-install verification
 apply equally to upgrades and downgrades.
 
 - Vega requires an accessible STM32 Bootloader WinUSB driver on Windows,
-  an identified Vega reporting READY, no pending serial transaction, and
-  user confirmation that deployment charges are disconnected. READY is not a
-  guarantee of physical safety. STM32CubeProgrammer is not required or invoked.
+  an identified Vega reporting CALIBRATING or READY, no pending serial transaction,
+  and user confirmation that deployment charges are disconnected. Neither state
+  guarantees physical safety. STM32CubeProgrammer is not required or invoked.
   The existing ST WinUSB driver is compatible; a clean Windows installation may
   need a signed driver installed for `0483:DF11`. Do not replace the Vega serial
   or ST-LINK driver. The updater never silently installs or changes drivers.
