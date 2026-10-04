@@ -667,17 +667,16 @@ impl FlightLogManager {
                 "Flight logs cannot be written to the mounted CATS drive.",
             ));
         }
-        if let Ok(existing) = fs::canonicalize(&destination) {
-            if state
+        if let Ok(existing) = fs::canonicalize(&destination)
+            && state
                 .protected_roots
                 .iter()
                 .any(|root| contained(root, &existing))
-            {
-                return Err(HostError::new(
-                    "protected_destination",
-                    "Flight logs cannot be written to the mounted CATS drive.",
-                ));
-            }
+        {
+            return Err(HostError::new(
+                "protected_destination",
+                "Flight logs cannot be written to the mounted CATS drive.",
+            ));
         }
         Ok(destination)
     }

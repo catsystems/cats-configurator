@@ -737,16 +737,16 @@ impl FirmwareManager {
                 )
                 .await;
             self.serial.disconnect_for_firmware().await;
-            if let Err(error) = result {
-                if !matches!(
+            if let Err(error) = result
+                && !matches!(
                     error.code,
                     "serial_disconnected"
                         | "serial_read_failed"
                         | "serial_write_failed"
                         | "board_timeout"
-                ) {
-                    return Err(error);
-                }
+                )
+            {
+                return Err(error);
             }
             let deadline = Instant::now() + Duration::from_secs(30);
             loop {
@@ -827,20 +827,19 @@ impl FirmwareManager {
         let original = job.device.port.as_ref().unwrap();
         let deadline = Instant::now() + Duration::from_secs(40);
         loop {
-            if let Ok(port) = unique_port(original) {
-                if self.serial.connected_path().await.as_deref() == Some(&port.path)
-                    || self.serial.connect_for_firmware(port.path).await.is_ok()
-                {
-                    match self.vega_versions().await {
-                        Ok((Some(installed), telemetry)) => {
-                            verify_running_version(Some(&installed), &job.asset.version)?;
-                            self.snapshot.lock().unwrap().telemetry_version = telemetry;
-                            self.complete_device(job, Some(installed));
-                            return Ok(());
-                        }
-                        _ => {
-                            self.serial.disconnect_for_firmware().await;
-                        }
+            if let Ok(port) = unique_port(original)
+                && (self.serial.connected_path().await.as_deref() == Some(&port.path)
+                    || self.serial.connect_for_firmware(port.path).await.is_ok())
+            {
+                match self.vega_versions().await {
+                    Ok((Some(installed), telemetry)) => {
+                        verify_running_version(Some(&installed), &job.asset.version)?;
+                        self.snapshot.lock().unwrap().telemetry_version = telemetry;
+                        self.complete_device(job, Some(installed));
+                        return Ok(());
+                    }
+                    _ => {
+                        self.serial.disconnect_for_firmware().await;
                     }
                 }
             }

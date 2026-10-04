@@ -1100,12 +1100,11 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.state::<AppState>().firmware.busy() {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event
+                && window.state::<AppState>().firmware.busy() {
                     api.prevent_close();
                     window.state::<AppState>().events.send("app:alert", json!("A firmware operation is active. Cancel preparation or wait for the device operation to finish before closing."));
                 }
-            }
         })
         .invoke_handler(|invoke| {
             if invoke.message.webview().state::<AppState>().firmware.busy()
@@ -1160,9 +1159,8 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building CATS Configurator")
         .run(|app, event| {
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                if app.state::<AppState>().firmware.busy() { api.prevent_exit(); }
-            }
+            if let tauri::RunEvent::ExitRequested { api, .. } = event
+                && app.state::<AppState>().firmware.busy() { api.prevent_exit(); }
         });
 }
 

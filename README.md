@@ -11,7 +11,7 @@ flight computers and inspecting `.cfl` flight logs. It uses a Vue/Vuetify
 renderer and a Rust/Tauri host for serial communication, configuration,
 profiles, preflight, local files, and CATS Flights handoff.
 
-The current version is `2.0.0`. Automatic Configurator self-updates remain
+The current version is `2.0.1`. Automatic Configurator self-updates remain
 disabled. Windows packages are unsigned, and macOS packages are ad-hoc signed
 but not notarized.
 
