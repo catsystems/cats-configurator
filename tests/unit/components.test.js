@@ -91,6 +91,10 @@ describe("renderer state components", () => {
   });
 
   it("shows the app and connected firmware versions in the footer", async () => {
+    window.cats.app = {
+      checkUpdate: vi.fn().mockResolvedValue(null),
+      onUpdateProgress: () => () => {},
+    };
     const wrapper = mount(AppFooter, {
       global: {
         plugins: [pinia, vuetify],
@@ -232,6 +236,44 @@ describe("renderer state components", () => {
 
     expect(wrapper.text()).toContain("h: 1.25m");
     wrapper.unmount();
+  });
+
+  it("keeps status polling at 250 ms and pauses it only during an app update", async () => {
+    vi.useFakeTimers();
+    let disconnected;
+    window.cats = {
+      board: {
+        getConfigs: vi.fn(),
+        getInfo: vi.fn(),
+      },
+      serial: {
+        onDisconnected: vi.fn((callback) => {
+          disconnected = callback;
+          return vi.fn();
+        }),
+      },
+    };
+    const wrapper = mount(Config, {
+      global: { plugins: [pinia, vuetify] },
+    });
+    try {
+      const store = useAppStore();
+      expect(window.cats.board.getInfo).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(window.cats.board.getInfo).toHaveBeenCalledTimes(5);
+      store.appUpdating = true;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(window.cats.board.getInfo).toHaveBeenCalledTimes(5);
+      store.appUpdating = false;
+      await vi.advanceTimersByTimeAsync(250);
+      expect(window.cats.board.getInfo).toHaveBeenCalledTimes(6);
+      disconnected();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(window.cats.board.getInfo).toHaveBeenCalledTimes(6);
+    } finally {
+      wrapper.unmount();
+      vi.useRealTimers();
+    }
   });
 
   it("saves timer values after editing reactive form data", async () => {

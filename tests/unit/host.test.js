@@ -53,6 +53,10 @@ describe("Tauri host bridge", () => {
       useImperialUnits: true,
     });
     expect(window.cats.updates).toBeUndefined();
+    await window.cats.app.checkUpdate();
+    expect(native.invoke).toHaveBeenLastCalledWith("app_check_update", {});
+    await window.cats.app.installUpdate();
+    expect(native.invoke).toHaveBeenLastCalledWith("app_install_update", {});
   });
 
   it("delivers native events and removes subscriptions", () => {
@@ -62,6 +66,25 @@ describe("Tauri host bridge", () => {
     expect(callback).toHaveBeenCalledWith(true);
     unsubscribe();
     native.channels[0].onmessage({ channel: "board:active", payload: false });
+    expect(callback).toHaveBeenCalledOnce();
+  });
+
+  it("streams updater download percentages and removes the subscription", () => {
+    const callback = vi.fn();
+    const unsubscribe = window.cats.app.onUpdateProgress(callback);
+    native.channels[0].onmessage({
+      channel: "app:update-progress",
+      payload: { stage: "downloading", progress: 45 },
+    });
+    expect(callback).toHaveBeenCalledWith({
+      stage: "downloading",
+      progress: 45,
+    });
+    unsubscribe();
+    native.channels[0].onmessage({
+      channel: "app:update-progress",
+      payload: { stage: "installing", progress: 100 },
+    });
     expect(callback).toHaveBeenCalledOnce();
   });
 

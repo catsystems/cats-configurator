@@ -100,7 +100,11 @@ export default {
     };
   },
   computed: {
-    ...mapState(useAppStore, ["serialPorts", "active", "firmwareBusy"]),
+    ...mapState(useAppStore, {
+      serialPorts: "serialPorts",
+      active: "active",
+      firmwareBusy: (store) => store.firmwareBusy || store.appUpdating,
+    }),
   },
   watch: {
     active(value) {

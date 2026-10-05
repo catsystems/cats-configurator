@@ -433,6 +433,7 @@ export default {
       config: "config",
       status: (store) => store.static.status,
       useImperialUnits: "useImperialUnits",
+      appUpdating: "appUpdating",
     }),
     configurationChanged() {
       const savedData = this.useImperialUnits
@@ -492,7 +493,7 @@ export default {
       window.cats.board.getInfo();
       if (this.timer) clearInterval(this.timer);
       this.timer = setInterval(() => {
-        window.cats.board.getInfo();
+        if (!this.appUpdating) window.cats.board.getInfo();
       }, 250);
     },
     async onSave() {

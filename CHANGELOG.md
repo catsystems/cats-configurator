@@ -6,6 +6,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.0.2] - 05-10-2026
+
+- Restore automatic application update checks with a clickable app version and
+  an **Install and restart** prompt. Verify signed updates before installation
+  and disconnect connected devices before updating. Pause status polling and
+  let current board commands finish before disconnecting. Wait for firmware operations
+  to finish before starting an app update.
+- Publish signed updater packages and `latest.json` with tagged releases.
+  Existing 2.0.0/2.0.1 installations need one manual upgrade. Debian packages
+  continue to use manual installation.
+- Show download percentage and link to release notes in the app update dialog.
+
 ## [2.0.0] - 08-09-2026
 
 - Deliver CATS Configurator 2.0.0 with its Vue interface and Rust/Tauri native

@@ -47,6 +47,9 @@ window.cats = {
     onState: (callback) => subscribe("firmware:state", callback),
   },
   app: {
+    checkUpdate: () => call("app_check_update"),
+    installUpdate: () => call("app_install_update"),
+    onUpdateProgress: (callback) => subscribe("app:update-progress", callback),
     openExternal: (url) => call("app_open_external", { url }),
     onAlert: (callback) => subscribe("app:alert", callback),
   },

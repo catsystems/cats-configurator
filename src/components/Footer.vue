@@ -10,7 +10,7 @@
         </div>
       </template>
       <div class="ml-auto d-flex align-center">
-        <span>App version: {{ appVersion }}</span>
+        <AppUpdates />
       </div>
     </div>
   </v-footer>
@@ -19,14 +19,11 @@
 <script>
 import { mapState } from "pinia";
 import { useAppStore } from "@/store";
+import AppUpdates from "@/components/AppUpdates.vue";
 
 export default {
   name: "AppFooter",
-  data() {
-    return {
-      appVersion: __APP_VERSION__,
-    };
-  },
+  components: { AppUpdates },
   computed: {
     ...mapState(useAppStore, {
       version: (store) =>
