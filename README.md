@@ -11,7 +11,7 @@ flight computers and inspecting `.cfl` flight logs. It uses a Vue/Vuetify
 renderer and a Rust/Tauri host for serial communication, configuration,
 profiles, preflight, local files, and CATS Flights handoff.
 
-The current version is `2.0.1`. Configurator checks for updates at startup and
+The current version is `2.0.2`. Configurator checks for updates at startup and
 offers to install signed updates and restart. Click the app version in the
 footer to check again. Connected devices are disconnected before installation.
 Debian packages are updated manually. Windows packages are unsigned, and macOS

@@ -6,6 +6,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.0.2] - 05-10-2026
+
 - Restore automatic application update checks with a clickable app version and
   an **Install and restart** prompt. Verify signed updates before installation
   and disconnect connected devices before updating. Pause status polling and
