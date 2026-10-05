@@ -21,13 +21,13 @@ jobs:
           - os: windows-latest
             name: Windows x64
             artifact: cats-configurator-windows-x64
-            build_command: npm run build
+            build_command: npm run build --
             artifact_path: src-tauri/target/release/bundle/nsis/*.exe
             updater_path: src-tauri/target/release/bundle/nsis/*.exe.sig
           - os: ubuntu-22.04
             name: Linux x64
             artifact: cats-configurator-linux-x64-appimage
-            build_command: npm run build
+            build_command: npm run build --
             artifact_path: src-tauri/target/release/bundle/appimage/*.AppImage
             updater_path: src-tauri/target/release/bundle/appimage/*.AppImage.sig
           - os: macos-latest

@@ -83,6 +83,13 @@ const appImagePatch = await fs.readFile(
   new URL("../scripts/patch-appimage-wayland.sh", import.meta.url),
   "utf8",
 );
+for (const [, command] of workflow.matchAll(/^\s+build_command: (.+)$/gm)) {
+  assert.match(
+    command,
+    /^npm run build --(?:\s|$)/,
+    "Native package commands must forward Tauri options through npm",
+  );
+}
 assert.doesNotMatch(workflow, /dmgbuild/);
 assert.doesNotMatch(workflow, /Build custom Mac installer/);
 assert.match(workflow, /test -L "\$mount\/Applications"/);
