@@ -12,8 +12,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   Dependabot pull requests #70, #71, and #72.
 - Keep the app and exported flight graphs free of Plotly's new cloud-upload
   button.
-- Fix Windows and Linux release commands so signed updater packages can be
-  built and published.
+- Omit separate signature downloads while keeping signed update verification
+  through the signatures embedded in `latest.json`.
 
 ## [2.0.2] - 05-10-2026
 
