@@ -13,6 +13,20 @@ assert.equal(config.productName, packageJson.productName);
 assert.equal(config.version, packageJson.version);
 assert.equal(config.identifier, "com.cats.cats-configurator");
 assert.equal(config.build.frontendDist, "../dist");
+assert.deepEqual(config.plugins.updater.endpoints, [
+  "https://github.com/catsystems/cats-configurator/releases/latest/download/latest.json",
+]);
+assert.match(
+  Buffer.from(config.plugins.updater.pubkey, "base64").toString(),
+  /minisign public key/,
+);
+const updaterConfig = JSON.parse(
+  await fs.readFile(
+    new URL("../src-tauri/tauri.updater.conf.json", import.meta.url),
+    "utf8",
+  ),
+);
+assert.equal(updaterConfig.bundle.createUpdaterArtifacts, true);
 assert.equal(lockfile.name, packageJson.name);
 assert.equal(lockfile.version, packageJson.version);
 assert.equal(lockfile.packages[""].name, packageJson.name);
@@ -73,6 +87,13 @@ assert.doesNotMatch(workflow, /dmgbuild/);
 assert.doesNotMatch(workflow, /Build custom Mac installer/);
 assert.match(workflow, /test -L "\$mount\/Applications"/);
 assert.match(workflow, /bash scripts\/patch-appimage-wayland\.sh/);
+assert.ok(
+  workflow.indexOf("Sign the final Linux AppImage") >
+    workflow.indexOf("bash scripts/patch-appimage-wayland.sh"),
+);
+assert.match(workflow, /--config src-tauri\/tauri\.updater\.conf\.json/);
+assert.match(workflow, /TAURI_SIGNING_PRIVATE_KEY/);
+assert.match(workflow, /node scripts\/create-updater-manifest\.mjs/);
 assert.match(workflow, /find "\$inspect\/squashfs-root\/usr\/lib"/);
 assert.match(appImagePatch, /libwayland-\*\.so\*/);
 assert.match(appImagePatch, /mksquashfs[\s\S]*-comp zstd/);

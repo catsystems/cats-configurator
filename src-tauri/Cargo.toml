@@ -32,6 +32,7 @@ tauri = { version = "2.12.1", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
+tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy"] }
 thiserror = "2"
 tokio = { version = "1", features = ["io-util", "macros", "rt-multi-thread", "sync", "time", "fs"] }
 tokio-serial = "5"
@@ -47,3 +48,4 @@ tokio = { version = "1", features = ["process"] }
 
 [dev-dependencies]
 plist = "1"
+tauri = { version = "2", features = ["test"] }

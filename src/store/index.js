@@ -10,6 +10,7 @@ export const useAppStore = defineStore("app", {
     currentBoardProfile: null,
     changedTab: null,
     firmware: null,
+    appUpdating: false,
     static: {},
     config: {},
     events: {},

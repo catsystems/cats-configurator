@@ -1,0 +1,1 @@
+CATS Configurator updater verification fixture.

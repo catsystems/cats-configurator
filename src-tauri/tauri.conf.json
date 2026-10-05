@@ -25,6 +25,14 @@
       "csp": "default-src 'self' customprotocol: asset:; connect-src ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'"
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYxMzVFMjVFNjc3NkEwMDkKUldRSm9IWm5YdUkxOFpISXlOTkRNWjRIZ1luV2ROd09ZaVFjMlBqQWVMVWpIcjBaUWdsUE5ldCsK",
+      "endpoints": [
+        "https://github.com/catsystems/cats-configurator/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "copyright": "Copyright © 2026 Control and Telemetry Systems GmbH",

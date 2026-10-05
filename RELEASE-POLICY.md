@@ -14,10 +14,31 @@ build configuration in this repository under the
 - Linux releases are provided as unsigned AppImage and Debian packages.
 - Operating systems may display a security warning because the packages do not
   use commercial platform code-signing certificates.
-- CATS Configurator does not check for or download application updates
-  automatically. Users install new versions manually.
+- CATS Configurator checks GitHub Releases for a newer stable application
+  version at startup. Users can also click the app version in the footer.
+  It downloads, verifies the updater signature, installs, and restarts only after
+  the user chooses **Install and restart**. Connected devices are disconnected
+  before downloading the update; firmware operations must finish first. Debian
+  packages are installed manually.
 - Official release status and provenance do not apply to forks, local builds,
   or binaries redistributed by third parties.
+
+## Updater signing
+
+Tagged release builds require the `TAURI_SIGNING_PRIVATE_KEY` GitHub Actions
+repository secret, matching the public key in `src-tauri/tauri.conf.json`.
+Set `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` only if the private key is encrypted.
+Keep a secure backup of the private key; replacing it prevents existing
+installations from accepting updates signed with the new key. Never commit it.
+Updater signatures are separate from Windows and macOS platform code signing.
+
+The release workflow publishes `latest.json` and signed Windows installers,
+Linux AppImages, and macOS application archives. The Linux AppImage is signed
+after its Wayland patch. Ordinary local and pull-request builds do not require
+the signing key. For a signed local build, set the signing environment variables
+and run `npm run build -- --config src-tauri/tauri.updater.conf.json`.
+
+Users of 2.0.0 and 2.0.1 need to install the first updater-enabled release manually.
 
 ## Team roles
 
@@ -44,6 +65,10 @@ an external service.
 Serial diagnostics are written to a local `vega-communication.log` in the
 operating system's per-user application log directory; the application does not
 upload this transcript.
+
+The automatic update check requests public release metadata from GitHub; no
+device information or user files are included. Application packages are
+downloaded only after the user confirms an update.
 
 External documentation, release pages, and CATS Flights are opened only after
 a user action. Choosing to analyze a flight log with CATS Flights opens

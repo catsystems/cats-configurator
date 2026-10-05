@@ -266,6 +266,18 @@ impl SerialManager {
         Ok(())
     }
 
+    pub async fn reserve_app_update(&self) -> Result<(), HostError> {
+        let _transaction = self.transaction.lock().await;
+        self.ensure_available()?;
+        // A cancelled caller or the delayed version refresh can leave a request
+        // in the serial actor after the transaction lock has been released.
+        while self.pending.load(Ordering::SeqCst) > 0 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        self.firmware_active.store(true, Ordering::SeqCst);
+        Ok(())
+    }
+
     pub async fn connected_path(&self) -> Option<String> {
         self.session
             .lock()
@@ -958,16 +970,119 @@ mod tests {
         assert!(caller.await.unwrap_err().is_cancelled());
         assert_eq!(serial.pending.load(Ordering::SeqCst), 1);
         assert!(serial.reserve_firmware().is_err());
+        let reservation = serial.reserve_app_update();
+        tokio::pin!(reservation);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), &mut reservation)
+                .await
+                .is_err()
+        );
+        assert!(!serial.firmware_active.load(Ordering::SeqCst));
         release.send(()).unwrap();
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while serial.pending.load(Ordering::SeqCst) != 0 {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
+        tokio::time::timeout(Duration::from_secs(1), reservation)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(serial.pending.load(Ordering::SeqCst), 0);
+        serial.firmware_active.store(false, Ordering::SeqCst);
         serial.reserve_firmware().unwrap();
         serial.firmware_active.store(false, Ordering::SeqCst);
+        serial.disconnect().await;
+    }
+
+    #[tokio::test]
+    async fn app_update_waits_for_poll_response_without_interrupting_communication() {
+        let serial = Arc::new(SerialManager::new(Arc::new(EventBus::default())));
+        let (requests, mut receiver) = mpsc::channel(1);
+        let (started, waiting) = oneshot::channel();
+        let (release, finish) = oneshot::channel();
+        let task = tokio::spawn(async move {
+            let Request::Execute {
+                command,
+                reply,
+                pending,
+                ..
+            } = receiver.recv().await.unwrap();
+            assert_eq!(command, "status");
+            started.send(()).unwrap();
+            finish.await.unwrap();
+            drop(pending);
+            reply.send(Ok(vec!["State: READY".into()])).unwrap();
+        });
+        *serial.session.lock().await = Some(Session {
+            port_path: "test-only".into(),
+            requests,
+            task,
+        });
+        let poll_serial = serial.clone();
+        let poll = tokio::spawn(async move {
+            poll_serial
+                .execute("status".into(), CommandOptions::default(), true)
+                .await
+        });
+        waiting.await.unwrap();
+        assert!(
+            serial
+                .execute("status".into(), CommandOptions::default(), true)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let reservation = serial.reserve_app_update();
+        tokio::pin!(reservation);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), &mut reservation)
+                .await
+                .is_err()
+        );
+        assert!(!serial.firmware_active.load(Ordering::SeqCst));
+        release.send(()).unwrap();
+        assert_eq!(
+            poll.await.unwrap().unwrap(),
+            Some(vec!["State: READY".into()])
+        );
+        reservation.await.unwrap();
+        assert_eq!(
+            serial
+                .execute("get main_altitude".into(), CommandOptions::default(), false)
+                .await
+                .unwrap_err()
+                .code,
+            "firmware_busy"
+        );
+        serial.disconnect_for_firmware().await;
+        serial.firmware_active.store(false, Ordering::SeqCst);
+        serial.connect("CATS-FAKE".into()).await.unwrap();
+        assert!(
+            serial
+                .execute("status".into(), CommandOptions::default(), true)
+                .await
+                .unwrap()
+                .unwrap()
+                .iter()
+                .any(|line| line == "State: READY")
+        );
+        serial.disconnect().await;
+    }
+
+    #[tokio::test]
+    async fn cancelled_app_update_wait_does_not_block_normal_commands() {
+        let serial = SerialManager::new(Arc::new(EventBus::default()));
+        serial.connect("CATS-FAKE".into()).await.unwrap();
+        let transaction = serial.transaction.lock().await;
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), serial.reserve_app_update())
+                .await
+                .is_err()
+        );
+        drop(transaction);
+        assert!(!serial.firmware_active.load(Ordering::SeqCst));
+        assert!(
+            serial
+                .execute("get main_altitude".into(), CommandOptions::default(), false)
+                .await
+                .is_ok()
+        );
         serial.disconnect().await;
     }
 

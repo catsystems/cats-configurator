@@ -22,6 +22,7 @@ use tauri::{Manager, State, ipc::Channel};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
+use tauri_plugin_updater::UpdaterExt;
 
 struct AppState {
     events: Arc<EventBus>,
@@ -29,6 +30,7 @@ struct AppState {
     handoff: Arc<HandoffManager>,
     serial: Arc<SerialManager>,
     firmware: Arc<firmware::FirmwareManager>,
+    app_update: tokio::sync::Mutex<Option<tauri_plugin_updater::Update>>,
 }
 
 impl Default for AppState {
@@ -44,6 +46,7 @@ impl Default for AppState {
             )),
             serial,
             events,
+            app_update: tokio::sync::Mutex::new(None),
         }
     }
 }
@@ -149,6 +152,102 @@ fn app_open_external(app: tauri::AppHandle, url: String) -> Result<(), HostError
         ));
     }
     open_external_url(&app, &url)
+}
+
+fn app_update_install_supported() -> bool {
+    !cfg!(target_os = "linux") || std::env::var_os("APPIMAGE").is_some()
+}
+
+#[tauri::command]
+async fn app_check_update<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: State<'_, AppState>,
+) -> Result<Option<Value>, HostError> {
+    let mut pending = state.app_update.lock().await;
+    let updater = app
+        .updater_builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|error| HostError::new("app_update_check", error.to_string()))?;
+    let mut update = updater
+        .check()
+        .await
+        .map_err(|error| HostError::new("app_update_check", error.to_string()))?;
+    // Allow time for the larger Linux package on slower connections.
+    if let Some(update) = &mut update {
+        update.timeout = Some(Duration::from_secs(600));
+    }
+    let summary = update.as_ref().map(
+        |update| json!({ "version": update.version, "canInstall": app_update_install_supported() }),
+    );
+    *pending = update;
+    Ok(summary)
+}
+
+#[tauri::command]
+async fn app_install_update<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: State<'_, AppState>,
+) -> Result<(), HostError> {
+    if !app_update_install_supported() {
+        return Err(HostError::new(
+            "app_update_manual",
+            "Install the new Debian package to update Configurator.",
+        ));
+    }
+    let pending = state.app_update.try_lock().map_err(|_| {
+        HostError::new(
+            "app_update_busy",
+            "An application update operation is already active.",
+        )
+    })?;
+    let update = pending.as_ref().ok_or_else(|| {
+        HostError::new("app_update_missing", "Check for updates before installing.")
+    })?;
+
+    // Share the existing device-operation lock so an app restart cannot interrupt
+    // a firmware update or race with a new serial connection.
+    state.serial.reserve_app_update().await?;
+    let result = async {
+        state.serial.disconnect_for_firmware().await;
+        let mut downloaded = 0_u64;
+        let mut last_progress = None;
+        state.events.send(
+            "app:update-progress",
+            json!({ "stage": "downloading", "progress": null }),
+        );
+        update
+            .download_and_install(
+                |chunk, total| {
+                    downloaded += chunk as u64;
+                    let progress = total
+                        .filter(|total| *total > 0)
+                        .map(|total| (downloaded * 100 / total).min(100));
+                    if progress != last_progress {
+                        last_progress = progress;
+                        state.events.send(
+                            "app:update-progress",
+                            json!({ "stage": "downloading", "progress": progress }),
+                        );
+                    }
+                },
+                || {
+                    state.events.send(
+                        "app:update-progress",
+                        json!({ "stage": "installing", "progress": 100 }),
+                    );
+                },
+            )
+            .await
+            .map_err(|error| HostError::new("app_update_install", error.to_string()))
+    }
+    .await;
+    state
+        .serial
+        .firmware_active
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    result?;
+    app.restart();
 }
 
 #[tauri::command]
@@ -1092,77 +1191,96 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
         .setup(|app| {
             let directory = app.path().app_log_dir()?;
             app.state::<AppState>().serial.set_log_directory(directory);
-            app.state::<AppState>().firmware.set_cache(app.path().app_cache_dir()?);
+            app.state::<AppState>()
+                .firmware
+                .set_cache(app.path().app_cache_dir()?);
             Ok(())
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event
-                && window.state::<AppState>().firmware.busy() {
-                    api.prevent_close();
-                    window.state::<AppState>().events.send("app:alert", json!("A firmware operation is active. Cancel preparation or wait for the device operation to finish before closing."));
-                }
+                && window.state::<AppState>().firmware.busy()
+            {
+                api.prevent_close();
+                window.state::<AppState>().events.send(
+                    "app:alert",
+                    json!("An update operation is active. Wait until it finishes before closing."),
+                );
+            }
         })
         .invoke_handler(|invoke| {
             if invoke.message.webview().state::<AppState>().firmware.busy()
-                && !command_allowed_during_firmware(invoke.message.command()) {
-                invoke.resolver.reject(HostError::new("firmware_busy", "A firmware operation is active. Wait until it finishes."));
+                && !command_allowed_during_firmware(invoke.message.command())
+            {
+                invoke.resolver.reject(HostError::new(
+                    "firmware_busy",
+                    "A firmware operation is active. Wait until it finishes.",
+                ));
                 return true;
             }
             let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
-            firmware_current,
-            firmware_check,
-            firmware_start,
-            firmware_retry,
-            firmware_cancel,
-            initialize_host,
-            app_open_external,
-            serial_list,
-            serial_connect,
-            serial_disconnect,
-            serial_send,
-            board_get_configs,
-            board_get_config,
-            board_set_config,
-            board_apply_config,
-            board_get_events,
-            board_get_timers,
-            board_get_info,
-            board_get_log_info,
-            board_reset,
-            board_save,
-            profile_current,
-            profile_export,
-            profile_open,
-            profile_apply,
-            preflight_run,
-            flight_log_load,
-            flight_log_choose_local,
-            flight_log_current,
-            flight_log_export_csv,
-            flight_log_export_html,
-            flight_log_discover_onboard,
-            flight_log_choose_onboard,
-            flight_log_refresh_onboard,
-            flight_log_clear_onboard,
-            flight_log_open_onboard,
-            flight_log_remove_onboard,
-            flight_log_save_original,
-            flight_log_open_in_flights,
-            flight_log_cancel_handoff,
-        ];
+                firmware_current,
+                firmware_check,
+                firmware_start,
+                firmware_retry,
+                firmware_cancel,
+                initialize_host,
+                app_open_external,
+                app_check_update,
+                app_install_update,
+                serial_list,
+                serial_connect,
+                serial_disconnect,
+                serial_send,
+                board_get_configs,
+                board_get_config,
+                board_set_config,
+                board_apply_config,
+                board_get_events,
+                board_get_timers,
+                board_get_info,
+                board_get_log_info,
+                board_reset,
+                board_save,
+                profile_current,
+                profile_export,
+                profile_open,
+                profile_apply,
+                preflight_run,
+                flight_log_load,
+                flight_log_choose_local,
+                flight_log_current,
+                flight_log_export_csv,
+                flight_log_export_html,
+                flight_log_discover_onboard,
+                flight_log_choose_onboard,
+                flight_log_refresh_onboard,
+                flight_log_clear_onboard,
+                flight_log_open_onboard,
+                flight_log_remove_onboard,
+                flight_log_save_original,
+                flight_log_open_in_flights,
+                flight_log_cancel_handoff,
+            ];
             handler(invoke)
         })
         .build(tauri::generate_context!())
         .expect("error while building CATS Configurator")
         .run(|app, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event
-                && app.state::<AppState>().firmware.busy() { api.prevent_exit(); }
+                && app.state::<AppState>().firmware.busy()
+            {
+                api.prevent_exit();
+            }
         });
 }
+
+#[cfg(test)]
+mod app_update_tests;
 
 #[cfg(test)]
 mod tests {
@@ -1258,6 +1376,8 @@ mod tests {
             "firmware_start",
             "firmware_check",
             "firmware_retry",
+            "app_check_update",
+            "app_install_update",
         ] {
             assert!(!super::command_allowed_during_firmware(command));
         }
