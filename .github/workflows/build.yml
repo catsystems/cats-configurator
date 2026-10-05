@@ -304,6 +304,9 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: node scripts/create-updater-manifest.mjs release-artifacts "$RELEASE_TAG"
 
+      - name: Remove standalone signature files
+        run: rm -- release-artifacts/*.sig
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v3
         with:
