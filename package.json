@@ -1,7 +1,7 @@
 {
   "name": "cats-configurator",
   "productName": "CATS Configurator",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Desktop configuration and flight-log analysis utility for CATS flight computers.",
   "author": "Control and Telemetry Systems GmbH",
   "private": true,
@@ -27,7 +27,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2.12.1",
     "markdown-it": "15.0.2",
-    "plotly.js-dist-min": "^3.7.0"
+    "plotly.js-dist-min": "^4.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -45,8 +45,8 @@
     "pinia": "^4.0.2",
     "prettier": "^3.9.9",
     "sass": "^1.105.1",
-    "vite": "^7.3.1",
-    "vitest": "^4.0.18",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3",
     "vue": "^3.5.43",
     "vue-router": "^5.3.1",
     "vuetify": "^4.2.3"

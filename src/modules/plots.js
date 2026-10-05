@@ -69,15 +69,20 @@ function makePlot(
 
   // lines.push(...eventInfoTraces)
 
-  return plotly.newPlot(elementId, lines, {
-    title: { text: title },
-    margin: { t: 50 },
-    xaxis: { title: "Timestamp [s]" },
-    yaxis: { title: ylabel, tickFormat: ",.0f" },
-    shapes: eventInfo.shapes,
-    annotations: eventInfo.annotations,
-    template: "plotly_dark",
-  });
+  return plotly.newPlot(
+    elementId,
+    lines,
+    {
+      title: { text: title },
+      margin: { t: 50 },
+      xaxis: { title: "Timestamp [s]" },
+      yaxis: { title: ylabel, tickFormat: ",.0f" },
+      shapes: eventInfo.shapes,
+      annotations: eventInfo.annotations,
+      template: "plotly_dark",
+    },
+    { showSendToCloud: false },
+  );
 }
 
 function makeEventInfoTraces(flightlog) {

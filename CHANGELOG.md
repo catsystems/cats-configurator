@@ -6,6 +6,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.0.3] - 05-10-2026
+
+- Update Plotly to 4.1.1, Vite to 8.3.2, and Vitest to 5.0.3, combining
+  Dependabot pull requests #70, #71, and #72.
+- Keep the app and exported flight graphs free of Plotly's new cloud-upload
+  button.
+- Omit separate signature downloads while keeping signed update verification
+  through the signatures embedded in `latest.json`.
+
 ## [2.0.2] - 05-10-2026
 
 - Restore automatic application update checks with a clickable app version and
