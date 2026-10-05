@@ -294,6 +294,11 @@ jobs:
           path: release-artifacts
           merge-multiple: true
 
+      - name: Flatten downloaded release packages
+        run: |
+          find release-artifacts -mindepth 2 -type f -exec mv -t release-artifacts -- {} +
+          find release-artifacts -mindepth 1 -type d -empty -delete
+
       - name: Generate update manifest
         env:
           RELEASE_TAG: ${{ github.ref_name }}
