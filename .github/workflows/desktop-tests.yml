@@ -1,0 +1,62 @@
+name: Desktop smoke tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-24.04, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libudev-dev libssl-dev pkg-config xvfb xauth
+
+      - run: npm ci
+
+      - name: Validate the Linux USB rules
+        if: runner.os == 'Linux'
+        run: udevadm verify "$PWD/src-tauri/resources/70-cats-devices.rules"
+
+      - run: npm run build:desktop-test
+
+      - name: Run native desktop tests on Linux
+        if: runner.os == 'Linux'
+        env:
+          GDK_BACKEND: x11
+          GDK_SCALE: 1
+        run: xvfb-run -a -s '-screen 0 1600x1000x24' npm run test:desktop
+
+      - name: Run native desktop tests on Windows or macOS
+        if: runner.os != 'Linux'
+        run: npm run test:desktop
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-failures-${{ matrix.os }}
+          path: test-results/desktop
+          if-no-files-found: ignore

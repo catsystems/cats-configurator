@@ -1,7 +1,23 @@
 <template>
-  <v-app>
-    <AppBar />
-    <NavPanel :items="navItems" />
+  <v-app @keydown.esc="closeNavigation">
+    <AppBar
+      :compact="compact"
+      :navigation-open="navigationOpen"
+      @toggle-navigation="navigationOpen = !navigationOpen"
+      @usb-access-required="openUsbAccess"
+    />
+    <NavPanel
+      v-model="navigationOpen"
+      :items="navItems"
+      :usb-setup-available="Boolean(usbSetup && !usbSetup.installed)"
+      @open-usb-access="openUsbAccess"
+    />
+    <UsbAccessDialog
+      v-if="usbSetup"
+      v-model="usbAccessOpen"
+      :setup="usbSetup"
+      @installed="usbSetup.installed = true"
+    />
     <Snackbar />
     <AppFooter />
 
@@ -13,11 +29,13 @@
 
 <script>
 import { mapActions, mapState } from "pinia";
+import { useDisplay } from "vuetify";
 import { useAppStore } from "@/store";
 import AppBar from "@/components/AppBar.vue";
 import NavPanel from "@/components/NavigationPanel.vue";
 import Snackbar from "@/components/Snackbar.vue";
 import AppFooter from "@/components/Footer.vue";
+import UsbAccessDialog from "@/components/UsbAccessDialog.vue";
 
 export default {
   name: "App",
@@ -26,9 +44,17 @@ export default {
     NavPanel,
     Snackbar,
     AppFooter,
+    UsbAccessDialog,
+  },
+  setup() {
+    const { smAndDown: compact } = useDisplay();
+    return { compact };
   },
   data() {
     return {
+      navigationOpen: null,
+      usbAccessOpen: false,
+      usbSetup: null,
       subscriptions: [],
       navItems: [
         {
@@ -53,9 +79,11 @@ export default {
     if (this.$route.path !== "/") this.$router.push("/");
 
     this.subscriptions.push(
-      window.cats.firmware.onState((snapshot) =>
-        this.setFirmwareSnapshot(snapshot),
-      ),
+      window.cats.firmware.onState((snapshot) => {
+        this.setFirmwareSnapshot(snapshot);
+        if (snapshot.error?.code === "gs_usb_permission_denied")
+          this.openUsbAccess();
+      }),
       window.cats.app.onAlert((text) => window.alert(text)),
       window.cats.board.onStaticData((data) => this.setStaticData(data)),
       window.cats.board.onActive((value) => {
@@ -85,6 +113,12 @@ export default {
         this.showSuccessSnackbar("Values saved successfully!");
       }),
     );
+    void window.cats.app
+      .usbAccessStatus()
+      .then((setup) => {
+        this.usbSetup = setup;
+      })
+      .catch((error) => this.showErrorSnackbar(error.message));
     void window.cats.firmware
       .current()
       .then(this.setFirmwareSnapshot)
@@ -97,6 +131,15 @@ export default {
     ...mapState(useAppStore, ["active", "firmwareBusy"]),
   },
   methods: {
+    openUsbAccess() {
+      if (this.compact) this.navigationOpen = false;
+      this.usbAccessOpen = true;
+    },
+    closeNavigation() {
+      if (!this.compact || !this.navigationOpen) return;
+      this.navigationOpen = false;
+      document.getElementById("navigation-toggle")?.focus();
+    },
     ...mapActions(useAppStore, [
       "setFirmwareSnapshot",
       "setStaticData",

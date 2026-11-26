@@ -117,7 +117,7 @@ pub async fn enter_gs(port: &SerialPortSummary) -> Result<(), HostError> {
     if matches.len() != 1 {
         return Err(bootloader_error("USB identity is missing or ambiguous"));
     }
-    let device = matches[0].open().await.map_err(bootloader_error)?;
+    let device = matches[0].open().await.map_err(gs_usb_error)?;
     let config = device.active_configuration().map_err(bootloader_error)?;
     let interfaces: Vec<_> = config
         .interface_alt_settings()
@@ -130,7 +130,7 @@ pub async fn enter_gs(port: &SerialPortSummary) -> Result<(), HostError> {
     let interface = device
         .claim_interface(interfaces[0])
         .await
-        .map_err(bootloader_error)?;
+        .map_err(gs_usb_error)?;
     let result = interface
         .control_out(
             ControlOut {
@@ -151,6 +151,16 @@ pub async fn enter_gs(port: &SerialPortSummary) -> Result<(), HostError> {
     // A detach is only a transition request. The caller still requires one new
     // pinned TinyUF2 drive before copying and fresh version.json afterwards.
     Ok(())
+}
+
+fn gs_usb_error(error: nusb::Error) -> HostError {
+    if cfg!(target_os = "linux") && error.kind() == nusb::ErrorKind::PermissionDenied {
+        return HostError::new(
+            "gs_usb_permission_denied",
+            "Linux denied access to the Ground Station update interface. Enable CATS USB access, reconnect the Ground Station, and check devices again.",
+        );
+    }
+    bootloader_error(error)
 }
 
 pub async fn copy_uf2(drive: &RecoveryDrive, bytes: &[u8]) -> Result<(), HostError> {
@@ -210,17 +220,35 @@ async fn write_and_flush(
     output: &mut (impl AsyncWrite + Unpin),
     bytes: &[u8],
 ) -> Result<Uf2Finalization, HostError> {
-    output.write_all(bytes).await.map_err(copy_error)?;
+    output.write_all(bytes).await.map_err(|error| {
+        HostError::new(
+            "gs_copy",
+            format!(
+                "Writing NEW.UF2 failed: {error}. Keep the device connected and retry in TinyUF2."
+            ),
+        )
+    })?;
     uf2_finalization(output.flush().await)
 }
+
+#[cfg(windows)]
+const UF2_DISCONNECT_ERRORS: &[i32] = &[433, 1167];
+#[cfg(target_os = "linux")]
+const UF2_DISCONNECT_ERRORS: &[i32] = &[libc::EIO, libc::ENODEV];
+#[cfg(not(any(windows, target_os = "linux")))]
+const UF2_DISCONNECT_ERRORS: &[i32] = &[];
 
 fn uf2_finalization(result: std::io::Result<()>) -> Result<Uf2Finalization, HostError> {
     match result {
         Ok(()) => Ok(Uf2Finalization::Flushed),
-        // TinyUF2 completes after receiving all blocks, potentially removing
-        // its drive before Windows finishes flush/sync. Only after write_all
-        // accepted the entire image may these errors proceed to verification.
-        Err(error) if cfg!(windows) && matches!(error.raw_os_error(), Some(433 | 1167)) => {
+        // TinyUF2 may remove the drive before the host finishes flush/sync.
+        // The caller still requires the drive to disappear and the restarted
+        // device to report the selected version.
+        Err(error)
+            if error
+                .raw_os_error()
+                .is_some_and(|code| UF2_DISCONNECT_ERRORS.contains(&code)) =>
+        {
             Ok(Uf2Finalization::Disconnected)
         }
         Err(error) => Err(copy_error(error)),
@@ -336,7 +364,7 @@ mod tests {
 
     #[tokio::test]
     async fn uf2_disconnect_during_partial_write_is_always_a_copy_failure() {
-        for code in [433, 1167] {
+        for code in [5, 19, 433, 1167] {
             let mut sink = CopySink {
                 bytes: Vec::new(),
                 fail_write: true,
@@ -352,9 +380,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn uf2_windows_disconnect_after_full_write_can_proceed_to_verification() {
+    async fn uf2_disconnect_after_full_write_can_proceed_to_verification() {
         let bytes = [0xa5; 512];
-        for code in [433, 1167] {
+        for code in [5, 19, 433, 1167] {
             let mut sink = CopySink {
                 bytes: Vec::new(),
                 fail_write: false,
@@ -365,7 +393,9 @@ mod tests {
             let result = write_and_flush(&mut sink, &bytes).await;
             assert_eq!(sink.bytes, bytes);
             assert!(sink.flushed);
-            if cfg!(windows) {
+            if (cfg!(windows) && matches!(code, 433 | 1167))
+                || (cfg!(target_os = "linux") && matches!(code, 5 | 19))
+            {
                 assert_eq!(result.unwrap(), Uf2Finalization::Disconnected);
             } else {
                 assert_eq!(result.unwrap_err().code, "gs_copy");
@@ -374,11 +404,13 @@ mod tests {
     }
 
     #[test]
-    fn uf2_sync_only_allows_windows_device_disappearance() {
+    fn uf2_sync_only_allows_platform_device_disappearance_errors() {
         assert_eq!(uf2_finalization(Ok(())).unwrap(), Uf2Finalization::Flushed);
-        for code in [5, 28, 112, 433, 995, 1167] {
+        for code in [5, 19, 28, 112, 433, 995, 1167] {
             let result = uf2_finalization(Err(io::Error::from_raw_os_error(code)));
-            if cfg!(windows) && matches!(code, 433 | 1167) {
+            if (cfg!(windows) && matches!(code, 433 | 1167))
+                || (cfg!(target_os = "linux") && matches!(code, 5 | 19))
+            {
                 assert_eq!(result.unwrap(), Uf2Finalization::Disconnected);
             } else {
                 assert_eq!(result.unwrap_err().code, "gs_copy");

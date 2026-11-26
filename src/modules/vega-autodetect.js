@@ -37,6 +37,19 @@ export function getSerialPortLabel(port) {
   return isVegaSerialPort(port) ? `CATS Vega (${port.path})` : port.path;
 }
 
+export function getSerialPortOptions(ports, showOtherPorts) {
+  const vegaPorts = ports.filter(isVegaSerialPort);
+  if (!showOtherPorts) return vegaPorts;
+
+  const otherPorts = ports.filter((port) => {
+    const isGroundStation =
+      normalizeUsbId(port.vendorId) === "239A" &&
+      normalizeUsbId(port.productId) === "80AB";
+    return !isVegaSerialPort(port) && !isGroundStation;
+  });
+  return [...vegaPorts, ...otherPorts];
+}
+
 export function createVegaPresenceState() {
   return {
     presentIds: new Set(),

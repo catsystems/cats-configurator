@@ -70,7 +70,6 @@ pub struct Snapshot {
     pub available: Vec<Asset>,
     pub telemetry_version: Option<String>,
     pub platform_supported: bool,
-    pub hardware_test: bool,
 }
 impl Default for Snapshot {
     fn default() -> Self {
@@ -89,17 +88,12 @@ impl Default for Snapshot {
             available: Vec::new(),
             telemetry_version: None,
             platform_supported: platform_enabled(),
-            hardware_test: cfg!(feature = "firmware-hardware-test"),
         }
     }
 }
 
 fn platform_enabled() -> bool {
-    cfg!(windows)
-        || cfg!(all(
-            feature = "firmware-hardware-test",
-            any(target_os = "macos", target_os = "linux")
-        ))
+    cfg!(any(windows, target_os = "linux", target_os = "macos"))
 }
 
 #[derive(Clone, Deserialize)]
@@ -407,7 +401,7 @@ impl FirmwareManager {
         if !platform_enabled() {
             return Err(HostError::new(
                 "firmware_platform",
-                "Firmware flashing on this platform is awaiting hardware acceptance. Windows is the initial target.",
+                "Firmware updates are supported on Windows, Linux, and macOS.",
             ));
         }
         let state = self.current();
@@ -911,8 +905,8 @@ impl FirmwareManager {
             false,
         );
         hardware::copy_uf2(&drive, bytes).await?;
-        // Includes a Windows device-disappeared error at final flush/sync after
-        // the full image was submitted. Neither case is success until verified.
+        // The recovery drive can disappear during final flush/sync after the
+        // full image was submitted. Verify the restarted device either way.
         job.awaiting_reconnect = true;
         self.reconnect(job).await
     }
@@ -1126,17 +1120,9 @@ fn recovery_message(stage: &str) -> &'static str {
 mod tests {
     use super::*;
     #[test]
-    fn hardware_test_installer_reports_its_platform_gate() {
-        let state = Snapshot::default();
-        assert_eq!(
-            state.hardware_test,
-            cfg!(feature = "firmware-hardware-test")
-        );
-        assert_eq!(
-            state.platform_supported,
-            cfg!(windows)
-                || (state.hardware_test && cfg!(any(target_os = "macos", target_os = "linux")))
-        );
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    fn standard_desktop_build_supports_firmware_updates() {
+        assert!(Snapshot::default().platform_supported);
     }
     fn request() -> StartRequest {
         StartRequest {

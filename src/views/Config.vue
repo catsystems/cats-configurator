@@ -2,7 +2,7 @@
   <div>
     <v-container fluid>
       <v-row>
-        <v-col>
+        <v-col cols="12" md="6">
           <v-card v-if="displayData" height="100%" class="config-card">
             <v-card-title>General</v-card-title>
             <v-card-text class="config-fields">
@@ -95,7 +95,7 @@
             </v-card-actions>
           </v-card>
         </v-col>
-        <v-col>
+        <v-col cols="12" md="6">
           <v-card
             v-if="status && status.length"
             height="100%"
@@ -119,7 +119,7 @@
         </v-col>
       </v-row>
       <v-row>
-        <v-col>
+        <v-col cols="12" md="6">
           <v-card
             v-if="status && status.length"
             height="100%"
@@ -214,7 +214,7 @@
             </v-card-text>
           </v-card>
         </v-col>
-        <v-col>
+        <v-col cols="12" md="6">
           <v-card
             v-if="status && status.length"
             height="100%"

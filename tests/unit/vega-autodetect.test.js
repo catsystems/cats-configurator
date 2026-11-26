@@ -5,6 +5,7 @@ import {
   getAutoConnectCandidate,
   getSerialPortIdentity,
   getSerialPortLabel,
+  getSerialPortOptions,
   isVegaSerialPort,
   markVegaConnectionAttempt,
   normalizeUsbId,
@@ -37,6 +38,26 @@ describe("Vega serial auto-detection", () => {
     expect(isVegaSerialPort({ path: "COM6" })).toBe(false);
     expect(getSerialPortLabel(vega())).toBe("CATS Vega (COM4)");
     expect(getSerialPortLabel({ path: "COM6" })).toBe("COM6");
+  });
+
+  it("lists Vega first and keeps the Ground Station out of both picker modes", () => {
+    const board = vega();
+    const groundStation = {
+      path: "COM5",
+      vendorId: 0x239a,
+      productId: "0x80ab",
+    };
+    const adapter = { path: "COM6", vendorId: "0403", productId: "6001" };
+    const unknownPort = { path: "COM7" };
+    const ports = [adapter, groundStation, unknownPort, board];
+
+    expect(getSerialPortOptions(ports, false)).toEqual([board]);
+    expect(getSerialPortOptions(ports, true)).toEqual([
+      board,
+      adapter,
+      unknownPort,
+    ]);
+    expect(getSerialPortOptions([groundStation, adapter], false)).toEqual([]);
   });
 
   it("uses serial number, location, then path as the stable identity", () => {

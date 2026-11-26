@@ -1,6 +1,8 @@
 # Access for the active local user; do not grant access to unrelated USB devices.
 # STM32 ROM DFU used by CATS Vega.
-SUBSYSTEM=="usb", ATTR{idVendor}=="0483", ATTR{idProduct}=="df11", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0483", ATTR{idProduct}=="df11", MODE="0660", TAG+="uaccess"
+# Ground Station runtime DFU uses the USB device directly.
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="239a", ATTR{idProduct}=="80ab", MODE="0660", TAG+="uaccess"
 # Vega and Ground Station consoles. Prevent ModemManager from probing them.
-SUBSYSTEM=="tty", ATTRS{idVendor}=="cafe", ATTRS{idProduct}=="4003", MODE="0660", GROUP="dialout", TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"
-SUBSYSTEM=="tty", ATTRS{idVendor}=="239a", ATTRS{idProduct}=="80ab", MODE="0660", GROUP="dialout", TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="cafe", ATTRS{idProduct}=="4003", MODE="0660", TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="239a", ATTRS{idProduct}=="80ab", MODE="0660", TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"

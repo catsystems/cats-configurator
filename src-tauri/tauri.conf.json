@@ -16,8 +16,6 @@
         "title": "CATS Configurator",
         "width": 1700,
         "height": 1000,
-        "minWidth": 1200,
-        "minHeight": 800,
         "dragDropEnabled": true
       }
     ],

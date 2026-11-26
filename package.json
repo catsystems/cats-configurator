@@ -22,7 +22,9 @@
     "verify:production-target": "node tests/verify-production-target.mjs",
     "verify:release-contract": "node tests/verify-release-contract.mjs",
     "verify:release-tag": "node tests/verify-release-tag.mjs",
-    "audit:prod": "npm audit --omit=dev --audit-level=high"
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
+    "build:desktop-test": "node tests/desktop/build.mjs",
+    "test:desktop": "node tests/desktop/run.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.5",
@@ -37,6 +39,12 @@
     "@tauri-apps/cli": "^2.12.6",
     "@vitejs/plugin-vue": "^6.0.11",
     "@vue/test-utils": "^2.6.0",
+    "@wdio/cli": "9.31.9",
+    "@wdio/globals": "9.31.3",
+    "@wdio/local-runner": "9.31.9",
+    "@wdio/mocha-framework": "9.31.9",
+    "@wdio/spec-reporter": "9.31.2",
+    "@wdio/tauri-service": "1.5.1",
     "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.12.1",
@@ -49,7 +57,8 @@
     "vitest": "^5.1.1",
     "vue": "^3.5.45",
     "vue-router": "^5.5.1",
-    "vuetify": "^4.3.4"
+    "vuetify": "^4.3.4",
+    "webdriverio": "9.31.9"
   },
   "engines": {
     "node": ">=24.15 <25"

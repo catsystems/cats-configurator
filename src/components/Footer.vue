@@ -1,11 +1,9 @@
 <template>
-  <v-footer app height="32" color="grey-darken-4" theme="catsDark">
-    <div class="d-flex text-caption" style="width: 100%">
-      <div class="mr-12">
-        Status: {{ active ? "Connected" : "Disconnected" }}
-      </div>
+  <v-footer app color="grey-darken-4" theme="catsDark" class="app-footer">
+    <div class="app-footer-content text-caption">
+      <div>Status: {{ active ? "Connected" : "Disconnected" }}</div>
       <template v-if="active && version">
-        <div class="mr-12" v-for="item in version" :key="item" cols="2">
+        <div v-for="item in version" :key="item">
           {{ item }}
         </div>
       </template>
@@ -35,3 +33,18 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.app-footer {
+  min-height: 32px;
+  padding-block: 4px;
+}
+
+.app-footer-content {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: clamp(12px, 4vw, 48px);
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+</style>

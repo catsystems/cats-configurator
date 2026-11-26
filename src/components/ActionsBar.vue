@@ -31,10 +31,10 @@ export default {
 <style scoped>
 .actions-bar {
   position: fixed;
-  right: 0;
-  bottom: 32px;
-  left: 300px;
-  z-index: 1004;
+  right: var(--v-layout-right);
+  bottom: var(--v-layout-bottom);
+  left: var(--v-layout-left);
+  z-index: 1;
   height: 52px;
 }
 </style>

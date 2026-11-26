@@ -32,8 +32,10 @@ On Debian or Ubuntu:
 sudo apt-get install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libudev-dev patchelf xdg-utils
 ```
 
-Linux users also need permission to access the Vega serial device. On Debian
-and Ubuntu this normally means membership in the `dialout` group.
+Linux users need access to the Vega serial device. The Debian package installs
+the CATS device rule for the active desktop user. For AppImage and source builds,
+choose **Enable CATS USB access** in Configurator's sidebar and approve the
+one-time system prompt. A Terminal setup option is available in the dialog.
 
 ## Development
 
@@ -49,6 +51,17 @@ the native backend and shell. `npm run dev` runs only the Vite server; use
 `npm start` to launch the working desktop app with its native host.
 
 ## Verification
+
+For AI-assisted checks on Windows, Linux, and macOS, copy the
+[CATS Configurator testing skill](skills/cats-configurator-test) into
+`.agents/skills` under your home directory. From a Codex chat opened in this
+checkout, invoke `$cats-configurator-test` with the no-board, Vega, or Ground
+Station mode.
+
+For the native no-board smoke suite, run `npm run build:desktop-test` followed by
+`npm run test:desktop`. CI runs it on Windows, Linux, and macOS. See the
+[desktop test procedure](skills/cats-configurator-test/references/desktop.md#native-webdriverio-suite)
+for the Linux virtual display command and the checks that need a physical bench.
 
 ```sh
 npm run lint
