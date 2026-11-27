@@ -322,6 +322,17 @@ impl SerialManager {
                 Err(error) => {
                     self.transcript.write("ERROR", &error.to_string());
                     self.transcript.stop("Connection failed");
+                    if cfg!(target_os = "linux")
+                        && matches!(
+                            error.kind(),
+                            tokio_serial::ErrorKind::Io(std::io::ErrorKind::PermissionDenied)
+                        )
+                    {
+                        return Err(HostError::new(
+                            "serial_permission_denied",
+                            error.to_string(),
+                        ));
+                    }
                     return Err(HostError::new("serial_open_failed", error.to_string()));
                 }
             };

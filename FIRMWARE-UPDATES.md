@@ -62,11 +62,11 @@ apply equally to upgrades and downgrades.
   The bootloader and partition table are never updated by this feature.
 - Copy/flush completion or drive disappearance alone is not success: the
   restarted device must expose the selected firmware version in a freshly read
-  `version.json` after recovery disconnects and its application reconnects. A
-  Windows device-disappeared error (433 or 1167) at final flush/sync, after the
-  entire image was accepted by `write_all`, proceeds to that verification: TinyUF2
-  may restart before Windows finishes finalizing the file. Partial writes and
-  all other I/O errors remain failures, even if the drive disappeared.
+  `version.json` after recovery disconnects and its application reconnects.
+  During final sync, Windows errors 433 or 1167, Linux `EIO` or `ENODEV`, and
+  macOS `ENXIO` proceed to that verification after the OS accepted the entire
+  image. TinyUF2 can restart before the host finalizes the file.
+  Partial writes and other I/O errors remain failures.
 
 Current Ground Station firmware generates `/version.json` containing
 `ground_station`, `telemetry_1`, and `telemetry_2` before handing its FAT volume to
@@ -174,6 +174,12 @@ is 11,873,317 bytes, SHA-256
 `02ac9bf07d06a6259a5b9efbd7219916349c26a782e08a793aa62373a737126a`.
 It replaces the previous installer at the same path above.
 
+On 2026-11-26, an Arch Linux bench build downgraded a Ground Station from 1.3.4
+to 1.3.3. The device restarted on 1.3.3 after Linux returned `EIO` as TinyUF2
+disappeared. With the finalization handling updated, an authorized reinstall of
+1.3.3 passed native reconnect and version verification. Both receiver versions
+reported 1.2.0 afterward.
+
 ## Validation and release readiness
 
 Run the normal frontend tests, Rust tests, lint, and builds. The ignored
@@ -181,9 +187,9 @@ Run the normal frontend tests, Rust tests, lint, and builds. The ignored
 device. `built_ground_station_uf2_is_compatible` validates a local build pointed
 to by `CATS_TEST_GS_UF2`; it does not enable local-file updates in the application.
 
-Windows is the initial flashing target. macOS and Linux expose discovery/release
-checks but reject flashing until their flows have separate hardware acceptance.
-Automated tests and builds do not qualify any physical update path.
+Standard Windows, Linux, and macOS builds can install eligible Vega and Ground
+Station application firmware and prepare Ground Station radio firmware. Test the
+physical installation and recovery paths on native hosts for each platform.
 
 ### Linux and macOS integration
 
@@ -203,43 +209,42 @@ and [WROVER definition](https://github.com/adafruit/tinyuf2/blob/8542b474ffa19c0
 These bootloader identities are not cryptographic proof that a board is a GS;
 recovery updates still require selecting the intended, unambiguous device.
 
-The Linux Debian package installs `70-cats-devices.rules` under
-`/usr/lib/udev/rules.d`. The AppImage includes the same rules as a resource, but
-cannot install system permissions itself. For an AppImage/source installation,
-an administrator can install the provided rules once:
+The Linux Debian and Arch packages install `70-cats-devices.rules` under
+`/usr/lib/udev/rules.d`. For the AppImage or a source build, choose **Enable CATS
+USB access** in the sidebar and authenticate once. The dialog also provides a
+Terminal command. To install the rule manually from a checkout, run the
+following commands as an administrator.
 
 ```sh
 sudo install -m 0644 src-tauri/resources/70-cats-devices.rules /etc/udev/rules.d/70-cats-devices.rules
 sudo udevadm control --reload-rules
 ```
 
-Reconnect the device afterwards. The rules grant the active local session access
-to Vega/GS serial and STM32 DFU interfaces, with `dialout`/`plugdev` group fallbacks,
-and tell ModemManager not to probe CATS serial endpoints. Ground Station volumes
+Reconnect the device afterwards. The rules use `uaccess` to grant the active
+local session access to Vega and GS serial, STM32 DFU, and GS runtime DFU.
+They use the system's existing device groups and tell ModemManager to ignore the
+CATS serial endpoints.
+Ground Station volumes
 must also be mounted writable by the logged-in user. Never run Configurator as
 root. On macOS, allow the USB accessory if prompted and close other serial/DFU
 tools; no additional STM32 driver is needed.
 
 CI builds Windows, Linux, and Apple Silicon/Intel macOS packages. Both Mac targets
-also receive backend checks. This checkout has additionally passed native Linux
-tests in Ubuntu WSL, which does not establish physical USB compatibility. macOS
-builds and physical Linux/macOS updates still need to run on their native hosts.
-Production flashing remains disabled there until that hardware acceptance is
-recorded; the UI and native host both enforce this restriction.
+receive backend and installer checks. CI verifies each DMG, its ad-hoc app
+signature, the executable architecture, and launch from a copy of the mounted
+app. Choose arm64 for Apple Silicon or x64 for Intel. If Gatekeeper blocks the
+ad-hoc-signed app, move it to Applications and use **Open Anyway** under macOS
+**Privacy & Security** for the trusted build. [Apple's instructions](https://support.apple.com/en-us/102445)
 
-For the requested Mac bench test, pull-request CI builds Apple Silicon and Intel
-DMGs with the explicit `firmware-hardware-test` Cargo feature. These installers
-show a hardware-test warning and enable the native Mac update path while keeping
-device identity, safety confirmation, image validation, version confirmations,
-and verification requirements intact. Tag/main builds do not enable this feature.
-The feature does not permit custom firmware or change the official asset contract.
-CI checks each DMG, ad-hoc app signature, and executable architecture, then copies
-the app from the mounted DMG and checks that it stays running after launch. The packages
-are not notarized: move the app to Applications and use **Open Anyway** under
-macOS **Privacy & Security** for this trusted test build if Gatekeeper blocks it;
-do not disable Gatekeeper globally. See [Apple's instructions](https://support.apple.com/en-us/102445).
-Choose the arm64 artifact for Apple Silicon
-or x64 for Intel.
+On 2026-11-26, an Arch Linux WebDriverIO test installed official Vega 3.0.2 over
+3.0.2-dev. The first attempt stopped before erase when Linux could not read the
+bootloader's USB descriptor (`-71`). Reconnecting Vega restored application mode.
+The retry verified the full image by USB readback and confirmed 3.0.2 over serial
+after restart. Ground Station 1.3.3 was reinstalled and verified from a fresh
+`version.json`. Both receivers reported 1.2.0 afterward. These versions were
+verified again after a separate power cycle. The bench operator confirmed that
+the Ground Station screen, buttons, and recording controls responded. Native
+macOS firmware installation still needs physical validation.
 
 Before testing, disconnect Vega deployment charges, close other serial/DFU tools,
 and keep a known recovery route available. Record the Mac model, macOS version,
@@ -261,9 +266,9 @@ connection check**. It does not download, erase, or rewrite another image. Missi
 or delayed startup reporting is retried within bounded deadlines; a reported
 version mismatch remains a failure. Accepted cancellation cannot be lost before
 the background worker starts, and cancellation is rejected after the transition
-boundary. Failed writes remain failures. Only Windows device-disappeared errors
-at final flush/sync after the full UF2 write proceed to reconnect verification;
-a failed verification offers a connection-only retry, never an automatic rewrite.
+boundary. Failed writes remain failures. The platform-specific device-disappearance
+errors described above proceed to reconnect verification only at final flush/sync
+after the full UF2 write. A failed verification offers a connection-only retry.
 The serial request owns its pending-operation count until the request completes
 or its worker stops. Cancelling the caller cannot leak the lock or permit a
 firmware transition while that command is still running. SemVer build metadata

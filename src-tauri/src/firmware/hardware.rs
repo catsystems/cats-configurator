@@ -1,8 +1,8 @@
 use std::{
+    io::{self, Write},
     path::{Path, PathBuf},
     time::Duration,
 };
-use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use super::assets::hash;
 use crate::{error::HostError, serial::SerialPortSummary};
@@ -117,7 +117,7 @@ pub async fn enter_gs(port: &SerialPortSummary) -> Result<(), HostError> {
     if matches.len() != 1 {
         return Err(bootloader_error("USB identity is missing or ambiguous"));
     }
-    let device = matches[0].open().await.map_err(bootloader_error)?;
+    let device = matches[0].open().await.map_err(gs_usb_error)?;
     let config = device.active_configuration().map_err(bootloader_error)?;
     let interfaces: Vec<_> = config
         .interface_alt_settings()
@@ -130,7 +130,7 @@ pub async fn enter_gs(port: &SerialPortSummary) -> Result<(), HostError> {
     let interface = device
         .claim_interface(interfaces[0])
         .await
-        .map_err(bootloader_error)?;
+        .map_err(gs_usb_error)?;
     let result = interface
         .control_out(
             ControlOut {
@@ -153,7 +153,17 @@ pub async fn enter_gs(port: &SerialPortSummary) -> Result<(), HostError> {
     Ok(())
 }
 
-pub async fn copy_uf2(drive: &RecoveryDrive, bytes: &[u8]) -> Result<(), HostError> {
+fn gs_usb_error(error: nusb::Error) -> HostError {
+    if cfg!(target_os = "linux") && error.kind() == nusb::ErrorKind::PermissionDenied {
+        return HostError::new(
+            "gs_usb_permission_denied",
+            "Linux denied access to the Ground Station update interface. Enable CATS USB access, reconnect the Ground Station, and check devices again.",
+        );
+    }
+    bootloader_error(error)
+}
+
+pub async fn copy_uf2(drive: &RecoveryDrive, bytes: Vec<u8>) -> Result<(), HostError> {
     if !recovery_drives().await?.contains(drive) {
         return Err(HostError::new(
             "gs_drive_changed",
@@ -172,7 +182,7 @@ pub async fn copy_uf2(drive: &RecoveryDrive, bytes: &[u8]) -> Result<(), HostErr
     options.custom_flags(libc::O_NOFOLLOW);
     #[cfg(windows)]
     options.custom_flags(0x0020_0000); // FILE_FLAG_OPEN_REPARSE_POINT
-    let mut output = options.open(destination).await.map_err(copy_error)?;
+    let output = options.open(destination).await.map_err(copy_error)?;
     let metadata = output.metadata().await.map_err(copy_error)?;
     #[cfg(windows)]
     {
@@ -191,42 +201,56 @@ pub async fn copy_uf2(drive: &RecoveryDrive, bytes: &[u8]) -> Result<(), HostErr
         ));
     }
     output.set_len(0).await.map_err(copy_error)?;
-    if write_and_flush(&mut output, bytes).await? == Uf2Finalization::Flushed {
-        uf2_finalization(output.sync_all().await)?;
-    }
-    drop(output);
-    // Even a clean flush is not installation proof. The caller must observe
-    // recovery disconnect, application reconnect, and the selected version.json.
-    Ok(())
+    // Tokio can report a buffered write before the OS completes it. Use an
+    // unbuffered file on a blocking worker to keep write errors separate from sync.
+    let mut output = output.into_std().await;
+    tokio::task::spawn_blocking(move || write_and_sync(&mut output, &bytes, |file| file.sync_all()))
+        .await
+        .map_err(copy_error)?
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum Uf2Finalization {
-    Flushed,
-    Disconnected,
-}
-
-async fn write_and_flush(
-    output: &mut (impl AsyncWrite + Unpin),
+fn write_and_sync<W: Write>(
+    output: &mut W,
     bytes: &[u8],
-) -> Result<Uf2Finalization, HostError> {
-    output.write_all(bytes).await.map_err(copy_error)?;
-    uf2_finalization(output.flush().await)
+    sync: impl FnOnce(&mut W) -> io::Result<()>,
+) -> Result<(), HostError> {
+    output.write_all(bytes).map_err(|error| {
+        HostError::new(
+            "gs_copy",
+            format!(
+                "Writing NEW.UF2 failed: {error}. Keep the device connected and retry in TinyUF2."
+            ),
+        )
+    })?;
+    uf2_finalization(sync(output))
 }
 
-fn uf2_finalization(result: std::io::Result<()>) -> Result<Uf2Finalization, HostError> {
+#[cfg(windows)]
+const UF2_DISCONNECT_ERRORS: &[i32] = &[433, 1167];
+#[cfg(target_os = "linux")]
+const UF2_DISCONNECT_ERRORS: &[i32] = &[libc::EIO, libc::ENODEV];
+#[cfg(target_os = "macos")]
+const UF2_DISCONNECT_ERRORS: &[i32] = &[libc::ENXIO];
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+const UF2_DISCONNECT_ERRORS: &[i32] = &[];
+
+fn uf2_finalization(result: io::Result<()>) -> Result<(), HostError> {
     match result {
-        Ok(()) => Ok(Uf2Finalization::Flushed),
-        // TinyUF2 completes after receiving all blocks, potentially removing
-        // its drive before Windows finishes flush/sync. Only after write_all
-        // accepted the entire image may these errors proceed to verification.
-        Err(error) if cfg!(windows) && matches!(error.raw_os_error(), Some(433 | 1167)) => {
-            Ok(Uf2Finalization::Disconnected)
+        Ok(()) => Ok(()),
+        // TinyUF2 may remove the drive before the host finishes syncing.
+        // The caller still requires the drive to disappear and the restarted
+        // device to report the selected version.
+        Err(error)
+            if error
+                .raw_os_error()
+                .is_some_and(|code| UF2_DISCONNECT_ERRORS.contains(&code)) =>
+        {
+            Ok(())
         }
         Err(error) => Err(copy_error(error)),
     }
 }
-fn copy_error(e: std::io::Error) -> HostError {
+fn copy_error(e: impl std::fmt::Display) -> HostError {
     HostError::new(
         "gs_copy",
         format!(
@@ -238,11 +262,6 @@ fn copy_error(e: std::io::Error) -> HostError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        io,
-        pin::Pin,
-        task::{Context, Poll},
-    };
 
     #[test]
     fn version_json_requires_one_ground_station_and_one_metadata_volume() {
@@ -275,98 +294,102 @@ mod tests {
     struct CopySink {
         bytes: Vec<u8>,
         fail_write: bool,
-        fail_flush: bool,
-        flushed: bool,
+        fail_sync: bool,
+        synced: bool,
         error_code: Option<i32>,
     }
-    impl AsyncWrite for CopySink {
-        fn poll_write(
-            mut self: Pin<&mut Self>,
-            _: &mut Context<'_>,
-            bytes: &[u8],
-        ) -> Poll<io::Result<usize>> {
+
+    impl CopySink {
+        fn error(&self, message: &str) -> io::Error {
+            self.error_code
+                .map(io::Error::from_raw_os_error)
+                .unwrap_or_else(|| io::Error::other(message))
+        }
+
+        fn sync(&mut self) -> io::Result<()> {
+            self.synced = true;
+            if self.fail_sync {
+                return Err(self.error("sync failed"));
+            }
+            Ok(())
+        }
+    }
+
+    impl Write for CopySink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
             if self.fail_write && !self.bytes.is_empty() {
-                return Poll::Ready(Err(self
-                    .error_code
-                    .map(io::Error::from_raw_os_error)
-                    .unwrap_or_else(|| io::Error::other("device disconnected"))));
+                return Err(self.error("device disconnected"));
             }
             let count = bytes.len().min(19); // Exercise short successful writes too.
             self.bytes.extend_from_slice(&bytes[..count]);
-            Poll::Ready(Ok(count))
+            Ok(count)
         }
-        fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-            self.flushed = true;
-            Poll::Ready(if self.fail_flush {
-                Err(self
-                    .error_code
-                    .map(io::Error::from_raw_os_error)
-                    .unwrap_or_else(|| io::Error::other("flush failed")))
-            } else {
-                Ok(())
-            })
-        }
-        fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-            self.poll_flush(cx)
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
         }
     }
-    #[tokio::test]
-    async fn uf2_copy_propagates_partial_write_and_flush_failures() {
+
+    #[test]
+    fn uf2_copy_propagates_partial_write_and_sync_failures() {
         let bytes = vec![0xa5; 512];
-        for (fail_write, fail_flush) in [(false, false), (true, false), (false, true)] {
+        for (fail_write, fail_sync) in [(false, false), (true, false), (false, true)] {
             let mut sink = CopySink {
                 bytes: Vec::new(),
                 fail_write,
-                fail_flush,
-                flushed: false,
+                fail_sync,
+                synced: false,
                 error_code: None,
             };
-            let result = write_and_flush(&mut sink, &bytes).await;
-            if fail_write || fail_flush {
+            let result = write_and_sync(&mut sink, &bytes, CopySink::sync);
+            if fail_write || fail_sync {
                 assert_eq!(result.unwrap_err().code, "gs_copy");
             } else {
-                assert_eq!(result.unwrap(), Uf2Finalization::Flushed);
+                result.unwrap();
             }
-            assert_eq!(sink.flushed, !fail_write);
+            assert_eq!(sink.synced, !fail_write);
             if !fail_write {
                 assert_eq!(sink.bytes, bytes);
             }
         }
     }
 
-    #[tokio::test]
-    async fn uf2_disconnect_during_partial_write_is_always_a_copy_failure() {
-        for code in [433, 1167] {
+    #[test]
+    fn uf2_disconnect_during_partial_write_is_always_a_copy_failure() {
+        for code in [5, 6, 19, 433, 1167] {
             let mut sink = CopySink {
                 bytes: Vec::new(),
                 fail_write: true,
-                fail_flush: false,
-                flushed: false,
+                fail_sync: false,
+                synced: false,
                 error_code: Some(code),
             };
-            let error = write_and_flush(&mut sink, &[0xa5; 512]).await.unwrap_err();
+            let error = write_and_sync(&mut sink, &[0xa5; 512], CopySink::sync).unwrap_err();
             assert_eq!(error.code, "gs_copy");
             assert_eq!(sink.bytes.len(), 19);
-            assert!(!sink.flushed);
+            assert!(!sink.synced);
         }
     }
 
-    #[tokio::test]
-    async fn uf2_windows_disconnect_after_full_write_can_proceed_to_verification() {
+    #[test]
+    fn uf2_disconnect_after_full_write_can_proceed_to_verification() {
         let bytes = [0xa5; 512];
-        for code in [433, 1167] {
+        for code in [5, 6, 19, 433, 1167] {
             let mut sink = CopySink {
                 bytes: Vec::new(),
                 fail_write: false,
-                fail_flush: true,
-                flushed: false,
+                fail_sync: true,
+                synced: false,
                 error_code: Some(code),
             };
-            let result = write_and_flush(&mut sink, &bytes).await;
+            let result = write_and_sync(&mut sink, &bytes, CopySink::sync);
             assert_eq!(sink.bytes, bytes);
-            assert!(sink.flushed);
-            if cfg!(windows) {
-                assert_eq!(result.unwrap(), Uf2Finalization::Disconnected);
+            assert!(sink.synced);
+            if (cfg!(windows) && matches!(code, 433 | 1167))
+                || (cfg!(target_os = "linux") && matches!(code, 5 | 19))
+                || (cfg!(target_os = "macos") && code == 6)
+            {
+                result.unwrap();
             } else {
                 assert_eq!(result.unwrap_err().code, "gs_copy");
             }
@@ -374,12 +397,15 @@ mod tests {
     }
 
     #[test]
-    fn uf2_sync_only_allows_windows_device_disappearance() {
-        assert_eq!(uf2_finalization(Ok(())).unwrap(), Uf2Finalization::Flushed);
-        for code in [5, 28, 112, 433, 995, 1167] {
+    fn uf2_sync_only_allows_platform_device_disappearance_errors() {
+        uf2_finalization(Ok(())).unwrap();
+        for code in [5, 6, 19, 28, 112, 433, 995, 1167] {
             let result = uf2_finalization(Err(io::Error::from_raw_os_error(code)));
-            if cfg!(windows) && matches!(code, 433 | 1167) {
-                assert_eq!(result.unwrap(), Uf2Finalization::Disconnected);
+            if (cfg!(windows) && matches!(code, 433 | 1167))
+                || (cfg!(target_os = "linux") && matches!(code, 5 | 19))
+                || (cfg!(target_os = "macos") && code == 6)
+            {
+                result.unwrap();
             } else {
                 assert_eq!(result.unwrap_err().code, "gs_copy");
             }

@@ -1,0 +1,11 @@
+{
+  "identifier": "com.cats.cats-configurator.desktop-test",
+  "bundle": {
+    "active": false
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": []
+    }
+  }
+}

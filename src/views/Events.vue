@@ -195,7 +195,7 @@ export default {
 }
 
 .event-action {
-  max-height: calc(100vh - 290px);
+  max-height: max(144px, calc(100dvh - 290px));
   overflow: scroll;
 }
 

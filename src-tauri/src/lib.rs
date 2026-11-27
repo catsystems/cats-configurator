@@ -7,6 +7,7 @@ mod preflight;
 mod profile;
 mod protocol;
 mod serial;
+mod usb_access;
 
 use std::{sync::Arc, time::Duration};
 
@@ -112,6 +113,14 @@ fn configure_appimage_opener(
 }
 
 pub(crate) fn open_external_url(app: &tauri::AppHandle, url: &str) -> Result<(), HostError> {
+    #[cfg(feature = "desktop-test")]
+    if let Some(capture) =
+        std::env::var_os("CATS_DESKTOP_TEST_FLIGHTS_CAPTURE").filter(|path| !path.is_empty())
+        && url.starts_with("https://catsystems.io/flights/analyze#")
+    {
+        return std::fs::write(capture, url)
+            .map_err(|error| HostError::new("open_external_failed", error.to_string()));
+    }
     if cfg!(target_os = "linux")
         && (std::env::var_os("APPIMAGE").is_some() || std::env::var_os("APPDIR").is_some())
     {
@@ -192,7 +201,7 @@ async fn app_install_update<R: tauri::Runtime>(
     if !app_update_install_supported() {
         return Err(HostError::new(
             "app_update_manual",
-            "Install the new Debian package to update Configurator.",
+            "Install the new Configurator package with your package manager.",
         ));
     }
     let pending = state.app_update.try_lock().map_err(|_| {
@@ -252,6 +261,20 @@ async fn app_install_update<R: tauri::Runtime>(
 
 #[tauri::command]
 fn serial_list() -> Result<Vec<SerialPortSummary>, HostError> {
+    #[cfg(feature = "desktop-test")]
+    match std::env::var("CATS_DESKTOP_TEST_MODE").as_deref() {
+        Ok("no-board" | "gs") => return Ok(Vec::new()),
+        Ok("vega") if std::env::var("CATS_DESKTOP_TEST_WITH_GS").as_deref() != Ok("1") => {
+            let selected = std::env::var("CATS_DESKTOP_TEST_VEGA_PORT").unwrap_or_default();
+            return SerialManager::list().map(|ports| {
+                ports
+                    .into_iter()
+                    .filter(|port| port.path == selected)
+                    .collect()
+            });
+        }
+        _ => {}
+    }
     SerialManager::list()
 }
 
@@ -1186,8 +1209,22 @@ fn command_allowed_during_firmware(command: &str) -> bool {
     )
 }
 
+#[cfg(all(feature = "desktop-test", not(debug_assertions)))]
+compile_error!("The desktop-test driver requires a debug build.");
+
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(feature = "desktop-test")]
+    let builder = match std::env::var(tauri_plugin_wdio_webdriver::PORT_ENV_VAR)
+        .ok()
+        .and_then(|port| port.parse::<u16>().ok())
+    {
+        Some(port) if port != 0 => {
+            builder.plugin(tauri_plugin_wdio_webdriver::init_with_port(port))
+        }
+        _ => builder,
+    };
+    builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
@@ -1230,6 +1267,8 @@ pub fn run() {
                 firmware_cancel,
                 initialize_host,
                 app_open_external,
+                usb_access::app_usb_access_status,
+                usb_access::app_enable_usb_access,
                 app_check_update,
                 app_install_update,
                 serial_list,

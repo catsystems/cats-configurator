@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import packageJson from "../package.json" with { type: "json" };
 import lockfile from "../package-lock.json" with { type: "json" };
 import config from "../src-tauri/tauri.conf.json" with { type: "json" };
+import desktopTest from "../src-tauri/tauri.desktop-test.conf.json" with { type: "json" };
 
 const cargo = await fs.readFile(
   new URL("../src-tauri/Cargo.toml", import.meta.url),
@@ -13,6 +14,9 @@ assert.equal(config.productName, packageJson.productName);
 assert.equal(config.version, packageJson.version);
 assert.equal(config.identifier, "com.cats.cats-configurator");
 assert.equal(config.build.frontendDist, "../dist");
+assert.notEqual(desktopTest.identifier, config.identifier);
+assert.equal(desktopTest.bundle.active, false);
+assert.deepEqual(desktopTest.plugins.updater.endpoints, []);
 assert.deepEqual(config.plugins.updater.endpoints, [
   "https://github.com/catsystems/cats-configurator/releases/latest/download/latest.json",
 ]);
@@ -91,6 +95,7 @@ for (const [, command] of workflow.matchAll(/^\s+build_command: (.+)$/gm)) {
   );
 }
 assert.doesNotMatch(workflow, /dmgbuild/);
+assert.doesNotMatch(workflow, /\bdesktop-test\b/);
 assert.doesNotMatch(workflow, /Build custom Mac installer/);
 assert.match(workflow, /test -L "\$mount\/Applications"/);
 assert.match(workflow, /bash scripts\/patch-appimage-wayland\.sh/);

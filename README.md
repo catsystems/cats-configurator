@@ -11,11 +11,11 @@ flight computers and inspecting `.cfl` flight logs. It uses a Vue/Vuetify
 renderer and a Rust/Tauri host for serial communication, configuration,
 profiles, preflight, local files, and CATS Flights handoff.
 
-The current version is `2.0.3`. Configurator checks for updates at startup and
+The current version is `2.1.0`. Configurator checks for updates at startup and
 offers to install signed updates and restart. Click the app version in the
 footer to check again. Connected devices are disconnected before installation.
-Debian packages are updated manually. Windows packages are unsigned, and macOS
-packages are ad-hoc signed but not notarized.
+Debian and Arch packages are updated with the system package manager. Windows
+packages are unsigned, and macOS packages are ad-hoc signed without notarization.
 
 ## Requirements
 
@@ -32,8 +32,18 @@ On Debian or Ubuntu:
 sudo apt-get install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libudev-dev patchelf xdg-utils
 ```
 
-Linux users also need permission to access the Vega serial device. On Debian
-and Ubuntu this normally means membership in the `dialout` group.
+Linux users need access to the Vega serial device. The Debian and Arch packages
+install the CATS device rule for the active desktop user. For AppImage and source builds,
+choose **Enable CATS USB access** in Configurator's sidebar and approve the
+one-time system prompt. A Terminal setup option is available in the dialog.
+
+### Install on Arch Linux or Omarchy
+
+Download the x86-64 `.pkg.tar.zst` from [GitHub Releases](https://github.com/catsystems/cats-configurator/releases)
+and pass the downloaded file to `sudo pacman -U`.
+Open **CATS Configurator** from Apps. Pacman installs the device rules and Arch's
+systemd hook reloads them. Reconnect any boards that were already plugged in if
+the desktop session has yet to pick up the permissions.
 
 ## Development
 
@@ -49,6 +59,17 @@ the native backend and shell. `npm run dev` runs only the Vite server; use
 `npm start` to launch the working desktop app with its native host.
 
 ## Verification
+
+For AI-assisted checks on Windows, Linux, and macOS, copy the
+[CATS Configurator testing skill](skills/cats-configurator-test) into
+`.agents/skills` under your home directory. From a Codex chat opened in this
+checkout, invoke `$cats-configurator-test` with the no-board, Vega, or Ground
+Station mode.
+
+For the native no-board smoke suite, run `npm run build:desktop-test` followed by
+`npm run test:desktop`. CI runs it on Windows, Linux, and macOS. See the
+[desktop test procedure](skills/cats-configurator-test/references/desktop.md#native-webdriverio-suite)
+for the Linux virtual display command and the checks that need a physical bench.
 
 ```sh
 npm run lint
@@ -90,10 +111,15 @@ Packages are written under `src-tauri/target/**/release/bundle/`:
 
 - Windows x64: NSIS installer
 - macOS: Intel and Apple Silicon application bundles and DMGs
-- Linux x64: AppImage and Debian package
+- Linux x64: AppImage, Debian package, and native Arch package
 
-CI installs from `package-lock.json`, checks both codebases, and builds all
-four platform/architecture targets. Version tags publish the native artifacts;
+On Arch Linux, with `base-devel` installed, build the native package from this
+checkout with `bash scripts/build-arch-package.sh --syncdeps`. The package is
+written to `src-tauri/target/arch/`. The build uses Node.js 24 and `package-lock.json`.
+
+CI installs from `package-lock.json`, checks both codebases, and builds the
+native artifacts, including a pacman installation check in an Arch container.
+Version tags publish the native artifacts;
 tags containing a prerelease suffix create GitHub prereleases. Pushing a branch
 does not publish a release. Native macOS/Linux device acceptance is still
 required.

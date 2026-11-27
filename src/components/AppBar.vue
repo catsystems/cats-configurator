@@ -1,5 +1,13 @@
 <template>
   <v-app-bar color="grey-darken-4" theme="catsDark">
+    <v-app-bar-nav-icon
+      v-if="compact"
+      id="navigation-toggle"
+      aria-label="Toggle navigation"
+      aria-controls="app-navigation"
+      :aria-expanded="Boolean(navigationOpen)"
+      @click="$emit('toggle-navigation')"
+    />
     <router-link class="app-brand" to="/" aria-label="CATS Configurator home">
       <img class="app-brand__mark" :src="logoImage" alt="" />
       <span class="app-brand__copy">
@@ -26,19 +34,40 @@
       </v-btn>
       <v-select
         v-model="selectedPort"
-        :items="serialPorts"
+        :items="portOptions"
         :disabled="active || connectionPending || firmwareBusy"
-        ref="portSelector"
-        label="ports"
-        no-data-text="No ports available"
+        :label="showOtherSerialPorts ? 'Serial port' : 'Vega'"
+        :no-data-text="
+          showOtherSerialPorts
+            ? 'No serial ports available'
+            : 'No Vega detected'
+        "
         :item-title="portTitle"
         item-value="path"
-        style="width: 220px"
+        class="port-selector"
         variant="solo-filled"
         density="compact"
         hide-details
         return-object
       >
+        <template #menu-footer>
+          <v-divider />
+          <div class="px-2 py-1">
+            <v-btn
+              block
+              size="small"
+              variant="text"
+              class="justify-start text-none"
+              @click="toggleOtherSerialPorts"
+            >
+              {{
+                showOtherSerialPorts
+                  ? "Hide other serial ports"
+                  : "Show other serial ports"
+              }}
+            </v-btn>
+          </div>
+        </template>
       </v-select>
       <v-btn
         v-if="!active"
@@ -78,6 +107,7 @@ import {
   createVegaPresenceState,
   getAutoConnectCandidate,
   getSerialPortLabel,
+  getSerialPortOptions,
   isVegaSerialPort,
   markVegaConnectionAttempt,
   reconcileVegaCandidates,
@@ -86,6 +116,11 @@ import {
 
 export default {
   name: "AppBar",
+  props: {
+    compact: Boolean,
+    navigationOpen: Boolean,
+  },
+  emits: ["toggle-navigation", "usb-access-required"],
   data() {
     return {
       isFetchingPorts: false,
@@ -94,6 +129,7 @@ export default {
       connectionPending: false,
       connectBtnLoading: false,
       selectedPort: null,
+      showOtherSerialPorts: false,
       vegaPresence: createVegaPresenceState(),
       subscriptions: [],
       logoImage,
@@ -105,6 +141,9 @@ export default {
       active: "active",
       firmwareBusy: (store) => store.firmwareBusy || store.appUpdating,
     }),
+    portOptions() {
+      return getSerialPortOptions(this.serialPorts, this.showOtherSerialPorts);
+    },
   },
   watch: {
     active(value) {
@@ -147,6 +186,12 @@ export default {
     portTitle(port) {
       return getSerialPortLabel(port);
     },
+    toggleOtherSerialPorts() {
+      this.showOtherSerialPorts = !this.showOtherSerialPorts;
+      if (!this.showOtherSerialPorts && !isVegaSerialPort(this.selectedPort)) {
+        this.selectedPort = null;
+      }
+    },
     async getPorts() {
       await this.refreshPorts(true);
     },
@@ -163,7 +208,7 @@ export default {
         const selectedPath = this.selectedPort?.path;
         this.setSerialPorts(ports);
         this.selectedPort = selectedPath
-          ? (ports.find(({ path }) => path === selectedPath) ?? null)
+          ? (this.portOptions.find(({ path }) => path === selectedPath) ?? null)
           : null;
 
         const candidates = reconcileVegaCandidates(this.vegaPresence, ports);
@@ -202,7 +247,14 @@ export default {
       } catch (error) {
         this.connectionPending = false;
         this.connectBtnLoading = false;
-        this.showErrorSnackbar(error.message);
+        if (
+          error.code === "serial_permission_denied" &&
+          isVegaSerialPort(this.selectedPort)
+        ) {
+          this.$emit("usb-access-required");
+        } else {
+          this.showErrorSnackbar(error.message);
+        }
       }
     },
     async disconnect() {
@@ -276,7 +328,29 @@ export default {
 }
 
 .app-bar-controls {
+  min-width: 0;
   padding-inline-end: 20px;
+}
+
+.port-selector {
+  width: 220px;
+  min-width: 0;
+}
+
+@media (width < 960px) {
+  .app-brand {
+    margin-inline-start: 0;
+  }
+
+  .app-bar-controls {
+    padding-inline-end: 12px;
+  }
+}
+
+@media (width < 600px) {
+  .app-brand__copy {
+    display: none;
+  }
 }
 
 .v-btn--disabled.bg-primary {

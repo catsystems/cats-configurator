@@ -1,0 +1,4 @@
+interface:
+  display_name: "CATS Configurator Testing"
+  short_description: "Run Configurator desktop and bench checks"
+  default_prompt: "Use $cats-configurator-test to test CATS Configurator in no-board mode on this machine."

@@ -11,7 +11,7 @@ build configuration in this repository under the
   [GitHub Releases](https://github.com/catsystems/cats-configurator/releases).
 - Windows releases use an unsigned NSIS installer.
 - macOS releases use ad-hoc application signing without notarization.
-- Linux releases are provided as unsigned AppImage and Debian packages.
+- Linux releases are provided as unsigned AppImage, Debian, and Arch packages.
 - Operating systems may display a security warning because the packages do not
   use commercial platform code-signing certificates.
 - CATS Configurator checks GitHub Releases for a newer stable application
@@ -19,7 +19,7 @@ build configuration in this repository under the
   It downloads, verifies the updater signature, installs, and restarts only after
   the user chooses **Install and restart**. Connected devices are disconnected
   before downloading the update; firmware operations must finish first. Debian
-  packages are installed manually.
+  and Arch packages are updated with the system package manager.
 - Official release status and provenance do not apply to forks, local builds,
   or binaries redistributed by third parties.
 
@@ -98,6 +98,7 @@ To uninstall:
   launcher entry created by the user.
 - Linux Debian package: remove `cats-configurator` using the system package
   manager.
+- Arch Linux or Omarchy: remove the native package with `sudo pacman -R cats-configurator`.
 
 Application data and logs are stored in the operating system's per-user
 application-data and log directories. Users may remove those directories

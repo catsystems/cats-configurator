@@ -1,6 +1,6 @@
 [package]
 name = "cats-configurator"
-version = "2.0.3"
+version = "2.1.0"
 description = "Desktop configuration and flight-log analysis utility for CATS flight computers"
 authors = ["Control and Telemetry Systems GmbH"]
 edition = "2024"
@@ -11,8 +11,7 @@ name = "cats_configurator_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-# Only explicitly requested bench-test installers enable unaccepted platforms.
-firmware-hardware-test = []
+desktop-test = ["dep:tauri-plugin-wdio-webdriver"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -33,6 +32,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy"] }
+tauri-plugin-wdio-webdriver = { version = "=1.5.1", optional = true }
 thiserror = "2"
 tokio = { version = "1", features = ["io-util", "macros", "rt-multi-thread", "sync", "time", "fs"] }
 tokio-serial = "5"

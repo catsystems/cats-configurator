@@ -191,7 +191,8 @@ export default {
 
 <style scoped>
 .cli-view {
-  height: calc(100vh - 96px);
+  height: calc(100dvh - var(--v-layout-top) - var(--v-layout-bottom));
+  min-height: 180px;
   position: relative;
 }
 

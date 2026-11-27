@@ -268,16 +268,6 @@ describe("firmware updates", () => {
       wrapper.unmount();
     },
   );
-  it("does not show hardware-test deployment warnings", async () => {
-    const wrapper = await render();
-    useAppStore().setFirmwareSnapshot({ ...snapshot(), hardwareTest: true });
-    await flushPromises();
-    expect(wrapper.text()).not.toContain("Hardware-test build");
-    expect(wrapper.text()).not.toContain("deployment charges disconnected");
-    expect(wrapper.text()).not.toContain("hardware acceptance");
-    expect(wrapper.vm.canUpdate("ground-station")).toBe(true);
-    wrapper.unmount();
-  });
   it("uses Ground Station version.json for same-version confirmation without a serial read", async () => {
     const wrapper = await render();
     const store = useAppStore();
@@ -314,7 +304,7 @@ describe("firmware updates", () => {
     expect(wrapper.vm.canUpdate("ground-station")).toBe(false);
     wrapper.unmount();
   });
-  it("blocks unsaved changes, same-version reinstall and unaccepted platforms", async () => {
+  it("requires reinstall confirmation and blocks unsaved changes and unsupported platforms", async () => {
     const wrapper = await render();
     const store = useAppStore();
     store.firmware.devices[0].version = "1.2.2+local";
@@ -330,7 +320,6 @@ describe("firmware updates", () => {
     store.firmware.platformSupported = false;
     await flushPromises();
     expect(wrapper.vm.canUpdate("ground-station")).toBe(false);
-    expect(wrapper.text()).not.toContain("awaiting USB hardware acceptance");
     wrapper.unmount();
   });
   it("does not autoselect ambiguous devices and presents recovery failures", async () => {

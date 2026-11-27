@@ -14,7 +14,7 @@
       <v-card-text>
         <p>CATS Configurator {{ update?.version }} is available.</p>
         <p v-if="!update?.canInstall" class="mt-3">
-          Download and install the new Debian package to update Configurator.
+          Download the new package and install it with your package manager.
         </p>
         <p v-else-if="blocked" class="mt-3">{{ blocked }}</p>
         <p v-else-if="active" class="mt-3">

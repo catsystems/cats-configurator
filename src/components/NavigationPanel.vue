@@ -1,11 +1,15 @@
 <template>
   <v-navigation-drawer
-    permanent
+    id="app-navigation"
+    :model-value="modelValue"
+    mobile-breakpoint="md"
+    retain-focus
     order="1"
     width="300"
     color="grey-darken-4"
     theme="catsDark"
     class="navigation-panel pb-4"
+    @update:model-value="$emit('update:modelValue', $event)"
   >
     <v-alert
       v-if="!active"
@@ -52,6 +56,12 @@
             <span class="flights-link__arrow" aria-hidden="true">&nearr;</span>
           </template>
         </v-list-item>
+        <v-list-item
+          v-if="usbSetupAvailable"
+          title="Enable CATS USB access"
+          :disabled="firmwareBusy"
+          @click="$emit('open-usb-access')"
+        />
       </v-list>
     </v-card>
     <UnitSwitch class="unit-switch mb-2" />
@@ -78,7 +88,10 @@ export default {
       type: Array,
       default: () => [],
     },
+    modelValue: { type: Boolean, default: null },
+    usbSetupAvailable: Boolean,
   },
+  emits: ["update:modelValue", "open-usb-access"],
   data() {
     return {
       flightsUrl: CATS_FLIGHTS_HOME_URL,

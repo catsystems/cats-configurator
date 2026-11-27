@@ -47,6 +47,8 @@ window.cats = {
     onState: (callback) => subscribe("firmware:state", callback),
   },
   app: {
+    usbAccessStatus: () => call("app_usb_access_status"),
+    enableUsbAccess: () => call("app_enable_usb_access"),
     checkUpdate: () => call("app_check_update"),
     installUpdate: () => call("app_install_update"),
     onUpdateProgress: (callback) => subscribe("app:update-progress", callback),
