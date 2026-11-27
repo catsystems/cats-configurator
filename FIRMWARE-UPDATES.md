@@ -209,7 +209,7 @@ and [WROVER definition](https://github.com/adafruit/tinyuf2/blob/8542b474ffa19c0
 These bootloader identities are not cryptographic proof that a board is a GS;
 recovery updates still require selecting the intended, unambiguous device.
 
-The Linux Debian package installs `70-cats-devices.rules` under
+The Linux Debian and Arch packages install `70-cats-devices.rules` under
 `/usr/lib/udev/rules.d`. For the AppImage or a source build, choose **Enable CATS
 USB access** in the sidebar and authenticate once. The dialog also provides a
 Terminal command. To install the rule manually from a checkout, run the

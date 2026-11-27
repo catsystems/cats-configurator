@@ -237,13 +237,14 @@ describe("application updates", () => {
     wrapper.unmount();
   });
 
-  it("opens the release page for Debian packages instead of installing an AppImage", async () => {
+  it("opens the release page for distribution packages", async () => {
     window.cats.app.checkUpdate.mockResolvedValue({
       version: "2.0.2",
       canInstall: false,
     });
     const wrapper = render();
     await flushPromises();
+    expect(wrapper.text()).toContain("install it with your package manager");
     expect(wrapper.text()).toContain("Download update");
     await wrapper.vm.install();
     expect(window.cats.app.openExternal).toHaveBeenCalledWith(

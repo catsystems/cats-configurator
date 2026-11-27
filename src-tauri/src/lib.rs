@@ -201,7 +201,7 @@ async fn app_install_update<R: tauri::Runtime>(
     if !app_update_install_supported() {
         return Err(HostError::new(
             "app_update_manual",
-            "Install the new Debian package to update Configurator.",
+            "Install the new Configurator package with your package manager.",
         ));
     }
     let pending = state.app_update.try_lock().map_err(|_| {

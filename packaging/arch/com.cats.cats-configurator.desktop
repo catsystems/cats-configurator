@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=CATS Configurator
+Comment=Configure CATS flight computers and inspect flight logs
+Exec=cats-configurator
+TryExec=cats-configurator
+Icon=cats-configurator
+Terminal=false
+Categories=Utility;
+StartupWMClass=cats-configurator

@@ -259,9 +259,41 @@ jobs:
           path: src-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: error
 
+  arch-package:
+    name: Arch Linux x64
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install Arch build dependencies
+        run: |
+          pacman -Syu --needed --noconfirm git nodejs-lts-krypton npm rust pkgconf \
+            desktop-file-utils dbus hicolor-icon-theme systemd webkit2gtk-4.1 xdg-utils
+
+      - uses: actions/checkout@v7
+
+      - name: Build native Arch package
+        run: |
+          useradd --create-home builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- bash scripts/build-arch-package.sh
+
+      - name: Verify the pacman installation
+        run: |
+          package=$(runuser -u builder -- bash scripts/build-arch-package.sh --packagelist)
+          pacman -U --noconfirm "$package"
+          pacman -Qkk cats-configurator
+          desktop-file-validate /usr/share/applications/com.cats.cats-configurator.desktop
+          udevadm verify /usr/lib/udev/rules.d/70-cats-devices.rules
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cats-configurator-linux-x64-arch
+          path: src-tauri/target/arch/*.pkg.tar.zst
+          if-no-files-found: error
+
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: package
+    needs: [package, arch-package]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -301,7 +333,7 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
             [Release policy](https://github.com/catsystems/cats-configurator/blob/main/RELEASE-POLICY.md)
-            Configurator checks for updates automatically and installs signed updates after confirmation. Debian packages are updated manually. Windows packages are unsigned; macOS packages are ad-hoc signed and not notarized.
+            Configurator checks for updates automatically and installs signed updates after confirmation. Update Debian and Arch packages with the system package manager. Windows packages are unsigned. macOS packages are ad-hoc signed and not notarized.
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: release-artifacts/*

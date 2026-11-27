@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+- Enable Vega and Ground Station firmware updates in standard Linux and macOS
+  builds. Verify the installed Ground Station version after a TinyUF2 restart
+  during the final sync.
+- Add a native Arch Linux package with an Apps launcher and CATS USB access
+  rules. AppImage users can enable USB access from the sidebar.
+- Show detected Vega devices in the connection picker and offer **Show other
+  serial ports** for manual selection. Ground Station appears in Firmware Updates.
+- Improve the layout for narrow desktop windows and add cross-platform desktop
+  smoke tests, including the Vega-to-Flights handoff bench check.
+
 ## [2.0.3] - 05-10-2026
 
 - Update Plotly to 4.1.1, Vite to 8.3.2, and Vitest to 5.0.3, combining
