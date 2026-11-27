@@ -40,7 +40,7 @@ one-time system prompt. A Terminal setup option is available in the dialog.
 ### Install on Arch Linux or Omarchy
 
 Download the x86-64 `.pkg.tar.zst` from [GitHub Releases](https://github.com/catsystems/cats-configurator/releases)
-and install it with `sudo pacman -U ./cats-configurator-<version>-1-x86_64.pkg.tar.zst`.
+and pass the downloaded file to `sudo pacman -U`.
 Open **CATS Configurator** from Apps. Pacman installs the device rules and Arch's
 systemd hook reloads them. Reconnect any boards that were already plugged in if
 the desktop session has yet to pick up the permissions.

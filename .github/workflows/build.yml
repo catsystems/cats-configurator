@@ -267,7 +267,7 @@ jobs:
       - name: Install Arch build dependencies
         run: |
           pacman -Syu --needed --noconfirm git nodejs-lts-krypton npm rust pkgconf \
-            desktop-file-utils dbus hicolor-icon-theme systemd webkit2gtk-4.1 xdg-utils
+            desktop-file-utils dbus hicolor-icon-theme openssl-3 systemd webkit2gtk-4.1 xdg-utils
 
       - uses: actions/checkout@v7
 

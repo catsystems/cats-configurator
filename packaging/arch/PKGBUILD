@@ -4,14 +4,15 @@ _checkout=$(realpath "$startdir/../..")
 _version=$(sed -n 's/^  "version": "\([^"]*\)",$/\1/p' "$_checkout/package.json")
 # Arch sorts a suffix like 2.0.3rc.1 before the final 2.0.3.
 pkgver=${_version//-/}
-pkgrel=1
+pkgrel=2
 pkgdesc='Configure CATS flight computers and inspect flight logs'
 arch=('x86_64')
 url='https://github.com/catsystems/cats-configurator'
 license=('GPL-3.0-only')
 depends=(
   'cairo' 'dbus' 'gdk-pixbuf2' 'glib2' 'glibc' 'gtk3' 'hicolor-icon-theme'
-  'libgcc' 'libsoup3' 'openssl' 'systemd' 'webkit2gtk-4.1' 'xdg-utils'
+  'libcrypto.so=3-64' 'libgcc' 'libsoup3' 'libssl.so=3-64' 'systemd'
+  'webkit2gtk-4.1' 'xdg-utils'
 )
 makedepends=('cargo' 'nodejs-lts-krypton' 'npm' 'pkgconf')
 checkdepends=('desktop-file-utils')
@@ -20,11 +21,22 @@ options=('!debug')
 build() {
   cd "$_checkout"
   node -e 'if (process.versions.node.split(".")[0] !== "24") throw Error("Use Node.js 24 to build Configurator")'
+  # Use Arch's compatibility package when the system OpenSSL is newer than 3.
+  # Omarchy's OpenSSL 3 package supplies the same library ABI in /usr/lib.
+  if [[ -f /usr/lib/openssl-3/pkgconfig/openssl.pc ]]; then
+    export PKG_CONFIG_PATH="/usr/lib/openssl-3/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+  fi
   npm ci --no-audit
   CARGO_TARGET_DIR="$_checkout/src-tauri/target" npm run build -- --no-bundle -- --locked
 }
 
 check() {
+  local libraries
+  libraries=$(LC_ALL=C readelf -d "$_checkout/src-tauri/target/release/cats-configurator")
+  if [[ $libraries != *'[libssl.so.3]'* || $libraries != *'[libcrypto.so.3]'* ]]; then
+    printf 'The Arch package must link to OpenSSL 3 for Omarchy compatibility.\n' >&2
+    return 1
+  fi
   desktop-file-validate "$_checkout/packaging/arch/com.cats.cats-configurator.desktop"
   udevadm verify "$_checkout/src-tauri/resources/70-cats-devices.rules"
 }
