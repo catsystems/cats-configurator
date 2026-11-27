@@ -682,7 +682,7 @@ impl FirmwareManager {
         self.emit();
         match job.device.target {
             Target::Vega => self.update_vega(job, &bytes).await,
-            Target::GroundStation => self.update_gs(job, &bytes).await,
+            Target::GroundStation => self.update_gs(job, bytes).await,
             Target::Telemetry => {
                 self.stage("staging-telemetry", "Copying, flushing and reading back the telemetry image on the Ground Station drive…", false);
                 let drive = job.device.telemetry_drive.as_ref().ok_or_else(|| {
@@ -847,7 +847,7 @@ impl FirmwareManager {
         }
     }
 
-    async fn update_gs(&self, job: &mut Job, bytes: &[u8]) -> Result<(), HostError> {
+    async fn update_gs(&self, job: &mut Job, bytes: Vec<u8>) -> Result<(), HostError> {
         let before_ports: Vec<_> = SerialManager::list()?
             .into_iter()
             .filter(hardware::gs_port)
@@ -905,7 +905,7 @@ impl FirmwareManager {
             false,
         );
         hardware::copy_uf2(&drive, bytes).await?;
-        // The recovery drive can disappear during final flush/sync after the
+        // The recovery drive can disappear during final sync after the
         // full image was submitted. Verify the restarted device either way.
         job.awaiting_reconnect = true;
         self.reconnect(job).await

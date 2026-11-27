@@ -63,9 +63,9 @@ apply equally to upgrades and downgrades.
 - Copy/flush completion or drive disappearance alone is not success: the
   restarted device must expose the selected firmware version in a freshly read
   `version.json` after recovery disconnects and its application reconnects.
-  Windows device-disappeared errors (433 or 1167) and Linux `EIO` or `ENODEV`
-  at final flush/sync proceed to that verification after `write_all` accepted
-  the entire image. TinyUF2 can restart before the host finalizes the file.
+  During final sync, Windows errors 433 or 1167, Linux `EIO` or `ENODEV`, and
+  macOS `ENXIO` proceed to that verification after the OS accepted the entire
+  image. TinyUF2 can restart before the host finalizes the file.
   Partial writes and other I/O errors remain failures.
 
 Current Ground Station firmware generates `/version.json` containing
